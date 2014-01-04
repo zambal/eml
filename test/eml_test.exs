@@ -1,0 +1,176 @@
+defmodule EmlTest do
+  use ExUnit.Case
+  use Eml
+  use Eml.Markup.Record
+
+  defp doc() do
+    [m(tag: :html, content: [ 
+      m(tag: :head, class: "test", content: [
+        m(tag: :title, class: "title", content: ["Eml is Html for developers"])
+      ]),
+      m(tag: :body, class: ["test", "main"], content: [
+        m(tag: :h1, class: "title", content: ["Eml is Html for developers"]),
+        m(tag: :article, class: "content", attrs: [_custom: "some custom attribute"],
+           content: ["Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."]),
+        m(tag: :div, id: "main-side-bar", class: ["content", "side-bar"], content: [ 
+          m(tag: :span, class: "test", content: ["Some notes..."])
+        ])
+      ])
+    ])]
+  end
+
+  test "Markup macro" do
+    doc = eml do
+      html do
+        head [class: "test"] do
+          title [class: "title"], "Eml is Html for developers"
+        end
+        body [class: ["test", "main"]] do
+          h1 [class: "title"], "Eml is Html for developers"
+          article [class: "content", _custom: "some custom attribute"], 
+          "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."
+          div [id: "main-side-bar", class: ["content", "side-bar"]] do
+            span [class: "test"], "Some notes..."
+          end
+        end
+      end
+    end
+    
+    assert doc() == doc
+  end
+
+  test "Add markup" do
+    input = eml do: body([id: "test"], "")
+    to_add = eml do: div("Hello world!")
+    expected = eml do: body([id: "test"], to_add)
+
+    assert expected == Eml.add(input, to_add, id: "test")
+  end
+
+  test "Select by class1" do
+    expected = eml do
+      [
+       title([class: "title"], "Eml is Html for developers"),
+       h1([class: "title"], "Eml is Html for developers")
+      ]
+    end
+    result = Eml.select(doc(), class: "title")
+
+    # The order of the returned content is unspecified,
+    # so we need to compare the elements. 
+
+    assert Enum.all?(result, fn element -> element in expected end)
+  end
+
+  test "Select by class 2" do
+    expected = eml do
+      [
+       head([class: "test"], title([class: "title"], "Eml is Html for developers")),
+       body class: ["test", "main"] do
+         h1 [class: "title"], "Eml is Html for developers"
+         article [class: "content", _custom: "some custom attribute"],
+         "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."
+         div [id: "main-side-bar", class: ["content", "side-bar"]] do
+           span [class: "test"], "Some notes..."
+         end
+       end,
+       span([class: "test"], "Some notes...")
+      ]
+    end
+    result = Eml.select(doc(), class: "test")
+
+    assert Enum.all?(result, fn element -> element in expected end)
+  end
+
+  test "Select by id" do
+    expected = eml do
+      div [id: "main-side-bar", class: ["content", "side-bar"]] do
+        span([class: "test"], "Some notes...")
+      end
+    end
+    result = Eml.select(doc(), id: "main-side-bar")
+
+    assert expected == result
+  end
+
+  test "Select by id and class 1" do
+    expected = eml do
+      div [id: "main-side-bar", class: ["content", "side-bar"]] do
+        span([class: "test"], "Some notes...")
+      end
+    end
+
+    result = Eml.select(doc(), id: "main-side-bar", class: "content")
+
+    # If both an id and a class are specified,
+    # only return the markup that satisfies both.
+
+    assert expected == result
+  end
+
+  test "Select by id and class 2" do
+    expected = []
+
+    result = Eml.select(doc(), id: "main-side-bar", class: "test")
+
+    assert expected == result
+  end
+
+  test "Remove by class 1" do
+    expected = eml do
+      html do
+        head [class: "test"], do: title([class: "title"], "Eml is Html for developers")
+        body class: ["test", "main"] do
+          h1 [class: "title"], "Eml is Html for developers"
+        end
+      end
+    end
+    result = Eml.remove(doc(), class: "content")
+
+    assert expected == result
+  end
+
+  test "Remove by class 2" do
+    expected = eml do: html []
+    result   = Eml.remove(doc(), class: "test")
+
+    assert expected == result
+  end
+
+  test "Remove by id" do
+    expected = eml do
+      html do
+        head [class: "test"], do: title([class: "title"], "Eml is Html for developers")
+        body class: ["test", "main"] do
+          h1 [class: "title"], "Eml is Html for developers"
+          article [class: "content", _custom: "some custom attribute"],
+          "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."
+        end
+      end
+    end
+    result = Eml.remove(doc(), id: "main-side-bar")
+
+    assert expected == result
+  end
+
+  test "Remove by id and class" do
+    expected = eml do
+      html do
+        head [class: "test"], do: title([class: "title"], "Eml is Html for developers")
+        body class: ["test", "main"] do
+          h1 [class: "title"], "Eml is Html for developers"
+          article [class: "content", _custom: "some custom attribute"],
+          "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."
+        end
+      end
+    end
+    result = Eml.remove(doc(), id: "main-side-bar", class: "content")
+
+    assert expected == result
+  end
+
+  test "Member?" do
+    assert Eml.member?(doc(), id: "main-side-bar")
+  end
+
+end

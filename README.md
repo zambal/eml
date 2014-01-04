@@ -50,8 +50,8 @@ simple, or too complex, making you almost learn a complete programming
 language before they can be used effectively. Furthermore, template
 languages make it hard to experiment with different kinds of abstractions
 to achieve a clean separation of concerns. Eml tries to fill this
-gap by providing the developer all the power of Elixir itself when writing
-markup.
+gap by providing the developer all the power of Elixir itself when working
+with markup.
 
 
 ### Walk-through

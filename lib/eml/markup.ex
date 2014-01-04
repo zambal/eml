@@ -250,6 +250,11 @@ defmodule Eml.Markup do
     end |> :lists.flatten()
   end
 
+  defp to_attr_value(nil), do: nil
+  defp to_attr_value([]), do: ""
+  defp to_attr_value(param)
+  when is_atom(param)
+  and not param in [true, false], do: Eml.Parameter.new(param, :attr)
   defp to_attr_value(data), do: to_string(data)
 
   defp insert_attr_value(old, new) do

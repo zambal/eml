@@ -702,11 +702,11 @@ defmodule Eml do
 
   def type(templ()), do: :template
 
-  def type(other) do
-    if Eml.Parameter.param?(other),
-      do: :param,
-    else: :undefined
-  end
+  def type(param)
+  when is_record(param, Eml.Parameter), do: :parameter
+
+  def type(_), do: :undefined
+
   # use Eml
 
   defmacro __using__(opts) do

@@ -13,7 +13,7 @@ defmodule Eml.Template do
   use Eml.Template.Record
   alias Eml.Readable, as: Read
 
-  @type chunks   :: binary | Eml.Parameter.t
+  @type chunks   :: [binary | Eml.Parameter.t]
   @type params   :: [{ Eml.Parameter.id, integer }]
   @type bindings :: [{ Eml.Parameter.id, [Eml.element] }]
   @type t        :: { Eml.Template, chunks, params, bindings }

@@ -192,7 +192,7 @@ defmodule Eml.Writers.Html do
 
   defp param_attr(chunks, field, param, Opts[quote: q]) do
     qchar = qchar(q)
-    [" #{field}=#{qchar}", param, "#{qchar}" | chunks]
+    ["#{qchar}", param, " #{field}=#{qchar}" | chunks]
   end
 
   # Markup helpers

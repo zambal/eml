@@ -19,6 +19,19 @@ defmodule EmlTest do
     ])]
   end
 
+  test "Native reader 1" do
+    assert []                  == eml do: [nil, "", []]
+    assert ["truefalse"]       == eml do: [true, false]
+    assert ["12345678"]        == eml do: Enum.to_list(1..8)
+    assert ["Hello world"]     == eml do: ["H", ["el", "lo", [" "]], ["wor", ["ld"]]]
+    assert ["Happy new 2014!"] == eml do: ["Happy new ", 2, 0, 1, 4, "!"]
+  end
+
+  test "Native reader 2" do
+    assert ["1234"]                          == Eml.read([1,2,3,4], Eml.Readers.Native)
+    assert { :error, "Unreadable data: {}" } == Eml.read({}, Eml.Readers.Native)
+  end
+
   test "Markup macro" do
     doc = eml do
       html do
@@ -172,5 +185,63 @@ defmodule EmlTest do
   test "Member?" do
     assert Eml.member?(doc(), id: "main-side-bar")
   end
+
+  test "Parameters" do
+    param = Eml.Parameter.new(:a_parameter)
+    assert [param]               == eml do: :a_parameter
+    assert [param, "and", param] == eml do: [:a_parameter, "and", :a_parameter]
+  end
+
+  test "Templates 1" do
+    e = eml do
+      div [id: :myid] do
+        div :fruit
+        div :fruit
+      end
+    end
+    { :ok, t } = Eml.write(e, pretty: false)
+
+    assert :template == Eml.type(t)
+    assert false == Template.bound?(t)
+    assert [myid: 1, fruit: 2] == Template.unbound(t)
+
+    t = Template.bind(t, :myid, "double-fruit")
+    assert [fruit: 2] == Template.unbound(t)
+
+    t = Template.bind(t, fruit: ["orange", "lemon"])
+    assert Template.bound?(t)
+
+    assert "<div id='double-fruit'><div>orange</div><div>lemon</div></div>" ==
+      Eml.write!(t)
+  end
+
+  test "Templates 2" do
+    e = eml do
+      [div(:fruit),
+       div(:fruit),
+       div(:fruit),
+       div(:fruit)]
+    end
+    { :ok, t } = Eml.write(e, pretty: false)
+
+    assert :template == Eml.type(t)
+    assert false == Template.bound?(t)
+    assert [fruit: 4] == Template.unbound(t)
+
+
+    t = Template.bind(t, fruit: ["orange", "lemon"])
+    assert [fruit: 2] == Template.unbound(t)
+
+    assert "<div>orange</div><div>lemon</div><div>blackberry</div><div>strawberry</div>" ==
+      Eml.write!(t, bindings: [fruit: ["blackberry", "strawberry"]])
+  end
+
+  test "write => read => compare" do
+    html      = Eml.write! doc()
+    read_back = Eml.read! html
+
+    assert doc() == read_back
+  end
+
 
 end

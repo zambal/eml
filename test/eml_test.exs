@@ -19,19 +19,6 @@ defmodule EmlTest do
     ])]
   end
 
-  test "Native reader 1" do
-    assert []                  == eml do: [nil, "", []]
-    assert ["truefalse"]       == eml do: [true, false]
-    assert ["12345678"]        == eml do: Enum.to_list(1..8)
-    assert ["Hello world"]     == eml do: ["H", ["el", "lo", [" "]], ["wor", ["ld"]]]
-    assert ["Happy new 2014!"] == eml do: ["Happy new ", 2, 0, 1, 4, "!"]
-  end
-
-  test "Native reader 2" do
-    assert ["1234"]                          == Eml.read([1,2,3,4], Eml.Readers.Native)
-    assert { :error, "Unreadable data: {}" } == Eml.read({}, Eml.Readers.Native)
-  end
-
   test "Markup macro" do
     doc = eml do
       html do
@@ -50,6 +37,59 @@ defmodule EmlTest do
     end
 
     assert doc() == doc
+  end
+
+  test "Native reader 1" do
+    assert []                  == eml do: [nil, "", []]
+    assert ["truefalse"]       == eml do: [true, false]
+    assert ["12345678"]        == eml do: Enum.to_list(1..8)
+    assert ["Hello world"]     == eml do: ["H", ["el", "lo", [" "]], ["wor", ["ld"]]]
+    assert ["Happy new 2014!"] == eml do: ["Happy new ", 2, 0, 1, 4, "!"]
+  end
+
+  test "Native reader 2" do
+    assert ["1234"]                          == Eml.read([1,2,3,4], Eml.Readers.Native)
+    assert { :error, "Unreadable data: {}" } == Eml.read({}, Eml.Readers.Native)
+  end
+
+  test "Unpack" do
+    e = eml do: div 42    
+    assert "42" == unpack unpack e
+    assert "42" == unpack ["42"]
+    assert "42" == unpack "42"
+    assert "42" == unpack Eml.Markup.new(content: 42)
+
+    e = eml do: [div(1), div(2)]
+    assert e == unpack e
+  end
+
+  test "Single unpackr" do
+    single = eml do: 42 |> div |> body |> html    
+    assert "42" == Eml.unpackr(single)
+  end
+
+  test "Multi unpackr" do
+    multi = eml do
+      html do
+        body do
+          div [ span(1), span(2) ]
+          div [ span(3) ]
+        end
+      end
+    end
+    assert [["1", "2"], "3"] == Eml.unpackr(multi)
+  end
+
+  test "Funpackr" do
+    multi = eml do
+      html do
+        body do
+          div [ span(1), span(2) ]
+          div [ span(3) ]
+        end
+      end
+    end
+    assert ["1", "2", "3"] == Eml.funpackr(multi)
   end
 
   test "Add markup" do

@@ -39,8 +39,15 @@ defmodule Eml.Writers.Html do
   end
 
   def write(eml, opts) do
+    bindings = opts[:bindings]
     opts = Opts.new(opts)
-    parse_eml(eml, opts, 0, state()) |> to_result(opts)
+    case { parse_eml(eml, opts, 0, state()) |> to_result(opts), bindings } do
+      { { :ok, templ() = t }, b } when not nil?(b) ->
+        t = Template.bind(t, b)
+        parse_templ(t, opts, state()) |> to_result(opts)
+      { res, _ } ->
+        res
+    end
   end
 
   # Eml parsing

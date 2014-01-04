@@ -39,6 +39,25 @@ defmodule EmlTest do
     assert doc() == doc
   end
 
+  test "Types" do
+    assert :content   == Eml.type eml(do: div 42)
+    assert :content   == Eml.type eml(do: [1,2,"z"])
+    assert :content   == Eml.type eml(do: "")
+    assert :content   == Eml.type eml(do: [])
+    assert :content   == Eml.type eml(do: nil)
+    assert :markup    == Eml.type Eml.Markup.new()
+    assert :markup    == Eml.type unpack eml(do: div 42)
+    assert :binary    == Eml.type "strings are binaries"
+    assert :binary    == Eml.type Eml.unpackr eml(do: div 42)
+    assert :binary    == Eml.type unpack eml(do: [1,2,"z"])
+    assert :binary    == Eml.type eml(do: :name) 
+                                  |> Eml.write!(bindings: [name: "Vincent"])
+    assert :template  == Eml.type Eml.write! eml(do: :name)
+    assert :template  == Eml.type Eml.write! eml(do: [div(1), div(2), div(:param), "..."])
+    assert :parameter == Eml.type Eml.Parameter.new(:param)
+    assert :parameter == Eml.type unpack eml(do: :param)
+  end
+
   test "Native reader 1" do
     assert []                  == eml do: [nil, "", []]
     assert ["truefalse"]       == eml do: [true, false]
@@ -276,12 +295,10 @@ defmodule EmlTest do
       Eml.write!(t, bindings: [fruit: ["blackberry", "strawberry"]])
   end
 
-  test "write => read => compare" do
+  test "Write => read => compare" do
     html      = Eml.write! doc()
     read_back = Eml.read! html
 
     assert doc() == read_back
   end
-
-
 end

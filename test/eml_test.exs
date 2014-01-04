@@ -4,7 +4,7 @@ defmodule EmlTest do
   use Eml.Markup.Record
 
   defp doc() do
-    [m(tag: :html, content: [ 
+    [m(tag: :html, content: [
       m(tag: :head, class: "test", content: [
         m(tag: :title, class: "title", content: ["Eml is Html for developers"])
       ]),
@@ -12,7 +12,7 @@ defmodule EmlTest do
         m(tag: :h1, class: "title", content: ["Eml is Html for developers"]),
         m(tag: :article, class: "content", attrs: [_custom: "some custom attribute"],
            content: ["Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."]),
-        m(tag: :div, id: "main-side-bar", class: ["content", "side-bar"], content: [ 
+        m(tag: :div, id: "main-side-bar", class: ["content", "side-bar"], content: [
           m(tag: :span, class: "test", content: ["Some notes..."])
         ])
       ])
@@ -40,7 +40,7 @@ defmodule EmlTest do
         end
         body [class: ["test", "main"]] do
           h1 [class: "title"], "Eml is Html for developers"
-          article [class: "content", _custom: "some custom attribute"], 
+          article [class: "content", _custom: "some custom attribute"],
           "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."
           div [id: "main-side-bar", class: ["content", "side-bar"]] do
             span [class: "test"], "Some notes..."
@@ -48,7 +48,7 @@ defmodule EmlTest do
         end
       end
     end
-    
+
     assert doc() == doc
   end
 
@@ -70,7 +70,7 @@ defmodule EmlTest do
     result = Eml.select(doc(), class: "title")
 
     # The order of the returned content is unspecified,
-    # so we need to compare the elements. 
+    # so we need to compare the elements.
 
     assert Enum.all?(result, fn element -> element in expected end)
   end

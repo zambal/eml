@@ -27,9 +27,9 @@ defmodule Eml do
   Define eml content.
 
   Just like in other Elixir blocks, evaluates all expressions
-  and returns the last. Code inside an eml block is just 
+  and returns the last. Code inside an eml block is just
   regular Elixir code. The purpose of the `eml/2` macro
-  is to make it more convenient to write eml.  
+  is to make it more convenient to write eml.
 
   It does this by doing two things:
 
@@ -348,7 +348,7 @@ defmodule Eml do
       iex> Eml.remove(e, id: "inner1")
       [#div<[#span<[id: "inner2", class: "inner"] ["world"]>]>]
 
-      iex> Eml.remove(e, pat: %r/.*/)   
+      iex> Eml.remove(e, pat: %r/.*/)
       [#div<[#span<[id: "inner1", class: "inner"]>,
         #span<[id: "inner2", class: "inner"]>]>]
 
@@ -434,7 +434,7 @@ defmodule Eml do
   @doc """
   Recursively transforms content. This is the most low level operation
   provided by Eml for manipulating eml content. For example, `update/3`
-  and `remove/2` are implemented by using this function. 
+  and `remove/2` are implemented by using this function.
 
   It accepts any eml and traverses all elements of the provided eml tree.
   The provided transform function will be evaluated for every element `transform/3`
@@ -461,7 +461,7 @@ defmodule Eml do
       ...> end
       [#div<[#span<[id: "inner1", class: "inner"] ["hello "]>,
         #span<[id: "inner2", class: "inner"] ["world"]>]>]
-      
+
       iex> Eml.transform(e, fn x -> if Markup.has?(x, tag: :span), do: "matched", else: x end)
       [#div<["matched", "matched"]>]
 

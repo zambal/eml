@@ -4,9 +4,11 @@
 
 ### What is it?
 Eml stands for Elixir Markup Language. It provides a flexible and
-modular toolkit for generating markup, written in the Elixir
-programming language. Currently its main focus is on producing the
-most popular markup language on the planet. To start of:
+modular toolkit for generating and manipulating markup, written in 
+the Elixir programming language. Currently its main focus is on
+producing the most popular markup language on the planet.
+
+To start off:
 
 This piece of code
 ```elixir

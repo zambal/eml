@@ -4,6 +4,8 @@ defmodule Eml do
   alias Eml.Readable
   use Eml.Markup.Record
   alias Eml.Markup.Record, as: R
+  use Eml.Template.Record
+
 
   @default_markup Eml.Markup.Html
   @default_reader Eml.Readers.Html
@@ -684,6 +686,27 @@ defmodule Eml do
     end
   end
 
+  def type(content)
+  when is_list(content) do
+    if Enum.any?(content, fn el -> type(el) === :undefined end) do
+      :undefined
+    else
+      :content
+    end
+  end
+
+  def type(bin)
+  when is_binary(bin), do: :binary
+
+  def type(m()), do: :markup
+
+  def type(templ()), do: :template
+
+  def type(other) do
+    if Eml.Parameter.param?(other),
+      do: :param,
+    else: :undefined
+  end
   # use Eml
 
   defmacro __using__(opts) do

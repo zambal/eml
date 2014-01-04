@@ -22,6 +22,10 @@ defmodule Eml.Parameter do
   @spec ilevel(t, ilevel) :: t
   def ilevel(param, ilevel), do: param(param, ilevel: ilevel)
 
+  @doc false
+  def param?(param()), do: true
+  def param?(_),       do: false
+
 end
 
 # Inspect protocol implementation

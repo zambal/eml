@@ -49,9 +49,9 @@ mostly not a fan of the *language* part. In my opinion they are either too
 simple, or too complex, making you almost learn a complete programming
 language before they can be used effectively. Furthermore, template
 languages make it hard to experiment with different kinds of abstractions
-to achieve a clean separation of responsibilities. Eml tries to fill this
-gap by providing the developer all the power of Elixir itself when writing
-markup.
+to achieve a clean separation of concerns. Eml tries to fill this
+gap by providing the developer all the power of Elixir itself when working
+with markup.
 
 
 ### Walk-through
@@ -409,7 +409,7 @@ iex(46)> Eml.write!(t)
 ### Notes
 
 The first thing to note is that this is still a work in progress.
-While it seems to be pretty stable and already has quite a rich API,
+While it should already be pretty stable and has quite a rich API,
 expect some raw edges here and there.
 
 #### Escaping

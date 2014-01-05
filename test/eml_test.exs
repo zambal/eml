@@ -262,7 +262,7 @@ defmodule EmlTest do
         div :fruit
       end
     end
-    { :ok, t } = Eml.write(e, pretty: false)
+    { :ok, t } = Eml.write(e)
 
     assert :template == Eml.type t
     assert false == Template.bound?(t)
@@ -274,8 +274,8 @@ defmodule EmlTest do
     t = Template.bind(t, fruit: ["orange", "lemon"])
     assert Template.bound?(t)
 
-    assert "<div id='double-fruit'><div>orange</div><div>lemon</div></div>" ==
-      Eml.write!(t)
+    assert "<div id='double-fruit'>\n  <div>orange</div>\n  <div>lemon</div>\n</div>" ==
+      Eml.write!(t, pretty: true)
   end
 
   test "Templates 2" do

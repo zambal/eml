@@ -1,26 +1,18 @@
 defmodule Eml.Parameter do
-  defrecordp :param, Eml.Parameter, id: nil, type: :content, ilevel: 0
+  defrecordp :param, Eml.Parameter, id: nil, type: :content
 
   @type id         :: atom
   @type param_type :: :content | :attr
-  @type ilevel     :: integer
-  @type t          :: { Eml.Parameter, id, param_type, ilevel }
+  @type t          :: { Eml.Parameter, id, param_type }
 
-  @spec new(id, param_type, ilevel) :: t
-  def new(id, type // :content, ilevel // 0),
-  do: param(id: id, type: type, ilevel: ilevel)
+  @spec new(id, param_type) :: t
+  def new(id, type // :content), do: param(id: id, type: type)
 
   @spec id(t) :: id
   def id(param(id: id)), do: id
 
   @spec type(t) :: param_type
   def type(param(type: type)), do: type
-
-  @spec ilevel(t) :: ilevel
-  def ilevel(param(ilevel: ilevel)), do: ilevel
-
-  @spec ilevel(t, ilevel) :: t
-  def ilevel(param, ilevel), do: param(param, ilevel: ilevel)
 
 end
 

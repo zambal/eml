@@ -5,9 +5,9 @@ defmodule Eml.Dialect.Html.Writer do
   alias Eml.Template
   alias Eml.Parameter, as: Param
 
-  defrecord  Opts, indent: 2, quote: :single, escape: true, output: :string, pretty: true
+  defrecord  Opts, indent: 2, quote: :single, escape: true, output: :string, pretty: false
 
-  defrecordp :state, type: :content, chunks: [], params: [], pos: :inline
+  defrecordp :state, type: :content, chunks: [], params: []
   
   # State handling shortcuts
   
@@ -23,10 +23,6 @@ defmodule Eml.Dialect.Html.Writer do
     quote do: state(type: unquote(type), chunks: unquote(chunks), params: unquote(params))
   end
   
-  defmacrop _s(type, chunks, params, pos) do
-    quote do: state(type: unquote(type), chunks: unquote(chunks), params: unquote(params), pos: unquote(pos))
-  end
-
   # API
 
   def write(templ() = t, opts) do
@@ -39,7 +35,7 @@ defmodule Eml.Dialect.Html.Writer do
   def write(eml, opts) do
     bindings = opts[:bindings]
     opts = Opts.new(opts)
-    case { parse_eml(eml, opts, 0, state()) |> to_result(opts), bindings } do
+    case { parse_eml(eml, opts, state()) |> to_result(opts), bindings } do
       { { :ok, templ() = t }, b } when not nil?(b) ->
         t = Template.bind(t, b)
         parse_templ(t, opts, state()) |> to_result(opts)
@@ -51,58 +47,47 @@ defmodule Eml.Dialect.Html.Writer do
   # Eml parsing
 
   defp parse_eml(m(tag: tag, id: id, class: class, attrs: attrs, content: content),
-                Opts[indent: iwidth, pretty: pretty] = opts, ilevel,
-                _s(type, chunks, params)) do
+                 opts,
+                 _s(type, chunks, params)) do
     type  = chunk_type(:markup, type)
     attrs = Markup.maybe_include(attrs, [id: id, class: class])
 
     if content == [] do
       chunks = chunks
-               |> newline(pretty)
-               |> doctype_or_indent(tag, iwidth, ilevel, pretty)
+               |> maybe_doctype(tag)
                |> empty_tag_open(tag)
       _s(type, chunks, params) = parse_attrs(attrs, opts, _s(type, chunks, params))
       chunks = empty_tag_close(chunks)
-      _s(type, chunks, params, :block)
+      _s(type, chunks, params)
     else
       chunks = chunks
-               |> newline(pretty)
-               |> doctype_or_indent(tag, iwidth, ilevel, pretty)
+               |> maybe_doctype(tag)
                |> start_tag_open(tag)
       _s(type, chunks, params) = parse_attrs(attrs, opts, _s(type, chunks, params))
       chunks = start_tag_close(chunks)
-      _s(type, chunks, params, pos) = parse_eml(content, opts, ilevel + 1, _s(type, chunks, params))
-      chunks = chunks
-               |> newline(pos, pretty)
-               |> indent(iwidth, ilevel, pos, pretty)
-               |> end_tag(tag)
-      _s(type, chunks, params, :block)
+      _s(type, chunks, params) = parse_eml(content, opts, _s(type, chunks, params))
+      chunks = end_tag(chunks, tag)
+      _s(type, chunks, params)
     end
   end
 
-  defp parse_eml(list, opts, ilevel, s) when is_list(list) do
+  defp parse_eml(list, opts, s) when is_list(list) do
     Enum.reduce(list, s, fn eml, s ->
-      parse_eml(eml, opts, ilevel, s)
+      parse_eml(eml, opts, s)
     end)
   end
 
-  defp parse_eml(param, _opts, ilevel, _s(chunks, params))
+  defp parse_eml(param, _opts, _s(chunks, params))
   when is_record(param, Param) do
-    param = Param.ilevel(param, ilevel)
     _s(:templ, [param | chunks], add_param(params, param))
   end
 
   # Consume template chunks and params and become a template itself
-  defp parse_eml(templ(chunks: tchunks, params: tparams), _opts, ilevel, _s(chunks, params)) do
-    tchunks = Enum.reduce(tchunks, [], fn c, acc -> 
-      if is_record(c, Param),
-        do: [Param.ilevel(c, ilevel + Param.ilevel(c)) | acc],
-      else: [c | acc]
-    end)
-    _s(:templ, tchunks ++ chunks, merge_params(params, tparams))
+  defp parse_eml(templ(chunks: tchunks, params: tparams), _opts, _s(chunks, params)) do
+    _s(:templ, :lists.reverse(tchunks) ++ chunks, merge_params(params, tparams))
   end
 
-  defp parse_eml(data, opts, _ilevel, s) do
+  defp parse_eml(data, opts, s) do
     parse_element(data, opts, s)
   end
 
@@ -152,7 +137,7 @@ defmodule Eml.Dialect.Html.Writer do
       {
        bindings,
        opts,
-       parse_binding(binding, Param.type(param), opts, Param.ilevel(param), s)
+       parse_binding(binding, Param.type(param), opts, s)
       }
       else
         {
@@ -167,11 +152,11 @@ defmodule Eml.Dialect.Html.Writer do
     { bindings, opts, state(s, chunks: [chunk | chunks]) }
   end
 
-  defp parse_binding(binding, :content, opts, ilevel, s) do
-    parse_eml(binding, opts, ilevel, s)
+  defp parse_binding(binding, :content, opts, s) do
+    parse_eml(binding, opts, s)
   end
 
-  defp parse_binding(binding, :attr, opts, _ilevel, _s(chunks) = s) do
+  defp parse_binding(binding, :attr, opts, _s(chunks) = s) do
     state(s, type: :attr, chunks: [attr_value(binding, opts) | chunks])
   end
 
@@ -183,19 +168,9 @@ defmodule Eml.Dialect.Html.Writer do
   defp start_tag_close(chunks),     do: [">" | chunks]
   defp end_tag(chunks, tag),        do: ["</#{tag}>" | chunks]
 
-  defp newline(chunks, true),         do: ["\n" | chunks]
-  defp newline(chunks, false),        do: chunks
-  defp newline(chunks, :block, true), do: ["\n" | chunks]
-  defp newline(chunks, _, _),         do: chunks
 
-  defp doctype_or_indent(chunks, :html, _, _, _pretty), do: ["<!doctype html>\n" | chunks]
-  defp doctype_or_indent(chunks, _, width, step, true), do: indent(chunks, width, step)
-  defp doctype_or_indent(chunks, _, _, _, false),       do: chunks
-
-  defp indent(chunks, _, 0),                      do: chunks
-  defp indent(chunks, width, step),               do: [String.duplicate(" ", width * step) | chunks]
-  defp indent(chunks, width, step, :block, true), do: indent(chunks, width, step)
-  defp indent(chunks, _, _, _pos, _pretty),       do: chunks
+  defp maybe_doctype(chunks, :html), do: ["<!doctype html>\n" | chunks]
+  defp maybe_doctype(chunks, _),    do: chunks
 
   defp attr(chunks, field, value, Opts[quote: q]) do
     qchar = qchar(q)
@@ -229,9 +204,6 @@ defmodule Eml.Dialect.Html.Writer do
     |> String.replace("<", "&lt;")
     |> String.replace(">", "&gt;")
   end
-
-  defp strip_newline(["\n" | data]), do: data
-  defp strip_newline(data), do: data
 
   # Attribute markup helpers
 
@@ -294,17 +266,49 @@ defmodule Eml.Dialect.Html.Writer do
     [str | acc]
   end
 
+  # pretty printing
+
+  defp pretty_print(bin, width) do
+    pretty_print(String.codepoints(bin), width, 0, true, []) 
+  end
+
+  defp pretty_print([">", "<", "/" | rest], width, level, _open?, acc) do
+    level = level - 1
+    pretty_print(rest, width, level, false, ["/", "<", String.duplicate(" ", width * level), "\n", ">"| acc])
+  end
+  defp pretty_print(["<", "/" | rest], width, level, _open?, acc) do
+    pretty_print(rest, width, level, false, ["/", "<" | acc])
+  end
+  defp pretty_print(["/", ">" | rest], width, level, _open?, acc) do
+    pretty_print(rest, width, level, false, [">", "/"  | acc])
+  end
+  defp pretty_print([">", "<" | rest], width, level, open?, acc) do
+    level = if open?, do: level + 1, else: level
+    pretty_print(rest, width, level, true, ["<", String.duplicate(" ", width * level), "\n", ">" | acc])
+  end
+  defp pretty_print([c | rest], width, level, open?, acc) do
+    pretty_print(rest, width, level, open?, [c | acc])
+  end
+  defp pretty_print([], _width, _level, _open?, acc) do
+    acc |> :lists.reverse() |> iolist_to_binary()
+  end
+
+
   # Create final result, depending on state type and output option.
 
   defp to_result(state(type: :templ, chunks: chunks, params: params), _opts) do
     { :ok, templ(chunks: chunks |> consolidate_chunks(), params: params) }
   end
 
+  defp to_result(state(chunks: chunks), Opts[output: :string, pretty: true, indent: width]) do
+    { :ok, chunks |> :lists.reverse() |> iolist_to_binary() |> pretty_print(width)  }
+  end
+
   defp to_result(state(chunks: chunks), Opts[output: :string]) do
-    { :ok, chunks |> :lists.reverse() |> strip_newline() |> iolist_to_binary() }
+    { :ok, chunks |> :lists.reverse() |> iolist_to_binary() }
   end
 
   defp to_result(state(chunks: chunks), Opts[output: :iolist]) do
-    { :ok, chunks |> :lists.reverse() |> strip_newline() }
+    { :ok, chunks |> :lists.reverse() }
   end
 end

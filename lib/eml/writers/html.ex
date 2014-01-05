@@ -94,6 +94,16 @@ defmodule Eml.Writers.Html do
     _s(:templ, [param | chunks], add_param(params, param))
   end
 
+  # Consume template chunks and params and become a template itself
+  defp parse_eml(templ(chunks: tchunks, params: tparams), _opts, ilevel, _s(chunks, params)) do
+    tchunks = Enum.reduce(tchunks, [], fn c, acc -> 
+      if is_record(c, Param),
+        do: [Param.ilevel(c, ilevel + Param.ilevel(c)) | acc],
+      else: [c | acc]
+    end)
+    _s(:templ, tchunks ++ chunks, merge_params(params, tparams))
+  end
+
   defp parse_eml(data, opts, _ilevel, s) do
     parse_element(data, opts, s)
   end
@@ -124,11 +134,10 @@ defmodule Eml.Writers.Html do
     type   = chunk_type(:attr, type)
     field  = attr_field(k)
     value  = attr_value(v, opts)
-    chunks = attr(chunks, field, value, opts)
+    chunks = if nil?(value), do: chunks, else: attr(chunks, field, value, opts)
     s      = _s(type, chunks, params)
     parse_attrs(rest, opts, s)
   end
-
   defp parse_attrs([], _, s), do: s
 
   # Template parsing
@@ -236,14 +245,14 @@ defmodule Eml.Writers.Html do
   end
 
   defp attr_value(v, opts) do
-    v |> maybe_join() |> maybe_escape(opts)
+    v |> parse_attr_value() |> maybe_escape(opts)
   end
 
-  defp maybe_join(v) when is_list(v) do
-    Enum.join(v, " ")
+  defp parse_attr_value(list) when is_list(list) do
+    Enum.join(list, " ")
   end
 
-  defp maybe_join(v), do: v
+  defp parse_attr_value(v), do: v
 
   # Chunk helpers
 
@@ -254,6 +263,12 @@ defmodule Eml.Writers.Html do
 
   defp add_param(params, param) do
     Keyword.update(params, Param.id(param), 1, &(&1 + 1))
+  end
+
+  defp merge_params(params1, params2) do
+    Keyword.merge(params1, params2, fn _k, v1, v2 ->
+      v1 + v2
+    end)
   end
 
   # Concatenates chunks inbetween parameters for efficient template compiling.

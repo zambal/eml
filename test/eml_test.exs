@@ -39,6 +39,10 @@ defmodule EmlTest do
     assert doc() == doc
   end
 
+  test "Write => Read => Compare" do
+    assert doc() == doc() |> Eml.write!() |> Eml.read!()
+  end
+
   test "Types" do
     assert :content   == Eml.type eml(do: div 42)
     assert :content   == Eml.type eml(do: [1,2,"z"])
@@ -260,7 +264,7 @@ defmodule EmlTest do
     end
     { :ok, t } = Eml.write(e, pretty: false)
 
-    assert :template == Eml.type(t)
+    assert :template == Eml.type t
     assert false == Template.bound?(t)
     assert [myid: 1, fruit: 2] == Template.unbound(t)
 
@@ -283,7 +287,7 @@ defmodule EmlTest do
     end
     { :ok, t } = Eml.write(e, pretty: false)
 
-    assert :template == Eml.type(t)
+    assert :template == Eml.type t
     assert false == Template.bound?(t)
     assert [fruit: 4] == Template.unbound(t)
 
@@ -295,10 +299,19 @@ defmodule EmlTest do
       Eml.write!(t, bindings: [fruit: ["blackberry", "strawberry"]])
   end
 
-  test "Write => read => compare" do
-    html      = Eml.write! doc()
-    read_back = Eml.read! html
+  test "Templates in eml" do
+    fruit  = eml do: section(:fruit)
+    tfruit = Eml.write!(fruit)
+    aside  = eml do: aside tfruit
+    taside = Eml.write!(aside)
 
-    assert doc() == read_back
+    assert :template == Eml.type taside
+
+    expected = eml do
+      aside [ section "lemon" ]
+    end
+    
+    assert Eml.write!(expected, pretty: false) == Eml.write!(taside, bindings: [fruit: "lemon"])
+    
   end
 end

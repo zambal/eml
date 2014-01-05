@@ -1,5 +1,7 @@
-defmodule Eml.Readers.Native do
-  @behaviour Eml.Reader
+defmodule Eml.Dialect.Native do
+  @behaviour Eml.Dialect
+
+  def markup?(), do: false
 
   def read(data, BitString) do
     data
@@ -20,5 +22,7 @@ defmodule Eml.Readers.Native do
   def read(data, Tuple) do
     { :error, "Unreadable data: #{inspect data}" }
   end
+
+  def write(data, _opts), do: data
 
 end

@@ -62,7 +62,7 @@ defmodule EmlTest do
     assert :parameter == Eml.type unpack eml(do: :param)
   end
 
-  test "Native reader 1" do
+  test "Native" do
     assert []                  == eml do: [nil, "", []]
     assert ["truefalse"]       == eml do: [true, false]
     assert ["12345678"]        == eml do: Enum.to_list(1..8)
@@ -70,9 +70,9 @@ defmodule EmlTest do
     assert ["Happy new 2014!"] == eml do: ["Happy new ", 2, 0, 1, 4, "!"]
   end
 
-  test "Native reader 2" do
-    assert ["1234"]                          == Eml.read([1,2,3,4], Eml.Readers.Native)
-    assert { :error, "Unreadable data: {}" } == Eml.read({}, Eml.Readers.Native)
+  test "Native read" do
+    assert ["1234"]                          == Eml.read([1,2,3,4], Eml.Dialect.Native)
+    assert { :error, "Unreadable data: {}" } == Eml.read({}, Eml.Dialect.Native)
   end
 
   test "Unpack" do

@@ -18,7 +18,7 @@ defmodule Eml.Template do
   @type bindings :: [{ Eml.Parameter.id, [Eml.element] }]
   @type t        :: { Eml.Template, chunks, params, bindings }
 
-  @reader Eml.Readers.Native
+  @dialect Eml.Dialect.Native
 
   @spec params(t) :: params
   def params(templ(params: params)), do: params
@@ -36,7 +36,7 @@ defmodule Eml.Template do
   @spec set(t, Eml.Parameter.id, Eml.data) :: t
   def set(templ(bindings: bindings) = t, param_id, data)
   when is_atom(param_id) do
-    templ(t, bindings: Keyword.put(bindings, param_id, Eml.read(data, @reader)))
+    templ(t, bindings: Keyword.put(bindings, param_id, Eml.read(data, @dialect)))
   end
 
   @spec unset(t, Eml.Parameter.id) :: Read.t | nil
@@ -47,9 +47,9 @@ defmodule Eml.Template do
   def bind(templ(bindings: current) = t, new) do
     new = lc { id, data } inlist new do
       readed = if is_list(data) do
-                 lc d inlist data, do: Eml.read(d, @reader)
+                 lc d inlist data, do: Eml.read(d, @dialect)
                else
-                 Eml.read(data, @reader)
+                 Eml.read(data, @dialect)
                end
       { id, get(t, id) ++ readed }
     end
@@ -63,7 +63,7 @@ defmodule Eml.Template do
   @spec unbind(t, bindings) :: t
   def unbind(templ(bindings: current) = t, unbinds) do
     removed = lc { id, data } inlist unbinds do
-      readed = lc d inlist data, do: Eml.read(d, @reader)
+      readed = lc d inlist data, do: Eml.read(d, @dialect)
       { id, get(t, id) -- readed }
     end
     templ(t, bindings: Keyword.merge(current, removed))

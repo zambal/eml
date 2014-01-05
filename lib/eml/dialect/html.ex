@@ -1,4 +1,5 @@
-defmodule Eml.Markup.Html do
+defmodule Eml.Dialect.Html.Markup do
+
   use Eml.Markup.Generator, tags: [:html, :head, :title, :base, :link, :meta, :style,
                                    :script, :noscript, :body, :div, :span, :article,
                                    :section, :nav, :aside, :h1, :h2, :h3, :h4, :h5, :h6,
@@ -12,11 +13,26 @@ defmodule Eml.Markup.Html do
                                    :tr, :td, :th, :form, :fieldset, :legend, :label, :input, :button, :select,
                                    :datalist, :optgroup, :option, :textarea, :keygen, :output, :progress,
                                    :meter, :details, :summary, :menuitem, :menu]
+end
+
+defmodule Eml.Dialect.Html do
+  @behaviour Eml.Dialect
+
+  def markup?(), do: true
+
+  def read(data, type) do
+    Eml.Dialect.Html.Reader.read(data, type)
+  end
+
+  def write(eml, opts) do
+    Eml.Dialect.Html.Writer.write(eml, opts)
+  end
+  
   defmacro __using__(_opts) do
     quote do
       import Kernel, except: [div: 2]
-      import unquote(__MODULE__)
+      import unquote(__MODULE__).Markup
       alias unquote(__MODULE__).Presets, warn: false
     end
-  end
+  end 
 end

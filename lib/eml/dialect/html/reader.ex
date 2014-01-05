@@ -1,6 +1,4 @@
-defmodule Eml.Readers.Html do
-  @behaviour Eml.Reader
-
+defmodule Eml.Dialect.Html.Reader do
   alias Eml.Markup
 
   # API

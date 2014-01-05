@@ -38,20 +38,20 @@ defmodule Eml.Markup do
 
   @type fields :: list(field)
 
-  @default_reader Eml.Readers.Native
+  @default_dialect Eml.Dialect.Native
 
   @spec new() :: t
   def new do
     m()
   end
 
-  @spec new(fields, Eml.reader) :: t
-  def new(fields, reader // @default_reader) do
+  @spec new(fields, Eml.dialect) :: t
+  def new(fields, dialect // @default_dialect) do
     tag     = fields[:tag] || :div
     id      = fields[:id]      |> to_attr_value()
     class   = fields[:class]   |> to_attr_value()
     attrs   = fields[:attrs]   |> to_attrs()
-    content = fields[:content] |> Eml.read!(reader)
+    content = fields[:content] |> Eml.read!(dialect)
     m(tag: tag, id: id, class: class, attrs: attrs, content: content)
   end
 
@@ -79,23 +79,23 @@ defmodule Eml.Markup do
   @spec content(t) :: content
   def content(m(content: content)), do: content
 
-  @spec content(t, data, Eml.reader) :: t
-  def content(markup, data, reader // @default_reader) do
-    m(markup, content: Eml.read!(data, reader))
+  @spec content(t, data, Eml.dialect) :: t
+  def content(markup, data, dialect // @default_dialect) do
+    m(markup, content: Eml.read!(data, dialect))
   end
 
   @spec add(t, data, Keyword.t) :: t
   def add(m(content: current) = markup, data, opts // []) do
     at      = opts[:at] || :end
-    reader  = opts[:reader] || @default_reader
-    content = Eml.read!(data, current, at, reader)
+    dialect  = opts[:dialect] || @default_dialect
+    content = Eml.read!(data, current, at, dialect)
     m(markup, content: content)
   end
 
-  @spec update(t, (Eml.element -> data), Eml.reader) :: t
-  def update(m(content: content) = markup, fun, reader // @default_reader) do
+  @spec update(t, (Eml.element -> data), Eml.dialect) :: t
+  def update(m(content: content) = markup, fun, dialect // @default_dialect) do
     content = lc element inlist content, data = fun.(element) do
-      Eml.Readable.read(data, reader)
+      Eml.Readable.read(data, dialect)
     end
     m(markup, content: content)
   end
@@ -146,7 +146,7 @@ defmodule Eml.Markup do
     { id, opts }       = Keyword.pop(opts, :id, :any)
     { class, opts }    = Keyword.pop(opts, :class, :any)
     { content, attrs } = Keyword.pop(opts, :content)
-    content            = Eml.read!(content, @default_reader)
+    content            = Eml.read!(content, @default_dialect)
     content            = if content == [], do: :any, else: content
 
     has_tag?(markup, tag)         and

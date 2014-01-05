@@ -137,41 +137,51 @@ iex(8)> (eml do: 42 |> div |> body |> html) |> Eml.write!(pretty: false)
 "<!doctype html>\n<html><body><div>42</div></body></html>"
 ```
 
+#### Dialects
+Let's turn back to Eml's data types. Mostly you'll be using binaries and markup. In
+order to provide translations from custom data types, Eml provides the `Eml.Readable`
+protocol. Primitive types are handles by dialects.
+
+A dialect implements the Eml.Dialect behaviour, providing a `read`, `write` and
+`markup?` function. The `read` function converts types like strings, integers and
+floats in to eml. The `write` function converts eml in to whatever representation the
+dialect has. In practice this will be mostly binary. The `markup?` function tells
+if the dialect provides markup macros. By default Eml provides two dialects:
+`Eml.Dialect.Native` and `Eml.Dialect.Html`. `Eml.Dialect.Native` is a bit of a
+special case, as it has no markup and is used internally in Eml. It is responsible
+for all conversions inside an `eml` block, like the conversion from a integer we saw
+in previous examples. `Eml.Dialect.Html` however is a dialect that the Eml core has
+no knowledge of, other than that it is specified as the default dialect when defining
+markup and is used by default in all read and write functions. Other dialects can be
+expected to appear after Eml itself is proven to be stable. 
 
 #### Reading
 
-Let's turn back to Eml's data types. Mostly you'll be using binaries and markup. In
-order to provide translations from other data types, Eml provides the `Eml.Readable`
-protocol for custom data types and the `Eml.Reader` behaviour for providing conversions
-from fundamental types. By default Eml provides two readers: `Eml.Readers.Native` and
-`Eml.Readers.Html`. Inside an `eml` block `Eml.Readers.Native` is used. This reader was
-performing the conversion from an integer to a binary in our previous examples.
-By default, `Eml.read` uses the `Eml.Readers.Html` reader. This reader provides a
-translation from binaries in to Eml markup.
+The `Eml.Dialect.Html` reader provides a translation from binaries in to Eml markup.
 ```elixir
 iex(9)> Eml.read "<!doctype html>\n<html><body><div>42</div></body></html>"
 [#html<[#body<[#div<["42"]>]>]>]
 ```
-Like the above, but using the `Eml.Readers.Native` reader instead
+`Eml.read` also accepts `Eml.Dialect.Native` as a reader,
+because it follows the Eml.Dialect behaviour too.
 ```elixir
-iex(10)> Eml.read("<div>42</div>", Eml.Readers.Native)
+iex(10)> Eml.read("<div>42</div>", Eml.Dialect.Native)
 ["<div>42</div>"]
 ```
 No conversion of strings is performed by the native reader.
 Here are a few other examples of conversion the native reader
 performs.
 ```elixir
-iex(11)> eml do: nil
+iex(11)> Eml.read(nil, Eml.Dialect.Native)
 []
 
-iex(12)> eml do: [1, 2, p("hello"), 4]
-["12", #p<["hello"]>, "4"]
+iex(12)> Eml.read([1, 2, eml(do: h1 "hello"), 4], Eml.Dialect.Native)
+["12", #h1<["hello"]>, "4"]
 
-iex(13)> eml do: [a: 1, b: 2]
-** (ArgumentError) Error "Unreadable data: {:a, 1}"
-    lib/eml.ex:505: Eml.read!/2
+iex(13)> Eml.read([a: 1, b: 2], Eml.Dialect.Native)
+{:error, "Unreadable data: {:a, 1}"}
 
-iex(14)> eml do: ["Hello ", [2014, ["!"]]]
+iex(14)> Eml.read(["Hello ", [2014, ["!"]]], Eml.Dialect.Native)
 ["Hello 2014!"]
 ```
 `nil` is a non-existing value in Eml. As will be later shown, it can be used to discard

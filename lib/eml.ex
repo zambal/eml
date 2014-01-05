@@ -7,17 +7,14 @@ defmodule Eml do
   use Eml.Template.Record
 
 
-  @default_markup Eml.Markup.Html
-  @default_reader Eml.Readers.Html
-  @default_writer Eml.Writers.Html
+  @default_dialect Eml.Dialect.Html
 
   @type element  :: binary | Eml.Markup.t | Eml.Parameter.t | Eml.Template.t
   @type content  :: [element]
   @type t        :: element | content
   @type data     :: Eml.Readable.t
   @type error    :: { :error, term }
-  @type reader   :: atom
-  @type writer   :: atom
+  @type dialect  :: atom
   @type path     :: binary
 
   @type unpackr_result  :: funpackr_result | [unpackr_result]
@@ -39,8 +36,8 @@ defmodule Eml do
   To illustrate, the expressions below all produce the same output:
 
   * `eml do: div 42`
-  * `Eml.Markup.new(tag: :div, content: 42) |> Eml.read!(Eml.Readers.Native)`
-  * `Eml.Markup.Html.div(42) |> Eml.read!(Eml.Readers.Native)`
+  * `Eml.Markup.new(tag: :div, content: 42) |> Eml.read!(Eml.Dialect.Native)`
+  * `Eml.Markup.Html.div(42) |> Eml.read!(Eml.Dialect.Native)`
 
   Note that since the Elixir `Kernel` module by default imports the `div/2`
   macro in to the global namespace, this macro is inside an eml block only
@@ -49,12 +46,12 @@ defmodule Eml do
   """
   defmacro eml(opts // [], do_block) do
     opts    = Keyword.merge(opts, do_block)
-    markup  = opts[:use] || @default_markup
+    dialect = opts[:use] || @default_dialect
     expr    = opts[:do]
     quote do
       (fn ->
-         use unquote(markup)
-         Eml.read! unquote(expr), Eml.Readers.Native
+         use unquote(dialect)
+         Eml.read! unquote(expr), Eml.Dialect.Native
        end).()
     end
   end
@@ -74,12 +71,12 @@ defmodule Eml do
 
   """
   defmacro defmarkup(call, do_block) do
-    markup   = do_block[:use] || @default_markup
+    markup   = do_block[:use] || @default_dialect
     expr     = do_block[:do]
     quote do
       def unquote(call) do
         use unquote(markup)
-        Eml.read! unquote(expr), Eml.Readers.Native
+        Eml.read! unquote(expr), Eml.Dialect.Native
       end
     end
   end
@@ -448,8 +445,8 @@ defmodule Eml do
   Note that because parent elements are evaluated before their children,
   no children will be evaluated if the parent is removed.
 
-  Accepts a reader as optional 3rd argument, in order to specify how transformed data
-  should be interpreted, defaults to `Eml.Readers.Native`
+  Accepts a dialect as optional 3rd argument, in order to specify how transformed data
+  should be interpreted, defaults to `Eml.Dialect.Native`
 
   ## Examples:
 
@@ -477,52 +474,52 @@ defmodule Eml do
       [#div<[#span<[id: "inner1", class: "inner"] ["hello "]>,
         #span<[id: "inner2", class: "inner"] ["world"]>]>]
   """
-  @spec transform(t, (element -> data), reader) :: t | nil
-  def transform(eml, fun, reader // Eml.Readers.Native)
+  @spec transform(t, (element -> data), dialect) :: t | nil
+  def transform(eml, fun, dialect // Eml.Dialect.Native)
 
-  def transform(eml, fun, reader) when is_list(eml) do
-    lc element inlist eml, t = transform(element, fun, reader), do: t
+  def transform(eml, fun, dialect) when is_list(eml) do
+    lc element inlist eml, t = transform(element, fun, dialect), do: t
   end
 
-  def transform(element, fun, reader) do
-    case element |> fun.() |> Readable.read(reader) do
+  def transform(element, fun, dialect) do
+    case element |> fun.() |> Readable.read(dialect) do
       { :error, _ } -> nil
       element ->
         if markup?(element),
-          do: m(element, content: transform(content(element), fun, reader)),
+          do: m(element, content: transform(content(element), fun, dialect)),
         else: element
     end
   end
 
-  @spec read(data, reader) :: t | error
-  def read(data, reader // @default_reader) do
-    read(data, [], :begin, reader)
+  @spec read(data, dialect) :: t | error
+  def read(data, dialect // @default_dialect) do
+    read(data, [], :begin, dialect)
   end
 
-  @spec read!(data, reader) :: t
-  def read!(data, reader // @default_reader) do
-    case read(data, reader) do
+  @spec read!(data, dialect) :: t
+  def read!(data, dialect // @default_dialect) do
+    case read(data, dialect) do
       { :error, e } ->
         raise ArgumentError, message: "Error #{inspect e}"
       eml -> eml
     end
   end
 
-  @spec read_file(path, reader) :: t | error
-  def read_file(path, reader // @default_reader) do
+  @spec read_file(path, dialect) :: t | error
+  def read_file(path, dialect // @default_dialect) do
     case File.read(path) do
-      { :ok, data }  -> read(data, [], :begin, reader)
+      { :ok, data }  -> read(data, [], :begin, dialect)
       { :error, e }  -> { :error, e }
     end
   end
 
-  @spec read_file!(path, reader) :: t | error
-  def read_file!(path, reader // @default_reader) do
-    File.read!(path) |> read!(reader)
+  @spec read_file!(path, dialect) :: t | error
+  def read_file!(path, dialect // @default_dialect) do
+    File.read!(path) |> read!(dialect)
   end
 
-  @spec read(data | error, content, atom, reader) :: t | error
-  def read(data, content, at, reader // Eml.Readers.Native)
+  @spec read(data | error, content, atom, dialect) :: t | error
+  def read(data, content, at, dialect // Eml.Dialects.Native)
 
   # Error pass through
   def read({ :error, e }, _, _, _), do: { :error, e }
@@ -533,14 +530,14 @@ defmodule Eml do
 
   # Handle lists
 
-  def read(data, content, :end, reader)
-  when is_list(data), do: add_content(data, :lists.reverse(content), :end, reader) |> :lists.reverse()
+  def read(data, content, :end, dialect)
+  when is_list(data), do: add_content(data, :lists.reverse(content), :end, dialect) |> :lists.reverse()
 
-  def read(data, content, :begin, reader)
-  when is_list(data), do: add_content(:lists.reverse(data), content, :begin, reader)
+  def read(data, content, :begin, dialect)
+  when is_list(data), do: add_content(:lists.reverse(data), content, :begin, dialect)
 
-  def read(data, content, mode, reader) do
-    case Readable.read(data, reader) do
+  def read(data, content, mode, dialect) do
+    case Readable.read(data, dialect) do
       { :error, e } -> { :error, e }
       element       -> add_element(element, content, mode)
     end
@@ -583,19 +580,19 @@ defmodule Eml do
     end
   end
 
-  defp add_content([h | t], content, mode, reader) do
+  defp add_content([h | t], content, mode, dialect) do
     content = if is_list(h) and mode === :end,
-                do: add_content(h, content, mode, reader),
-              else: read(h, content, mode, reader)
-    add_content(t, content, mode, reader)
+                do: add_content(h, content, mode, dialect),
+              else: read(h, content, mode, dialect)
+    add_content(t, content, mode, dialect)
   end
 
   defp add_content([], content, _, _),
   do: content
 
-  @spec read!(data | error, content, atom, reader) :: t
-  def read!(data, content, at, reader // @default_reader) do
-    case read(data, content, at, reader) do
+  @spec read!(data | error, content, atom, dialect) :: t
+  def read!(data, content, at, dialect // @default_dialect) do
+    case read(data, content, at, dialect) do
       { :error, e } ->
         raise ArgumentError, message: "Error #{e}"
       content -> content
@@ -606,8 +603,8 @@ defmodule Eml do
   def write(eml, opts // [])
 
   def write(eml, opts) do
-    { writer, opts } = Keyword.pop(opts, :writer, @default_writer)
-    writer.write(eml, opts)
+    { dialect, opts } = Keyword.pop(opts, :dialect, @default_dialect)
+    dialect.write(eml, opts)
   end
 
   @spec write!(t, Keyword.t) :: binary

@@ -241,20 +241,20 @@ defmodule Eml.Markup do
   defp to_attrs(nil), do: []
 
   defp to_attr_value(nil),    do: nil
-  defp to_attr_value([]),     do: ""
+  defp to_attr_value([]),     do: nil
   defp to_attr_value([data]), do: to_attr_value(data)
 
-  defp to_attr_value(data) when is_list(data) do
-    lc d inlist data, not nil?(d) do
-      to_attr_value(d)
+  defp to_attr_value(list) when is_list(list) do
+    res = lc data inlist list, not nil?(data) do
+      to_attr_value(data)
     end |> :lists.flatten()
+    if res === [], do: nil, else: res
   end
 
-  defp to_attr_value(nil), do: nil
-  defp to_attr_value([]), do: ""
   defp to_attr_value(param)
   when is_atom(param)
   and not param in [true, false], do: Eml.Parameter.new(param, :attr)
+
   defp to_attr_value(data), do: to_string(data)
 
   defp insert_attr_value(old, new) do

@@ -548,10 +548,10 @@ defmodule Eml do
 
   # Optimize for most comon cases
 
-  def add_element(element, [], _),
+  defp add_element(element, [], _),
   do: [element]
 
-  def add_element(element, [current], :end) do
+  defp add_element(element, [current], :end) do
     if is_binary(element) and is_binary(current) do
       [current <> element]
     else
@@ -559,7 +559,7 @@ defmodule Eml do
     end
   end
 
-  def add_element(element, [current], :begin) do
+  defp add_element(element, [current], :begin) do
     if is_binary(element) and is_binary(current) do
       [element <> current]
     else
@@ -567,7 +567,7 @@ defmodule Eml do
     end
   end
 
-  def add_element(element, [h | t], :end) do
+  defp add_element(element, [h | t], :end) do
     if is_binary(element) and is_binary(h) do
       [h <> element | t]
     else
@@ -575,7 +575,7 @@ defmodule Eml do
     end
   end
 
-  def add_element(element, [h | t], :begin) do
+  defp add_element(element, [h | t], :begin) do
     if is_binary(element) and is_binary(h) do
       [element <> h | t]
     else

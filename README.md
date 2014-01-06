@@ -115,14 +115,16 @@ Contents can be written to a string by calling `Eml.write`.
 Notice that Eml automatically inserts a doctype declaration when
 the html element is the root.
 ```elixir
-iex(6)> Eml.write(eml do: html(body(div(42))))
+iex(6)> Eml.write(eml(do: html(body(div(42)))), pretty: true)
 {:ok,
  "<!doctype html>\n<html>\n  <body>\n    <div>42</div>\n  </body>\n</html>"}
 ```
+Setting the `:pretty` option to `true` instructs the writer to try to nicely indent
+the generated markup in a human readable format. This is turned off by default as
+it's currently a rather expensive operation and browser inspectors generally will do
+a far better job properly identing markup anyway.
+
 Eml also provides a version of write that either succeeds, or raises an exception.
-Write by default 'pretty prints' html, which means it tries to properly indent and
-newline content. Turning this off actually makes the output look better in Elixir's
-shell.
 ```elixir
 iex(7)> Eml.write!(eml(do: html(body(div(42)))), pretty: false)
 "<!doctype html>\n<html><body><div>42</div></body></html>"

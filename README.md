@@ -365,49 +365,54 @@ iex(34)> e = eml do: [:atoms, " ", :are, " ", :converted, " ", :to_parameters]
 [#param:atoms, " ", #param:are, " ", #param:converted, " ",
  #param:to_parameters]
 
-iex(35)> unbound = Eml.write!(e)
-#Template<[atoms: 1, are: 1, converted: 1, to_parameters: 1]>
+iex(35)> Eml.write!(e)
+"#param{atoms} #param{are} #param{converted} #param{to_parameters}"
 
-iex(36)> Eml.write!(unbound, bindings: [atoms: "Atoms", are: "are", converted: "converted", to_parameters: "to parameters."])
+iex(36)> Eml.write!(e, bindings: [atoms: "Atoms", are: "are", converted: "converted", to_parameters: "to parameters."])
 "Atoms are converted to parameters."
 
+iex(37)> unbound = Eml.compile(e)
+#Template<[atoms: 1, are: 1, converted: 1, to_parameters: 1]>
+
 # `Eml.Template` is automatically aliased as `Template` when `use Eml` is invoked.
-iex(37)> t = Template.bind(unbound, atoms: "Atoms", are: "are")
+iex(38)> t = Template.bind(unbound, atoms: "Atoms", are: "are")
 #Template<[converted: 1, to_parameters: 1]>
 
-iex(38)> bound = Template.bind(t, converted: "converted", to_parameters: "to parameters.")
+iex(39)> bound = Template.bind(t, converted: "converted", to_parameters: "to parameters.")
 #Template<BOUND>
 
-iex(39)> Eml.write!(bound)
+iex(40)> Eml.write!(bound)
 "Atoms are converted to parameters."
 ```
 When creating eml, atoms are automatically converted to parameters.
-Whenever you try to write eml that contains parameters, a template is
-returned instead of rendered markup. Eml provides two methods of binding
-values to parameters: using the `:bindings` option of `Eml.write`, or
-by using the various functions from `Eml.Template`. The output of
-templates on Elixir's shell provides some information about their state.
-The returned template at `iex(33)` tells that it has four parameters.
-The returned template at `iex(35)` tells that whatever parameters it has,
-they are all bound and the template is ready to render. Parameters with
-the same name can occur multiple times in a template. You can either call
-`Eml.Template.bind` as many times as needed in order to bind all instances,
-or you can provide a list of values who's length is at least as long as
-the number of occurrences of the parameter in the template.
+Whenever you try to write eml that contains parameters, the parameters
+are converted in to a string representation. If you have a parameter with
+id `:myparam`, the string representation will be `#param{myparam}`. If Eml
+reads back html that contains these strings, it will automatically convert
+those in to parameters. To bind data to parameters in eml, you can either
+compile eml data to a template and use its various binding options, or you
+can directly bind data to parameters by calling `Eml.write` with the
+`:bindings` option. If there are still unbound parameters left, `Eml.write`
+will also return a template. The output of templates on Elixir's shell
+provides some information about their state. The returned template at
+`iex(33)` tells that it has four parameters. The returned template at
+`iex(35)` tells that whatever parameters it has, they are all bound and the
+template is ready to render. Parameters with the same name can occur
+multiple times in a template. You can either call `Eml.Template.bind` as
+many times as needed in order to bind all instances, or you can provide a
+list of values who's length is at least as long as the number of
+occurrences of the parameter in the template.
 ```elixir
-iex(40)> e = eml do: [div(:fruit), div(:fruit)]
+iex(41)> e = eml do: [div(:fruit), div(:fruit)]
 [#div<[#param:fruit]>, #div<[#param:fruit]>]
 
-iex(41)> unbound = Eml.write!(e)
+iex(42)> unbound = Eml.compile(e)
 #Template<[fruit: 2]>
 
-iex(42)> t = Template.bind(unbound, fruit: "orange")
+iex(43)> t = Template.bind(unbound, fruit: "orange")
 #Template<[fruit: 1]>
 
-iex(43)> t = Template.bind(t, fruit: "lemon")
-#Template<BOUND>
-
-iex(44)> Eml.write!(t)
+iex(44)> Eml.write!(t, bindings: [fruit: "lemon"])
 "<div>orange</div>\n<div>lemon</div>"
 
 iex(45)> t = Template.bind(unbound, fruit: ["blackberry", "strawberry"])

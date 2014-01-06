@@ -3,36 +3,36 @@ defprotocol Eml.Readable do
   The Eml Readable protocol.
   """
 
-  def read(data, dialect)
+  def read(data, lang)
 end
 
 defimpl Eml.Readable, for: BitString do
-  def read(data, dialect), do: dialect.read(data, BitString)
+  def read(data, lang), do: lang.read(data, BitString)
 end
 
 defimpl Eml.Readable, for: Integer do
-  def read(data, dialect), do: dialect.read(data, Integer)
+  def read(data, lang), do: lang.read(data, Integer)
 end
 
 defimpl Eml.Readable, for: Float do
-  def read(data, dialect), do: dialect.read(data, Float)
+  def read(data, lang), do: lang.read(data, Float)
 end
 
 defimpl Eml.Readable, for: Tuple do
-  def read(data, dialect), do: dialect.read(data, Tuple)
+  def read(data, lang), do: lang.read(data, Tuple)
 end
 
 defimpl Eml.Readable, for: Atom do
-  def read(nil, _dialect),   do: nil
-  def read(true, dialect),   do: dialect.read(true, Atom)
-  def read(false, dialect),  do: dialect.read(false, Atom)
-  def read(param, _dialect), do: Eml.Parameter.new(param)
+  def read(nil, _lang),   do: nil
+  def read(true, lang),   do: lang.read(true, Atom)
+  def read(false, lang),  do: lang.read(false, Atom)
+  def read(param, _lang), do: Eml.Parameter.new(param)
 end
 
 defimpl Eml.Readable, for: [Eml.Markup, Eml.Parameter, Eml.Template] do
-  def read(data, _dialect), do: data
+  def read(data, _lang), do: data
 end
 
 defimpl Eml.Readable, for: [Function, PID, Port, Reference, List] do
-  def read(data, _dialect), do: { :error, "Unreadable data: #{inspect data}" }
+  def read(data, _lang), do: { :error, "Unreadable data: #{inspect data}" }
 end

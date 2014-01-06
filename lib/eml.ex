@@ -7,14 +7,14 @@ defmodule Eml do
   use Eml.Template.Record
 
 
-  @default_dialect Eml.Dialect.Html
+  @default_lang Eml.Language.Html
 
   @type element  :: binary | Eml.Markup.t | Eml.Parameter.t | Eml.Template.t
   @type content  :: [element]
   @type t        :: element | content
   @type data     :: Eml.Readable.t
   @type error    :: { :error, term }
-  @type dialect  :: atom
+  @type lang  :: atom
   @type path     :: binary
 
   @type unpackr_result  :: funpackr_result | [unpackr_result]
@@ -36,8 +36,8 @@ defmodule Eml do
   To illustrate, the expressions below all produce the same output:
 
   * `eml do: div 42`
-  * `Eml.Markup.new(tag: :div, content: 42) |> Eml.read!(Eml.Dialect.Native)`
-  * `Eml.Markup.Html.div(42) |> Eml.read!(Eml.Dialect.Native)`
+  * `Eml.Markup.new(tag: :div, content: 42) |> Eml.read!(Eml.Language.Native)`
+  * `Eml.Markup.Html.div(42) |> Eml.read!(Eml.Language.Native)`
 
   Note that since the Elixir `Kernel` module by default imports the `div/2`
   macro in to the global namespace, this macro is inside an eml block only
@@ -46,12 +46,12 @@ defmodule Eml do
   """
   defmacro eml(opts // [], do_block) do
     opts    = Keyword.merge(opts, do_block)
-    dialect = opts[:use] || @default_dialect
+    lang = opts[:use] || @default_lang
     expr    = opts[:do]
     quote do
       (fn ->
-         use unquote(dialect)
-         Eml.read! unquote(expr), Eml.Dialect.Native
+         use unquote(lang)
+         Eml.read! unquote(expr), Eml.Language.Native
        end).()
     end
   end
@@ -71,12 +71,12 @@ defmodule Eml do
 
   """
   defmacro defmarkup(call, do_block) do
-    markup   = do_block[:use] || @default_dialect
+    markup   = do_block[:use] || @default_lang
     expr     = do_block[:do]
     quote do
       def unquote(call) do
         use unquote(markup)
-        Eml.read! unquote(expr), Eml.Dialect.Native
+        Eml.read! unquote(expr), Eml.Language.Native
       end
     end
   end
@@ -445,8 +445,8 @@ defmodule Eml do
   Note that because parent elements are evaluated before their children,
   no children will be evaluated if the parent is removed.
 
-  Accepts a dialect as optional 3rd argument, in order to specify how transformed data
-  should be interpreted, defaults to `Eml.Dialect.Native`
+  Accepts a lang as optional 3rd argument, in order to specify how transformed data
+  should be interpreted, defaults to `Eml.Language.Native`
 
   ## Examples:
 
@@ -474,52 +474,52 @@ defmodule Eml do
       [#div<[#span<[id: "inner1", class: "inner"] ["hello "]>,
         #span<[id: "inner2", class: "inner"] ["world"]>]>]
   """
-  @spec transform(t, (element -> data), dialect) :: t | nil
-  def transform(eml, fun, dialect // Eml.Dialect.Native)
+  @spec transform(t, (element -> data), lang) :: t | nil
+  def transform(eml, fun, lang // Eml.Language.Native)
 
-  def transform(eml, fun, dialect) when is_list(eml) do
-    lc element inlist eml, t = transform(element, fun, dialect), do: t
+  def transform(eml, fun, lang) when is_list(eml) do
+    lc element inlist eml, t = transform(element, fun, lang), do: t
   end
 
-  def transform(element, fun, dialect) do
-    case element |> fun.() |> Readable.read(dialect) do
+  def transform(element, fun, lang) do
+    case element |> fun.() |> Readable.read(lang) do
       { :error, _ } -> nil
       element ->
         if markup?(element),
-          do: m(element, content: transform(content(element), fun, dialect)),
+          do: m(element, content: transform(content(element), fun, lang)),
         else: element
     end
   end
 
-  @spec read(data, dialect) :: t | error
-  def read(data, dialect // @default_dialect) do
-    read(data, [], :begin, dialect)
+  @spec read(data, lang) :: t | error
+  def read(data, lang // @default_lang) do
+    read(data, [], :begin, lang)
   end
 
-  @spec read!(data, dialect) :: t
-  def read!(data, dialect // @default_dialect) do
-    case read(data, dialect) do
+  @spec read!(data, lang) :: t
+  def read!(data, lang // @default_lang) do
+    case read(data, lang) do
       { :error, e } ->
         raise ArgumentError, message: "Error #{inspect e}"
       eml -> eml
     end
   end
 
-  @spec read_file(path, dialect) :: t | error
-  def read_file(path, dialect // @default_dialect) do
+  @spec read_file(path, lang) :: t | error
+  def read_file(path, lang // @default_lang) do
     case File.read(path) do
-      { :ok, data }  -> read(data, [], :begin, dialect)
+      { :ok, data }  -> read(data, [], :begin, lang)
       { :error, e }  -> { :error, e }
     end
   end
 
-  @spec read_file!(path, dialect) :: t | error
-  def read_file!(path, dialect // @default_dialect) do
-    File.read!(path) |> read!(dialect)
+  @spec read_file!(path, lang) :: t | error
+  def read_file!(path, lang // @default_lang) do
+    File.read!(path) |> read!(lang)
   end
 
-  @spec read(data | error, content, atom, dialect) :: t | error
-  def read(data, content, at, dialect // Eml.Dialects.Native)
+  @spec read(data | error, content, atom, lang) :: t | error
+  def read(data, content, at, lang // Eml.Languages.Native)
 
   # Error pass through
   def read({ :error, e }, _, _, _), do: { :error, e }
@@ -530,14 +530,14 @@ defmodule Eml do
 
   # Handle lists
 
-  def read(data, content, :end, dialect)
-  when is_list(data), do: add_content(data, :lists.reverse(content), :end, dialect) |> :lists.reverse()
+  def read(data, content, :end, lang)
+  when is_list(data), do: add_content(data, :lists.reverse(content), :end, lang) |> :lists.reverse()
 
-  def read(data, content, :begin, dialect)
-  when is_list(data), do: add_content(:lists.reverse(data), content, :begin, dialect)
+  def read(data, content, :begin, lang)
+  when is_list(data), do: add_content(:lists.reverse(data), content, :begin, lang)
 
-  def read(data, content, mode, dialect) do
-    case Readable.read(data, dialect) do
+  def read(data, content, mode, lang) do
+    case Readable.read(data, lang) do
       { :error, e } -> { :error, e }
       element       -> add_element(element, content, mode)
     end
@@ -580,19 +580,19 @@ defmodule Eml do
     end
   end
 
-  defp add_content([h | t], content, mode, dialect) do
+  defp add_content([h | t], content, mode, lang) do
     content = if is_list(h) and mode === :end,
-                do: add_content(h, content, mode, dialect),
-              else: read(h, content, mode, dialect)
-    add_content(t, content, mode, dialect)
+                do: add_content(h, content, mode, lang),
+              else: read(h, content, mode, lang)
+    add_content(t, content, mode, lang)
   end
 
   defp add_content([], content, _, _),
   do: content
 
-  @spec read!(data | error, content, atom, dialect) :: t
-  def read!(data, content, at, dialect // @default_dialect) do
-    case read(data, content, at, dialect) do
+  @spec read!(data | error, content, atom, lang) :: t
+  def read!(data, content, at, lang // @default_lang) do
+    case read(data, content, at, lang) do
       { :error, e } ->
         raise ArgumentError, message: "Error #{e}"
       content -> content
@@ -603,13 +603,13 @@ defmodule Eml do
   def write(eml, opts // [])
 
   def write(templ() = t, opts) do
-    { dialect, opts } = Keyword.pop(opts, :dialect, @default_dialect)
-    dialect.write(t, Keyword.put(opts, :mode, :compile))
+    { lang, opts } = Keyword.pop(opts, :lang, @default_lang)
+    lang.write(t, Keyword.put(opts, :mode, :compile))
   end
 
   def write(eml, opts) do
-    { dialect, opts } = Keyword.pop(opts, :dialect, @default_dialect)
-    dialect.write(eml, Keyword.put(opts, :mode, :render))
+    { lang, opts } = Keyword.pop(opts, :lang, @default_lang)
+    lang.write(eml, Keyword.put(opts, :mode, :render))
   end
 
   @spec write!(t, Keyword.t) :: binary
@@ -634,14 +634,14 @@ defmodule Eml do
   end
 
 
-  @spec compile(t, dialect) :: Eml.Template.t | error
-  def compile(eml, dialect // @default_dialect)
+  @spec compile(t, lang) :: Eml.Template.t | error
+  def compile(eml, lang // @default_lang)
 
   def compile(templ() = t, _), do: t
-  def compile(eml, dialect) do
+  def compile(eml, lang) do
     # for consistence, when compiling eml we always want to return a template, even if
     # there are no parameters at all, or all of them are bound.
-    case dialect.write(eml, [mode: :compile, force_templ: true]) do
+    case lang.write(eml, [mode: :compile, force_templ: true]) do
       { :ok, t } -> t
       error      -> error
     end

@@ -1,5 +1,5 @@
-defmodule Eml.Dialect.Native do
-  @behaviour Eml.Dialect
+defmodule Eml.Language.Native do
+  @behaviour Eml.Language
 
   def markup?(), do: false
 

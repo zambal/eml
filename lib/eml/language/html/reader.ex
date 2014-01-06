@@ -1,4 +1,4 @@
-defmodule Eml.Dialect.Html.Reader do
+defmodule Eml.Language.Html.Reader do
   alias Eml.Markup
 
   # API

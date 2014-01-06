@@ -1,4 +1,4 @@
-defmodule Eml.Dialect.Html.Writer do
+defmodule Eml.Language.Html.Writer do
   use Eml.Markup.Record
   use Eml.Template.Record
   alias Eml.Markup

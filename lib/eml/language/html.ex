@@ -1,4 +1,4 @@
-defmodule Eml.Dialect.Html.Markup do
+defmodule Eml.Language.Html.Markup do
 
   use Eml.Markup.Generator, tags: [:html, :head, :title, :base, :link, :meta, :style,
                                    :script, :noscript, :body, :div, :span, :article,
@@ -15,17 +15,17 @@ defmodule Eml.Dialect.Html.Markup do
                                    :meter, :details, :summary, :menuitem, :menu]
 end
 
-defmodule Eml.Dialect.Html do
-  @behaviour Eml.Dialect
+defmodule Eml.Language.Html do
+  @behaviour Eml.Language
 
   def markup?(), do: true
 
   def read(data, type) do
-    Eml.Dialect.Html.Reader.read(data, type)
+    Eml.Language.Html.Reader.read(data, type)
   end
 
   def write(eml, opts) do
-    Eml.Dialect.Html.Writer.write(eml, opts)
+    Eml.Language.Html.Writer.write(eml, opts)
   end
   
   defmacro __using__(_opts) do

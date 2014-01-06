@@ -1,4 +1,4 @@
-defmodule Eml.Dialect do
+defmodule Eml.Language do
   use Behaviour
 
   @type type :: atom

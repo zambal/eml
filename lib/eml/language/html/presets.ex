@@ -1,4 +1,4 @@
-defmodule Eml.Dialect.Html.Presets do
+defmodule Eml.Language.Html.Presets do
   use Eml
 
   defmarkup keyword(kw, sep // ":") do

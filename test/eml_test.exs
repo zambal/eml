@@ -72,8 +72,8 @@ defmodule EmlTest do
   end
 
   test "Native read" do
-    assert ["1234"]                          == Eml.read([1,2,3,4], Eml.Dialect.Native)
-    assert { :error, "Unreadable data: {}" } == Eml.read({}, Eml.Dialect.Native)
+    assert ["1234"]                          == Eml.read([1,2,3,4], Eml.Language.Native)
+    assert { :error, "Unreadable data: {}" } == Eml.read({}, Eml.Language.Native)
   end
 
   test "Unpack" do

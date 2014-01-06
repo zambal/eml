@@ -252,6 +252,8 @@ defmodule Eml.Markup do
   end
 
   defp to_attr_value(param)
+  when is_record(param, Eml.Parameter), do: param
+  defp to_attr_value(param)
   when is_atom(param)
   and not param in [true, false], do: Eml.Parameter.new(param, :attr)
 

@@ -602,9 +602,14 @@ defmodule Eml do
   @spec write(t, Keyword.t) :: { :ok, binary } | error
   def write(eml, opts // [])
 
+  def write(templ() = t, opts) do
+    { dialect, opts } = Keyword.pop(opts, :dialect, @default_dialect)
+    dialect.write(t, Keyword.put(opts, :mode, :compile))
+  end
+
   def write(eml, opts) do
     { dialect, opts } = Keyword.pop(opts, :dialect, @default_dialect)
-    dialect.write(eml, opts)
+    dialect.write(eml, Keyword.put(opts, :mode, :render))
   end
 
   @spec write!(t, Keyword.t) :: binary
@@ -627,6 +632,22 @@ defmodule Eml do
   def write_file!(path, eml, opts // []) do
     File.write!(path, write!(eml, opts))
   end
+
+
+  @spec compile(t, Keyword.t) :: Eml.Template.t | error
+  def compile(eml, opts // [])
+
+  def compile(templ() = t, _opts), do: t
+  def compile(eml, opts) do
+    { dialect, opts } = Keyword.pop(opts, :dialect, @default_dialect)
+    # for consistence, when compiling eml we always want to return a template, even if
+    # all parameters are bound, or there are no parameters at all.
+    case dialect.write(eml, Keyword.merge(opts, [mode: :compile, force_templ: true])) do
+      { :ok, t } -> t
+      error      -> error
+    end
+  end
+
 
   @spec unpack(t) :: t
   def unpack(m(content: [element])), do: element

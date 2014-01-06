@@ -34,6 +34,28 @@ defmodule Eml.Dialect.Html.Reader do
     parse(cs, buf, acc, :doctype)
   end
 
+  # Parameters
+  defp parse(["#", "p", "a", "r", "a", "m", "{" | cs], buf, acc, state) do
+    case state do
+      s when s in [:content, :blank, :start_close, :end_close, :close, :content_newline] ->
+        next(cs, buf, [], acc, :param_content)
+      s when s in [:attr_open, :attr_value] ->
+        next(cs, buf, [], acc, :param_attr)
+      _ -> error("#param", cs, buf, acc, state)
+    end
+  end
+  defp parse(["}" | cs], buf, acc, :param_content) do
+    next(cs, buf, [], acc, :content)
+  end
+  defp parse(["}" | cs], buf, acc, :param_attr) do
+    next(cs, buf, [], acc, :attr_value)
+  end
+  defp parse([c | cs], buf, acc, state)
+  when state in [:param_content, :param_attr] do
+    consume(c, cs, buf, acc, state)
+  end
+  
+
   # When inside entity, accept any char, except ';'
   defp parse([c | cs], buf, acc, :entity) when c != ";" do
     consume(c, cs, buf, acc, :entity)
@@ -78,7 +100,7 @@ defmodule Eml.Dialect.Html.Reader do
       s when s in [:attr_value, :content] ->
         consume(c, cs, buf, acc, state)
       :close_entity ->
-        state = state_before_entity(acc)
+        state = state_before(:open_entity, acc)
         next(cs, buf, [c], acc, state)
       _ ->
         parse(cs, buf, acc, state)
@@ -107,7 +129,7 @@ defmodule Eml.Dialect.Html.Reader do
       :open_entity ->
         next(cs, buf, [c], acc, :entity)
       :close_entity ->
-        state = state_before_entity(acc)
+        state = state_before(:open_entity, acc)
         next(cs, buf, [c], acc, state)
       _ ->
         error(c, cs, buf, acc, state)
@@ -215,7 +237,7 @@ defmodule Eml.Dialect.Html.Reader do
       :open_entity ->
         next(cs, buf, [c], acc, :entity)
       :close_entity ->
-        state = state_before_entity(acc)
+        state = state_before(:open_entity, acc)
         next(cs, buf, [c], acc, state)
       _ ->
         error(c, cs, buf, acc, state)
@@ -280,10 +302,12 @@ defmodule Eml.Dialect.Html.Reader do
   defp close_last_tag?([_ | ts]), do: close_last_tag?(ts)
   defp close_last_tag?([]), do: false
 
-  defp state_before_entity([{ :open_entity, _ }, { state, _ } | _]), do: state
-  defp state_before_entity([{ :open_entity, _ } | _]), do: :blank
-  defp state_before_entity([_ | t]), do: state_before_entity(t)
-  defp state_before_entity([]), do: :error
+  defp state_before(asked, [{ maybe_asked, _ }, { state, _ } | _])
+  when maybe_asked === asked, do: state
+  defp state_before(asked, [{ maybe_asked, _ } | _])
+  when maybe_asked === asked, do: :blank
+  defp state_before(asked, [_ | t]), do: state_before(asked, t)
+  defp state_before(_, []), do: :error
   
   # Compile the genrated tokens
 
@@ -311,8 +335,16 @@ defmodule Eml.Dialect.Html.Reader do
         attrs = [{ field, nil } | acc[:attrs]]
         compile(ts, Keyword.put(acc, :attrs, attrs), state)
       { :attr_value, value } ->
-        [{ field, nil } | rest] = acc[:attrs]
-        attrs = [{ field, value } | rest]
+        [{ field, current } | rest] = acc[:attrs]
+        attrs = cond do
+          is_binary(value) && String.strip(value) == "" ->
+            [{ field, current } | rest]
+          (is_binary(current) && String.strip(current) == "") || nil?(current) ->
+            [{ field, value } | rest]
+           true ->
+            current = if is_list(current), do: current, else: [current]
+            [{ field, current ++ [value] } | rest]
+        end
         compile(ts, Keyword.put(acc, :attrs, attrs), state)
       :start_content ->
         compile(ts, acc, :in_content)
@@ -369,6 +401,9 @@ defmodule Eml.Dialect.Html.Reader do
   defp precompile(:entity, "amp"), do: {:content, "&" }
   defp precompile(:entity, "lt"), do: {:content, "<" }
   defp precompile(:entity, "gt"), do: {:content, ">" }
+
+  defp precompile(:param_content, id), do: {:content, binary_to_atom(id) }
+  defp precompile(:param_attr, id), do: {:attr_value, binary_to_atom(id) }
 
 
   defp class_value(nil), do: nil

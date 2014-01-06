@@ -5,7 +5,7 @@ defmodule Eml.Dialect.Html.Writer do
   alias Eml.Template
   alias Eml.Parameter, as: Param
 
-  defrecord  Opts, indent: 2, quote: :single, escape: true, output: :string, pretty: false
+  defrecord  Opts, indent: 2, quote: :single, escape: true, output: :string, pretty: false, mode: :render, force_templ: false
 
   defrecordp :state, type: :content, chunks: [], params: []
   
@@ -27,6 +27,7 @@ defmodule Eml.Dialect.Html.Writer do
 
   def write(templ() = t, opts) do
     new  = Keyword.get(opts, :bindings, [])
+    opts = Keyword.put(opts, :mode, :compile)
     opts = Opts.new(opts)
     t    = Template.bind(t, new)
     parse_templ(t, opts, state()) |> to_result(opts)
@@ -34,8 +35,14 @@ defmodule Eml.Dialect.Html.Writer do
 
   def write(eml, opts) do
     bindings = opts[:bindings]
+    force_templ? = opts[:force_templ]
+    opts = case bindings do
+             nil -> opts
+             _   -> Keyword.put(opts, :mode, :compile)
+           end
     opts = Opts.new(opts)
-    case { parse_eml(eml, opts, state()) |> to_result(opts), bindings } do
+    type = if force_templ?, do: :templ, else: :content
+    case { parse_eml(eml, opts, state(type: type)) |> to_result(opts), bindings } do
       { { :ok, templ() = t }, b } when not nil?(b) ->
         t = Template.bind(t, b)
         parse_templ(t, opts, state()) |> to_result(opts)
@@ -77,14 +84,30 @@ defmodule Eml.Dialect.Html.Writer do
     end)
   end
 
-  defp parse_eml(param, _opts, _s(chunks, params))
+  defp parse_eml(param, Opts[mode: :compile], _s(chunks, params))
   when is_record(param, Param) do
     _s(:templ, [param | chunks], add_param(params, param))
   end
 
-  # Consume template chunks and params and become a template itself
-  defp parse_eml(templ(chunks: tchunks, params: tparams), _opts, _s(chunks, params)) do
+  defp parse_eml(param, Opts[mode: :render], _s(type, chunks, params))
+  when is_record(param, Param) do
+    param = parse_param(param)
+    _s(type, [param | chunks], params)
+  end
+
+  # If mode is compile, consume template chunks and params and become a template itself
+  defp parse_eml(templ(chunks: tchunks, params: tparams), Opts[mode: :compile], _s(chunks, params)) do
     _s(:templ, :lists.reverse(tchunks) ++ chunks, merge_params(params, tparams))
+  end
+
+  # If mode is render, convert all parameters of the template to strings.
+  defp parse_eml(templ(chunks: tchunks, params: tparams), Opts[mode: :render], _s(type, chunks, params)) do
+    tchunks = Enum.reduce(tchunks, [], fn chunk, acc ->
+      if Eml.type(chunk) === :parameter,
+        do: [parse_param(chunk) | acc],
+      else: [chunk | acc]
+    end)
+    _s(type, tchunks ++ chunks, merge_params(params, tparams))
   end
 
   defp parse_eml(data, opts, s) do
@@ -105,22 +128,22 @@ defmodule Eml.Dialect.Html.Writer do
     parse_attrs(rest, opts, s)
   end
 
-  defp parse_attrs([{ k, param } | rest], opts, _s(chunks, params))
-  when is_record(param, Param) do
-    field  = attr_field(k)
-    chunks = param_attr(chunks, field, param, opts)
-    s      = _s(:templ, chunks, add_param(params, param))
-    parse_attrs(rest, opts, s)
-  end
-
   defp parse_attrs([{ k, v } | rest], opts, _s(type, chunks, params)) do
     type   = chunk_type(:attr, type)
     field  = attr_field(k)
     value  = attr_value(v, opts)
-    chunks = if nil?(value), do: chunks, else: attr(chunks, field, value, opts)
-    s      = _s(type, chunks, params)
+    s = if Eml.type(value) == :parameter do
+          chunks = attr(chunks, field, value, opts)
+          _s(:templ, chunks, add_param(params, value))
+        else
+          chunks = if nil?(value), 
+                     do: chunks,
+                   else: attr(chunks, field, value, opts)
+          _s(type, chunks, params)
+        end
     parse_attrs(rest, opts, s)
   end
+  
   defp parse_attrs([], _, s), do: s
 
   # Template parsing
@@ -130,20 +153,21 @@ defmodule Eml.Dialect.Html.Writer do
     s
   end
 
-  defp process_chunk(param, { bindings, opts, _s(chunks, params) = s })
+  defp process_chunk(param, { bindings, Opts[force_templ: force_templ?] = opts, _s(type, chunks, params)})
   when is_record(param, Param) do
     { binding, bindings } = Template.pop(bindings, Param.id(param))
     if binding do
+      type = if force_templ?, do: :templ, else: type
       {
        bindings,
        opts,
-       parse_binding(binding, Param.type(param), opts, s)
+       parse_binding(binding, Param.type(param), opts, _s(type, chunks, params))
       }
       else
         {
          bindings,
          opts,
-         state(s, type: :templ, chunks: [param | chunks], params: add_param(params, param))
+         _s(:templ, [param | chunks], add_param(params, param))
         }
     end
   end
@@ -172,14 +196,7 @@ defmodule Eml.Dialect.Html.Writer do
   defp maybe_doctype(chunks, :html), do: ["<!doctype html>\n" | chunks]
   defp maybe_doctype(chunks, _),    do: chunks
 
-  defp attr(chunks, field, value, Opts[quote: q]) do
-    qchar = qchar(q)
-    if nil?(value),
-      do:   chunks,
-      else: [" #{field}=#{qchar}#{value}#{qchar}" | chunks]
-  end
-
-  defp param_attr(chunks, field, param, Opts[quote: q]) do
+  defp attr(chunks, field, param, Opts[quote: q]) do
     qchar = qchar(q)
     ["#{qchar}", param, " #{field}=#{qchar}" | chunks]
   end
@@ -190,6 +207,17 @@ defmodule Eml.Dialect.Html.Writer do
   defp qchar(:double), do: "\""
   defp qchar(_),       do: "'"
 
+  defp maybe_escape(list, Opts[escape: true] = opts) when is_list(list) do
+    lc data inlist list do
+      maybe_escape(data, opts)
+    end 
+  end
+
+  defp maybe_escape(data, _)
+  when is_record(data, Param) do
+    data
+  end
+
   defp maybe_escape(data, Opts[escape: true]) do
     escape(data)
   end
@@ -198,11 +226,24 @@ defmodule Eml.Dialect.Html.Writer do
     data
   end
 
-  defp escape(s) do
-    s
-    |> String.replace("&", "&amp;")
-    |> String.replace("<", "&lt;")
-    |> String.replace(">", "&gt;")
+  defp escape(s) when is_binary(s) do
+    bc <<char>> inbits s, <<new::binary>> = escape_chars(char) do
+      <<new::binary>>
+    end
+  end
+
+  defp escape_chars(char) do
+    case char do
+      ?& -> <<"&amp;">>
+      ?< -> <<"&lt;">>
+      ?> -> <<"&gt;">>
+      _  -> <<char>>
+    end
+  end
+
+
+  defp parse_param(param) do
+    "#param{#{Param.id(param)}}"
   end
 
   # Attribute markup helpers
@@ -215,14 +256,38 @@ defmodule Eml.Dialect.Html.Writer do
   end
 
   defp attr_value(v, opts) do
-    v |> parse_attr_value() |> maybe_escape(opts)
+    parse_attr_value(v, opts) |> maybe_escape(opts)
   end
 
-  defp parse_attr_value(list) when is_list(list) do
-    Enum.join(list, " ")
+  defp parse_attr_value(list, Opts[mode: :compile])
+  when is_list(list) do
+    if Enum.any?(list, fn attr_v -> is_record(attr_v, Param) end),
+      do: list,
+    else: Enum.join(list, " ")
   end
 
-  defp parse_attr_value(v), do: v
+  defp parse_attr_value(list, Opts[mode: :render])
+  when is_list(list) do
+    if Enum.any?(list, fn attr_v -> is_record(attr_v, Param) end) do
+      lc attr_v inlist list do
+        if is_record(attr_v, Param), 
+          do: parse_param(attr_v),
+        else: attr_v
+      end
+    else 
+      Enum.join(list, " ")
+    end
+  end
+
+  defp parse_attr_value(param, Opts[mode: mode])
+  when is_record(param, Param) do
+    case mode do
+      :compile -> param
+      :render  -> parse_param(param)
+    end
+  end
+
+  defp parse_attr_value(v, _), do: v
 
   # Chunk helpers
 

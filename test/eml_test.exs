@@ -56,8 +56,9 @@ defmodule EmlTest do
     assert :binary    == Eml.type unpack eml(do: [1,2,"z"])
     assert :binary    == Eml.type eml(do: :name) 
                                   |> Eml.write!(bindings: [name: "Vincent"])
-    assert :template  == Eml.type Eml.write! eml(do: :name)
-    assert :template  == Eml.type Eml.write! eml(do: [div(1), div(2), div(:param), "..."])
+    assert :binary    == Eml.type Eml.write! eml(do: :name)
+    assert :template  == Eml.type Eml.compile eml(do: :name)
+    assert :template  == Eml.type Eml.compile eml(do: [div(1), div(2), div(:param), "..."])
     assert :parameter == Eml.type Eml.Parameter.new(:param)
     assert :parameter == Eml.type unpack eml(do: :param)
   end
@@ -262,7 +263,7 @@ defmodule EmlTest do
         div :fruit
       end
     end
-    { :ok, t } = Eml.write(e)
+    t = Eml.compile(e)
 
     assert :template == Eml.type t
     assert false == Template.bound?(t)
@@ -285,7 +286,7 @@ defmodule EmlTest do
        div(:fruit),
        div(:fruit)]
     end
-    { :ok, t } = Eml.write(e, pretty: false)
+    t = Eml.compile(e, pretty: false)
 
     assert :template == Eml.type t
     assert false == Template.bound?(t)
@@ -301,9 +302,9 @@ defmodule EmlTest do
 
   test "Templates in eml" do
     fruit  = eml do: section(:fruit)
-    tfruit = Eml.write!(fruit)
+    tfruit = Eml.compile(fruit)
     aside  = eml do: aside tfruit
-    taside = Eml.write!(aside)
+    taside = Eml.compile(aside)
 
     assert :template == Eml.type taside
 
@@ -311,7 +312,7 @@ defmodule EmlTest do
       aside [ section "lemon" ]
     end
     
-    assert Eml.write!(expected, pretty: false) == Eml.write!(taside, bindings: [fruit: "lemon"])
+    assert Eml.write!(expected) == Eml.write!(taside, bindings: [fruit: "lemon"])
     
   end
 end

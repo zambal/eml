@@ -54,9 +54,15 @@ defmodule EmlTest do
     assert :binary    == Eml.type "strings are binaries"
     assert :binary    == Eml.type Eml.unpackr eml(do: div 42)
     assert :binary    == Eml.type unpack eml(do: [1,2,"z"])
-    assert :binary    == Eml.type eml(do: :name) 
-                                  |> Eml.write!(bindings: [name: "Vincent"])
     assert :binary    == Eml.type Eml.write! eml(do: :name)
+    assert :binary    == Eml.type eml(do: :name)
+                                  |> Eml.compile()
+                                  |> Eml.write!(bindings: [name: "Vincent"])
+    assert :template  == Eml.type eml(do: [:name, :age])
+                                  |> Eml.compile()
+                                  |> Eml.write!(bindings: [age: 36])
+    assert :template  == Eml.type eml(do: [:name, :age])
+                                  |> Eml.write!(bindings: [age: 36])
     assert :template  == Eml.type Eml.compile eml(do: :name)
     assert :template  == Eml.type Eml.compile eml(do: [div(1), div(2), div(:param), "..."])
     assert :parameter == Eml.type Eml.Parameter.new(:param)
@@ -314,5 +320,14 @@ defmodule EmlTest do
     
     assert Eml.write!(expected) == Eml.write!(taside, bindings: [fruit: "lemon"])
     
+  end
+
+  test "Read parameters from html" do
+    html       = "<div><span>#param{name}</span><span>#param{age}</span></div"
+    name_param = Eml.Parameter.new(:name)
+    age_param  = Eml.Parameter.new(:age)
+    eml        = Eml.read(html)
+
+    assert [name_param, age_param] == Eml.unpackr eml
   end
 end

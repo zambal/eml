@@ -364,7 +364,12 @@ defmodule Eml.Language.Html.Reader do
   defp compile([], acc, _ ) do
     {id, attrs } = Keyword.pop(acc[:attrs], :id)
     {class, attrs } = Keyword.pop(attrs, :class)
-    { Markup.new(tag: acc[:tag], id: id, class: class, attrs: attrs, content: acc[:content]), [] }
+    { Markup.new(tag: acc[:tag],
+                 id: id,
+                 class: class,
+                 attrs: :lists.reverse(attrs),
+                 content: :lists.reverse(acc[:content])),
+      [] }
   end
 
   defp precompile(:blank, _),           do: :skip

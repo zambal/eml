@@ -634,15 +634,14 @@ defmodule Eml do
   end
 
 
-  @spec compile(t, Keyword.t) :: Eml.Template.t | error
-  def compile(eml, opts // [])
+  @spec compile(t, dialect) :: Eml.Template.t | error
+  def compile(eml, dialect // @default_dialect)
 
-  def compile(templ() = t, _opts), do: t
-  def compile(eml, opts) do
-    { dialect, opts } = Keyword.pop(opts, :dialect, @default_dialect)
+  def compile(templ() = t, _), do: t
+  def compile(eml, dialect) do
     # for consistence, when compiling eml we always want to return a template, even if
-    # all parameters are bound, or there are no parameters at all.
-    case dialect.write(eml, Keyword.merge(opts, [mode: :compile, force_templ: true])) do
+    # there are no parameters at all, or all of them are bound.
+    case dialect.write(eml, [mode: :compile, force_templ: true]) do
       { :ok, t } -> t
       error      -> error
     end

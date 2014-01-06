@@ -286,7 +286,7 @@ defmodule EmlTest do
        div(:fruit),
        div(:fruit)]
     end
-    t = Eml.compile(e, pretty: false)
+    t = Eml.compile(e)
 
     assert :template == Eml.type t
     assert false == Template.bound?(t)

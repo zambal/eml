@@ -330,4 +330,28 @@ defmodule EmlTest do
 
     assert [name_param, age_param] == Eml.unpackr eml
   end
+
+  test "Parameterized attribute rendering" do
+    e = eml do
+      div [id: :id_param,
+           class: [:class1, "class2", :class3],
+           _custom1: :custom,
+           _custom2: :custom], []
+    end
+
+    expected1 = "<div id='#param{id_param}' class='#param{class1} class2 #param{class3}'" <> 
+                " data-custom1='#param{custom}' data-custom2='#param{custom}'/>"
+    assert expected1 == Eml.write!(e)
+
+    expected2 = "<div id='parameterized' class='class1 class2 class3' data-custom1='1' data-custom2='2'/>"
+    assert expected2 == Eml.write!(e, bindings: [id_param: "parameterized",
+                                                 class1: "class1",
+                                                 class3: "class3",
+                                                 custom: [1, 2]])
+
+    t = Eml.write!(e, bindings: [class3: "class3", custom: 1])
+    assert :template == Eml.type t
+    assert [id_param: 1, class1: 1, custom: 1] == Template.unbound(t)
+    assert expected2 == Eml.write!(t, bindings: [id_param: "parameterized", class1: "class1", custom: 2])
+  end
 end

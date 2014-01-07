@@ -97,10 +97,10 @@ defmodule Eml.Language.Html.Writer do
       bindings !== [] ->
         t = Template.bind(t, bindings)
         case parse_templ(t, opts, state()) do
-          { :ok, templ(chunks: tchunks, params: tparams, bindings: tbindings) } ->
-            state(type: :templ, chunks: :lists.reverse(tchunks) ++ chunks, params: merge_params(params, tparams), bindings: tbindings)
-          { :ok, bin } ->
-            state(s, chunks: [bin | chunks])
+          state(type: :templ, chunks: tchunks, params: tparams, bindings: tbindings) ->
+            state(type: :templ, chunks: tchunks ++ chunks, params: merge_params(params, tparams), bindings: tbindings)
+          state(chunks: rchunks, bindings: rbindings) ->
+            state(s, chunks: rchunks ++ chunks, bindings: rbindings)
         end
       # otherwise make a new parse state of type template
       # and add the all chunks and params to it.

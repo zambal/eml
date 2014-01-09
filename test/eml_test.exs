@@ -83,7 +83,7 @@ defmodule EmlTest do
   end
 
   test "Unpack" do
-    e = eml do: div 42    
+    e = eml do: div 42
     assert "42" == unpack unpack e
     assert "42" == unpack ["42"]
     assert "42" == unpack "42"
@@ -94,7 +94,7 @@ defmodule EmlTest do
   end
 
   test "Single unpackr" do
-    single = eml do: 42 |> div |> body |> html    
+    single = eml do: 42 |> div |> body |> html
     assert "42" == Eml.unpackr(single)
   end
 
@@ -317,9 +317,9 @@ defmodule EmlTest do
     expected = eml do
       aside [ section "lemon" ]
     end
-    
+
     assert Eml.write!(expected) == Eml.write!(taside, bindings: [fruit: "lemon"])
-    
+
   end
 
   test "Read parameters from html" do
@@ -339,7 +339,7 @@ defmodule EmlTest do
            _custom2: :custom], []
     end
 
-    expected1 = "<div id='#param{id_param}' class='#param{class1} class2 #param{class3}'" <> 
+    expected1 = "<div id='#param{id_param}' class='#param{class1} class2 #param{class3}'" <>
                 " data-custom1='#param{custom}' data-custom2='#param{custom}'/>"
     assert expected1 == Eml.write!(e)
 

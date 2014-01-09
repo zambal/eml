@@ -229,19 +229,10 @@ defmodule Eml.Language.Html.Writer do
     data
   end
 
-  defp escape(s) when is_binary(s) do
-    bc <<char>> inbits s, <<new::binary>> = escape_chars(char) do
-      <<new::binary>>
-    end
-  end
-
-  defp escape_chars(char) do
-    case char do
-      ?& -> <<"&amp;">>
-      ?< -> <<"&lt;">>
-      ?> -> <<"&gt;">>
-      _  -> <<char>>
-    end
+  defp escape(s) do
+    :binary.replace(s, "&", "&amp;", [:global])
+    |> :binary.replace("<", "&lt;", [:global])
+    |> :binary.replace(">", "&gt;", [:global])
   end
 
   # Attribute markup helpers
@@ -331,28 +322,30 @@ defmodule Eml.Language.Html.Writer do
   # pretty printing
 
   defp pretty_print(bin, width) do
-    pretty_print(String.codepoints(bin), width, 0, true, []) 
+    pretty_print(bin, width, 0, true, <<>>) 
   end
 
-  defp pretty_print([">", "<", "/" | rest], width, level, _open?, acc) do
+  defp pretty_print(<<"></", rest::binary>>, width, level, _open?, acc) do
     level = level - 1
-    pretty_print(rest, width, level, false, ["/", "<", String.duplicate(" ", width * level), "\n", ">"| acc])
+    b = ">\n" <> String.duplicate(" ", width * level) <> "</"
+    pretty_print(rest, width, level, false, <<acc::binary, b::binary>>)
   end
-  defp pretty_print(["<", "/" | rest], width, level, _open?, acc) do
-    pretty_print(rest, width, level, false, ["/", "<" | acc])
+  defp pretty_print(<<"</", rest::binary>>, width, level, _open?, acc) do
+    pretty_print(rest, width, level, false, <<acc::binary, "</">>)
   end
-  defp pretty_print(["/", ">" | rest], width, level, _open?, acc) do
-    pretty_print(rest, width, level, false, [">", "/"  | acc])
+  defp pretty_print(<<"/>", rest::binary>>, width, level, _open?, acc) do
+    pretty_print(rest, width, level, false, <<acc::binary, "/>">>)
   end
-  defp pretty_print([">", "<" | rest], width, level, open?, acc) do
+  defp pretty_print(<<"><", rest::binary>>, width, level, open?, acc) do
     level = if open?, do: level + 1, else: level
-    pretty_print(rest, width, level, true, ["<", String.duplicate(" ", width * level), "\n", ">" | acc])
+    b = ">\n" <> String.duplicate(" ", width * level) <> "<"
+    pretty_print(rest, width, level, true, <<acc::binary, b::binary>>)
   end
-  defp pretty_print([c | rest], width, level, open?, acc) do
-    pretty_print(rest, width, level, open?, [c | acc])
+  defp pretty_print(<<c, rest::binary>>, width, level, open?, acc) do
+    pretty_print(rest, width, level, open?, <<acc::binary, c>>)
   end
-  defp pretty_print([], _width, _level, _open?, acc) do
-    acc |> :lists.reverse() |> iolist_to_binary()
+  defp pretty_print(<<>>, _width, _level, _open?, acc) do
+    acc
   end
 
 

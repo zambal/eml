@@ -54,7 +54,7 @@ defmodule Eml.Language.Html.Reader do
   when state in [:param_content, :param_attr] do
     consume(c, cs, buf, acc, state)
   end
-  
+
 
   # When inside entity, accept any char, except ';'
   defp parse([c | cs], buf, acc, :entity) when c != ";" do
@@ -308,7 +308,7 @@ defmodule Eml.Language.Html.Reader do
   when maybe_asked === asked, do: :blank
   defp state_before(asked, [_ | t]), do: state_before(asked, t)
   defp state_before(_, []), do: :error
-  
+
   # Compile the genrated tokens
 
   defp compile(tokens) do

@@ -14,7 +14,7 @@ defmodule Eml.Language.Html.Writer do
                    force_templ: false
 
   defrecordp :state, type: :content, chunks: [], params: [], bindings: []
-    
+
   # API
 
   def write(templ() = t, opts) do
@@ -134,10 +134,10 @@ defmodule Eml.Language.Html.Writer do
 
   defp parse_attrs([{ k, v } | rest], opts, state(type: type) = s) do
     type = chunk_type(:attr, type)
-    s    = parse_attr(k, v, opts, state(s, type: type)) 
+    s    = parse_attr(k, v, opts, state(s, type: type))
     parse_attrs(rest, opts, s)
   end
-  
+
   defp parse_attrs([], _, s), do: s
 
   defp parse_attr(_, nil, _, s), do: s
@@ -218,7 +218,7 @@ defmodule Eml.Language.Html.Writer do
   # Markup helpers
 
   defp parse_param(param) do
-    "#param{#{Param.id(param)}}"  
+    "#param{#{Param.id(param)}}"
   end
 
   defp maybe_escape(data, Opts[escape: true]) do
@@ -256,7 +256,7 @@ defmodule Eml.Language.Html.Writer do
   def insert_whitespace([v], acc) do
     :lists.reverse([v | acc])
   end
-  def insert_whitespace([v | rest], acc) do 
+  def insert_whitespace([v | rest], acc) do
     insert_whitespace(rest, [" ", v | acc])
   end
   def insert_whitespace([], acc) do
@@ -288,7 +288,7 @@ defmodule Eml.Language.Html.Writer do
           |> Enum.map(fn v -> Eml.read(v, Eml.Language.Native) end)
       { k, v }
     end)
-  end 
+  end
 
   # Concatenates chunks inbetween parameters for efficient template compiling.
   # It is feeded by the reverserd list of chunks,
@@ -305,7 +305,7 @@ defmodule Eml.Language.Html.Writer do
   # pretty printing
 
   defp pretty_print(bin, width) do
-    pretty_print(bin, width, 0, true, <<>>) 
+    pretty_print(bin, width, 0, true, <<>>)
   end
 
   defp pretty_print(<<"></", rest::binary>>, width, level, _open?, acc) do

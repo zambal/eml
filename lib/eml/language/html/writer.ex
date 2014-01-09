@@ -294,30 +294,13 @@ defmodule Eml.Language.Html.Writer do
   # It is feeded by the reverserd list of chunks,
   # so consolidate_chunks doesn't need to reverse its results.
 
-  defp consolidate_chunks(chunks) do
-    consolidate_chunks(chunks, "", [])
-  end
+  defp consolidate_chunks(chunks), do: consolidate_chunks(chunks, [])
 
-  defp consolidate_chunks([param | chunks], str, acc)
-  when is_record(param, Param) do
-    consolidate_chunks(chunks, "", [param, str | acc])
-  end
-
-  defp consolidate_chunks([chunk | chunks], str, acc ) do
-    consolidate_chunks(chunks, chunk <> str, acc )
-  end
-
-  defp consolidate_chunks([], str, [h | t]) do
-    if is_binary(h) do
-      [h <> str | t]
-    else
-      [str, h | t]
-    end
-  end
-
-  defp consolidate_chunks([], str, _) do
-    str
-  end
+  defp consolidate_chunks([], acc),             do: acc
+  defp consolidate_chunks([chunk | rest], []),  do: consolidate_chunks(rest, [chunk])
+  defp consolidate_chunks([chunk | rest], [h | t])
+  when is_binary(chunk) and is_binary(h),       do: consolidate_chunks(rest, [chunk <> h | t])
+  defp consolidate_chunks([chunk | rest], acc), do: consolidate_chunks(rest, [chunk | acc])
 
   # pretty printing
 

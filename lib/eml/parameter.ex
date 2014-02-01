@@ -23,6 +23,6 @@ defimpl Inspect, for: Eml.Parameter do
   import Inspect.Algebra
 
   def inspect(param, opts) do
-    concat ["#param", Kernel.inspect(Param.id(param), opts)]
+    concat ["#param", to_doc(Param.id(param), opts)]
   end
 end

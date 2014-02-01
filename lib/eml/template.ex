@@ -117,7 +117,7 @@ defimpl Inspect, for: Eml.Template do
   def inspect(t, opts) do
     bindstat = case Eml.Template.unbound(t) do
                  []      -> "BOUND"
-                 unbound -> Kernel.inspect(unbound, opts)
+                 unbound -> to_doc(unbound, opts)
                end
     concat ["#Template", "<", bindstat, ">"]
   end

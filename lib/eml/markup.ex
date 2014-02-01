@@ -321,8 +321,8 @@ defimpl Inspect, for: Eml.Markup do
     opts = if is_list(opts), do: Keyword.put(opts, :hide_content_type, true), else: opts
     tag   = atom_to_binary(tag)
     attrs = Eml.Markup.maybe_include(attrs, [id: id, class: class])
-    attrs = if attrs == [], do: "", else: Kernel.inspect(attrs, opts)
-    content  = if Eml.empty?(content), do: "", else: Kernel.inspect(content, opts)
+    attrs = if attrs == [], do: "", else: to_doc(attrs, opts)
+    content  = if Eml.empty?(content), do: "", else: to_doc(content, opts)
     fields = case { attrs, content } do
                { "", "" } -> ""
                { "", _ }  -> content

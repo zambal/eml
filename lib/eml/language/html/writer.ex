@@ -44,23 +44,14 @@ defmodule Eml.Language.Html.Writer do
     type  = chunk_type(:markup, type)
     attrs = Markup.maybe_include(attrs, [id: id, class: class])
 
-    if content == [] do
-      chunks = chunks
-               |> maybe_doctype(tag)
-               |> empty_tag_open(tag)
-      s = state(chunks: chunks) = parse_attrs(attrs, opts, state(s, type: type, chunks: chunks))
-      chunks = empty_tag_close(chunks)
-      state(s, chunks: chunks)
-    else
-      chunks = chunks
-               |> maybe_doctype(tag)
-               |> start_tag_open(tag)
-      s = state(chunks: chunks) = parse_attrs(attrs, opts, state(s, type: type, chunks: chunks))
-      chunks = start_tag_close(chunks)
-      s = state(chunks: chunks) = parse_eml(content, opts, state(s, chunks: chunks))
-      chunks = end_tag(chunks, tag)
-      state(s, chunks: chunks)
-    end
+    chunks = chunks
+             |> maybe_doctype(tag)
+             |> start_tag_open(tag)
+    s = state(chunks: chunks) = parse_attrs(attrs, opts, state(s, type: type, chunks: chunks))
+    chunks = start_tag_close(chunks)
+    s = state(chunks: chunks) = parse_eml(content, opts, state(s, chunks: chunks))
+    chunks = end_tag(chunks, tag)
+    state(s, chunks: chunks)
   end
 
   defp parse_eml(list, opts, s) when is_list(list) do
@@ -204,8 +195,6 @@ defmodule Eml.Language.Html.Writer do
 
   # Markup generators
 
-  defp empty_tag_open(chunks, tag), do: ["<#{tag}" | chunks]
-  defp empty_tag_close(chunks),     do: ["/>" | chunks]
   defp start_tag_open(chunks, tag), do: ["<#{tag}" | chunks]
   defp start_tag_close(chunks),     do: [">" | chunks]
   defp end_tag(chunks, tag),        do: ["</#{tag}>" | chunks]

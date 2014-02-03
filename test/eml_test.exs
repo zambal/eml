@@ -340,10 +340,10 @@ defmodule EmlTest do
     end
 
     expected1 = "<div id='#param{id_param}' class='#param{class1} class2 #param{class3}'" <>
-                " data-custom1='#param{custom}' data-custom2='#param{custom}'/>"
+                " data-custom1='#param{custom}' data-custom2='#param{custom}'></div>"
     assert expected1 == Eml.write!(e)
 
-    expected2 = "<div id='parameterized' class='class1 class2 class3' data-custom1='1' data-custom2='2'/>"
+    expected2 = "<div id='parameterized' class='class1 class2 class3' data-custom1='1' data-custom2='2'></div>"
     assert expected2 == Eml.write!(e, bindings: [id_param: "parameterized",
                                                  class1: "class1",
                                                  class3: "class3",

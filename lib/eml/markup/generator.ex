@@ -13,7 +13,7 @@ defmodule Eml.Markup.Generator do
   @doc false
   defmacro def_markup(tag) do
     quote bind_quoted: [tag: tag] do
-      defmacro unquote(tag)(attrs // [], content) do
+      defmacro unquote(tag)(attrs \\ [], content) do
         tag = unquote(tag)
         markup = Eml.Markup.Generator.extract_args(tag, content, attrs)
         quote do

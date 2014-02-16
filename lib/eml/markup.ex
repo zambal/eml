@@ -46,7 +46,7 @@ defmodule Eml.Markup do
   end
 
   @spec new(fields, Eml.lang) :: t
-  def new(fields, lang // @default_lang) do
+  def new(fields, lang \\ @default_lang) do
     tag     = fields[:tag] || :div
     id      = fields[:id]      |> to_attr_value()
     class   = fields[:class]   |> to_attr_value()
@@ -80,12 +80,12 @@ defmodule Eml.Markup do
   def content(m(content: content)), do: content
 
   @spec content(t, data, Eml.lang) :: t
-  def content(markup, data, lang // @default_lang) do
+  def content(markup, data, lang \\ @default_lang) do
     m(markup, content: Eml.read!(data, lang))
   end
 
   @spec add(t, data, Keyword.t) :: t
-  def add(m(content: current) = markup, data, opts // []) do
+  def add(m(content: current) = markup, data, opts \\ []) do
     at      = opts[:at] || :end
     lang  = opts[:lang] || @default_lang
     content = Eml.read!(data, current, at, lang)
@@ -93,7 +93,7 @@ defmodule Eml.Markup do
   end
 
   @spec update(t, (Eml.element -> data), Eml.lang) :: t
-  def update(m(content: content) = markup, fun, lang // @default_lang) do
+  def update(m(content: content) = markup, fun, lang \\ @default_lang) do
     content = lc element inlist content, data = fun.(element) do
       Eml.Readable.read(data, lang)
     end
@@ -187,7 +187,7 @@ defmodule Eml.Markup do
     end)
   end
 
-  def match?(_, tag, id // :any, class // :any)
+  def match?(_, tag, id \\ :any, class \\ :any)
 
   def match?(_, :any, :any, :any),
   do: true

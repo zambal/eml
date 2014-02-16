@@ -44,7 +44,7 @@ defmodule Eml do
   available as `Kernel.div/2`
 
   """
-  defmacro eml(opts // [], do_block) do
+  defmacro eml(opts \\ [], do_block) do
     opts    = Keyword.merge(opts, do_block)
     lang = opts[:use] || @default_lang
     expr    = opts[:do]
@@ -133,7 +133,7 @@ defmodule Eml do
 
   """
   @spec select(t) :: t
-  def select(eml, opts // [])
+  def select(eml, opts \\ [])
 
   def select(content, opts) when is_list(content) do
     Enum.flat_map(content, &select(&1, opts))
@@ -217,7 +217,7 @@ defmodule Eml do
 
   """
   @spec add(t, data, Keyword.t) :: t
-  def add(eml, data, opts // []) do
+  def add(eml, data, opts \\ []) do
     tag     = opts[:tag] || :any
     id      = opts[:id] || :any
     class   = opts[:class] || :any
@@ -282,7 +282,7 @@ defmodule Eml do
 
   """
   @spec update(t, (element -> data), Keyword.t) :: t
-  def update(eml, fun, opts // []) do
+  def update(eml, fun, opts \\ []) do
     tag            = opts[:tag] || :any
     id             = opts[:id] || :any
     class          = opts[:class] || :any
@@ -351,7 +351,7 @@ defmodule Eml do
 
   """
   @spec remove(t, Keyword.t) :: t
-  def remove(eml, opts // []) do
+  def remove(eml, opts \\ []) do
     tag            = opts[:tag] || :any
     id             = opts[:id] || :any
     class          = opts[:class] || :any
@@ -475,7 +475,7 @@ defmodule Eml do
         #span<[id: "inner2", class: "inner"] ["world"]>]>]
   """
   @spec transform(t, (element -> data), lang) :: t | nil
-  def transform(eml, fun, lang // Eml.Language.Native)
+  def transform(eml, fun, lang \\ Eml.Language.Native)
 
   def transform(eml, fun, lang) when is_list(eml) do
     lc element inlist eml, t = transform(element, fun, lang), do: t
@@ -492,12 +492,12 @@ defmodule Eml do
   end
 
   @spec read(data, lang) :: t | error
-  def read(data, lang // @default_lang) do
+  def read(data, lang \\ @default_lang) do
     read(data, [], :begin, lang)
   end
 
   @spec read!(data, lang) :: t
-  def read!(data, lang // @default_lang) do
+  def read!(data, lang \\ @default_lang) do
     case read(data, lang) do
       { :error, e } ->
         raise ArgumentError, message: "Error #{inspect e}"
@@ -506,7 +506,7 @@ defmodule Eml do
   end
 
   @spec read_file(path, lang) :: t | error
-  def read_file(path, lang // @default_lang) do
+  def read_file(path, lang \\ @default_lang) do
     case File.read(path) do
       { :ok, data }  -> read(data, [], :begin, lang)
       { :error, e }  -> { :error, e }
@@ -514,12 +514,12 @@ defmodule Eml do
   end
 
   @spec read_file!(path, lang) :: t | error
-  def read_file!(path, lang // @default_lang) do
+  def read_file!(path, lang \\ @default_lang) do
     File.read!(path) |> read!(lang)
   end
 
   @spec read(data | error, content, atom, lang) :: t | error
-  def read(data, content, at, lang // Eml.Languages.Native)
+  def read(data, content, at, lang \\ Eml.Languages.Native)
 
   # Error pass through
   def read({ :error, e }, _, _, _), do: { :error, e }
@@ -591,7 +591,7 @@ defmodule Eml do
   do: content
 
   @spec read!(data | error, content, atom, lang) :: t
-  def read!(data, content, at, lang // @default_lang) do
+  def read!(data, content, at, lang \\ @default_lang) do
     case read(data, content, at, lang) do
       { :error, e } ->
         raise ArgumentError, message: "Error #{e}"
@@ -600,7 +600,7 @@ defmodule Eml do
   end
 
   @spec write(t, Keyword.t) :: { :ok, binary } | error
-  def write(eml, opts // [])
+  def write(eml, opts \\ [])
 
   def write(templ() = t, opts) do
     { lang, opts } = Keyword.pop(opts, :lang, @default_lang)
@@ -613,7 +613,7 @@ defmodule Eml do
   end
 
   @spec write!(t, Keyword.t) :: binary
-  def write!(eml, opts // []) do
+  def write!(eml, opts \\ []) do
     case write(eml, opts) do
       { :ok, str }  -> str
       { :error, e } -> raise ArgumentError, message: inspect(e, pretty: true)
@@ -621,7 +621,7 @@ defmodule Eml do
   end
 
   @spec write_file(path, t, Keyword.t) :: :ok | error
-  def write_file(path, eml, opts // []) do
+  def write_file(path, eml, opts \\ []) do
     case write(eml, opts) do
       { :ok, str } -> File.write(path, str)
       error        -> error
@@ -629,13 +629,13 @@ defmodule Eml do
   end
 
   @spec write_file!(path, t, Keyword.t) :: :ok
-  def write_file!(path, eml, opts // []) do
+  def write_file!(path, eml, opts \\ []) do
     File.write!(path, write!(eml, opts))
   end
 
 
   @spec compile(t, lang) :: Eml.Template.t | error
-  def compile(eml, lang // @default_lang)
+  def compile(eml, lang \\ @default_lang)
 
   def compile(templ() = t, _), do: t
   def compile(eml, lang) do
@@ -681,7 +681,7 @@ defmodule Eml do
   def empty?(m(content: [])), do: true
   def empty?(_), do: false
 
-  defmacro match!(opts // []) do
+  defmacro match!(opts \\ []) do
     any      = quote do: _
     tag      = Keyword.get(opts, :tag, any)
     id       = Keyword.get(opts, :id, any)
@@ -694,7 +694,7 @@ defmodule Eml do
     end
   end
 
-  defmacro match?(markup, opts // []) do
+  defmacro match?(markup, opts \\ []) do
     quote do
       case unquote(markup) do
         Eml.match!(unquote(opts)) -> true

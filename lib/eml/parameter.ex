@@ -6,7 +6,7 @@ defmodule Eml.Parameter do
   @type t          :: { Eml.Parameter, id, param_type }
 
   @spec new(id, param_type) :: t
-  def new(id, type // :content), do: param(id: id, type: type)
+  def new(id, type \\ :content), do: param(id: id, type: type)
 
   @spec id(t) :: id
   def id(param(id: id)), do: id

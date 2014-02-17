@@ -125,10 +125,10 @@ defmodule Eml do
       iex> Eml.select(e, class: "inner", id: "test")
       []
 
-      iex> Eml.select(e, pat: %r/h.*o/)
+      iex> Eml.select(e, pat: ~r/h.*o/)
       ["hello "]
 
-      iex> Eml.select(e, pat: %r/H.*o/, parent: true)
+      iex> Eml.select(e, pat: ~r/H.*o/, parent: true)
       [#span<[id: "inner1", class: "inner"] ["hello "]>]
 
   """
@@ -277,7 +277,7 @@ defmodule Eml do
        [#span<[id: "inner1", class: "inner"] ["hello "]>,
         #span<[id: "inner2", class: "inner"] ["world"]>]>]
 
-      iex> Eml.update(e, fn s -> String.upcase(s) end, pat: %r/.*/) |> Eml.write!(pretty: false)
+      iex> Eml.update(e, fn s -> String.upcase(s) end, pat: ~r/.*/) |> Eml.write!(pretty: false)
       "<div><span id='inner1' class='inner'>HELLO </span><span id='inner2' class='inner'>WORLD</span></div>"
 
   """
@@ -345,7 +345,7 @@ defmodule Eml do
       iex> Eml.remove(e, id: "inner1")
       [#div<[#span<[id: "inner2", class: "inner"] ["world"]>]>]
 
-      iex> Eml.remove(e, pat: %r/.*/)
+      iex> Eml.remove(e, pat: ~r/.*/)
       [#div<[#span<[id: "inner1", class: "inner"]>,
         #span<[id: "inner2", class: "inner"]>]>]
 
@@ -416,7 +416,7 @@ defmodule Eml do
       iex> Eml.member?(e, class: "inner", id: "test")
       false
 
-      iex> Eml.member?(e, pat: %r/h.*o/)
+      iex> Eml.member?(e, pat: ~r/h.*o/)
       true
 
   """

@@ -275,10 +275,10 @@ iex(22)> Eml.select(e, tag: :meta, parent: true)
 
 # when using the :pat option, a regular expression can be used to
 # match binary content
-iex(23)> Eml.select(e, pat: %r/H.*d/)
+iex(23)> Eml.select(e, pat: ~r/H.*d/)
 ["Hello world"]
 
-iex(24)> Eml.select(e, pat: %r/TOD/, parent: true)
+iex(24)> Eml.select(e, pat: ~r/TOD/, parent: true)
 [#section<[class: ["conclusion", "article"]] ["TODO"]>]
 
 iex(25)> Eml.member?(e, class: "head")
@@ -302,13 +302,13 @@ iex(27)> Eml.remove(e, class: "article")
 [#html<[#head<[class: "head"] [#meta<[charset: "UTF-8"]>]>,
   #body<[#article<[id: "main-content"]>]>]>]
 
-iex(28)> Eml.remove(e, pat: %r/orld/)
+iex(28)> Eml.remove(e, pat: ~r/orld/)
 [#html<[#head<[class: "head"] [#meta<[charset: "UTF-8"]>]>,
   #body<[#article<[id: "main-content"]
    [#section<[class: ["intro", "article"]] [#h3<>]>,
     #section<[class: ["conclusion", "article"]] ["TODO"]>]>]>]>]
 
-iex(29)> Eml.update(e, &String.downcase(&1), pat: %r/.*/)
+iex(29)> Eml.update(e, &String.downcase(&1), pat: ~r/.*/)
 [#html<[#head<[class: "head"] [#meta<[charset: "UTF-8"]>]>,
   #body<[#article<[id: "main-content"]
    [#section<[class: ["intro", "article"]] [#h3<["hello world"]>]>,

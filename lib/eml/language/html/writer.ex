@@ -4,8 +4,9 @@ defmodule Eml.Language.Html.Writer do
   alias Eml.Markup
   alias Eml.Template
   alias Eml.Parameter, as: Param
+  require Record
 
-  defrecord  Opts, indent: 2,
+  defrecord Opts, indent: 2,
                    quote: :single,
                    escape: true,
                    output: :string,
@@ -13,7 +14,7 @@ defmodule Eml.Language.Html.Writer do
                    mode: :render,
                    force_templ: false
 
-  defrecordp :state, type: :content, chunks: [], params: [], bindings: []
+  Record.defrecordp :state, type: :content, chunks: [], params: [], bindings: []
 
   # API
 
@@ -61,7 +62,7 @@ defmodule Eml.Language.Html.Writer do
   end
 
   defp parse_eml(param, Opts[mode: :compile] = opts, state(chunks: chunks, params: params, bindings: bindings) = s)
-  when is_record(param, Param) do
+  when Record.record?(param, Param) do
     case Template.pop(bindings, Param.id(param)) do
       { nil, b }   -> state(type: :templ, chunks: [param | chunks], params: add_param(params, param), bindings: b)
       { value, b } -> parse_eml(value, opts, state(s, bindings: b))
@@ -69,7 +70,7 @@ defmodule Eml.Language.Html.Writer do
   end
 
   defp parse_eml(param, Opts[mode: :render], state(chunks: chunks, params: params) = s)
-  when is_record(param, Param) do
+  when Record.record?(param, Param) do
     param = parse_param(param)
     state(s, chunks: [param | chunks], params: params)
   end
@@ -156,7 +157,7 @@ defmodule Eml.Language.Html.Writer do
   end
 
   defp parse_attr_value(param, Opts[mode: mode] = opts, state(chunks: chunks, params: params, bindings: bindings) = s)
-  when is_record(param, Param) do
+  when Record.record?(param, Param) do
     case mode do
       :compile ->
         case Template.pop(bindings, Param.id(param)) do
@@ -177,7 +178,7 @@ defmodule Eml.Language.Html.Writer do
   defp parse_templ(templ(chunks: chunks, bindings: bindings), Opts[force_templ: force_templ?] = opts, state(type: type) = s) do
     type = if force_templ?, do: :templ, else: type
     process_chunk = fn
-      param, st when is_record(param, Param) ->
+      param, st when Record.record?(param, Param) ->
         expand_param(param, Param.type(param), opts, st)
       chunk, state(chunks: chunks) = st ->
         state(st, chunks: [chunk | chunks])
@@ -328,11 +329,11 @@ defmodule Eml.Language.Html.Writer do
   end
 
   defp to_result(state(chunks: chunks), Opts[output: :string, pretty: true, indent: width]) do
-    { :ok, chunks |> :lists.reverse() |> iolist_to_binary() |> pretty_print(width)  }
+    { :ok, chunks |> :lists.reverse() |> iodata_to_binary |> pretty_print(width)  }
   end
 
   defp to_result(state(chunks: chunks), Opts[output: :string]) do
-    { :ok, chunks |> :lists.reverse() |> iolist_to_binary() }
+    { :ok, chunks |> :lists.reverse() |> iodata_to_binary }
   end
 
   defp to_result(state(chunks: chunks), Opts[output: :iolist]) do

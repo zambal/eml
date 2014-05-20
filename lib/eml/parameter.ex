@@ -1,5 +1,7 @@
 defmodule Eml.Parameter do
-  defrecordp :param, Eml.Parameter, id: nil, type: :content
+  require Record
+
+  Record.defrecordp :param, Eml.Parameter, id: nil, type: :content
 
   @type id         :: atom
   @type param_type :: :content | :attr

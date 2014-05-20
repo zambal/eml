@@ -3,7 +3,8 @@ defmodule Eml.Template.Record do
 
   defmacro __using__(_) do
     quote do
-      defrecordp :templ, Eml.Template, chunks: [], params: [], bindings: []
+      require Record
+      Record.defrecordp :templ, Eml.Template, chunks: [], params: [], bindings: []
     end
   end
 
@@ -45,9 +46,9 @@ defmodule Eml.Template do
 
   @spec bind(t, bindings) :: t
   def bind(templ(bindings: current) = t, new) do
-    new = lc { id, data } inlist new do
+    new = for { id, data } <- new do
       readed = if is_list(data) do
-                 lc d inlist data, do: Eml.read(d, @lang)
+                 for d <- data, do: Eml.read(d, @lang)
                else
                  Eml.read(data, @lang)
                end
@@ -62,8 +63,8 @@ defmodule Eml.Template do
 
   @spec unbind(t, bindings) :: t
   def unbind(templ(bindings: current) = t, unbinds) do
-    removed = lc { id, data } inlist unbinds do
-      readed = lc d inlist data, do: Eml.read(d, @lang)
+    removed = for { id, data } <- unbinds do
+      readed = for d <- data, do: Eml.read(d, @lang)
       { id, get(t, id) -- readed }
     end
     templ(t, bindings: Keyword.merge(current, removed))

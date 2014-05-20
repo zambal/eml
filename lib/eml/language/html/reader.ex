@@ -280,7 +280,7 @@ defmodule Eml.Language.Html.Reader do
   end
 
   defp stringify(buf) when is_list(buf) do
-    buf |> :lists.reverse() |> iolist_to_binary()
+    buf |> :lists.reverse() |> iodata_to_binary
   end
 
   # Checks for empty content

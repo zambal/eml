@@ -1,9 +1,11 @@
 defmodule Eml.Markup.Record do
   @moduledoc false
+  require Record
 
   defmacro __using__(_) do
     quote do
-      defrecordp :m, Eml.Markup, tag: :div, id: nil, class: nil, attrs: [], content: []
+      require Record
+      Record.defrecordp :m, Eml.Markup, tag: :div, id: nil, class: nil, attrs: [], content: []
     end
   end
 
@@ -94,7 +96,7 @@ defmodule Eml.Markup do
 
   @spec update(t, (Eml.element -> data), Eml.lang) :: t
   def update(m(content: content) = markup, fun, lang \\ @default_lang) do
-    content = lc element inlist content, data = fun.(element) do
+    content = for element <- content, data <- fun.(element) do
       Eml.Readable.read(data, lang)
     end
     m(markup, content: content)
@@ -103,7 +105,7 @@ defmodule Eml.Markup do
   @spec remove(t, Eml.element | content) :: t
   def remove(m(content: content) = markup, to_remove) do
     to_remove = if is_list(to_remove), do: to_remove, else: [to_remove]
-    content = lc element inlist content, not element in to_remove do
+    content = for element <- content, not element in to_remove do
       element
     end
     m(markup, content: content)
@@ -233,7 +235,7 @@ defmodule Eml.Markup do
 
   defp to_attrs(data)
   when is_list(data) do
-    lc { field, value } inlist data, not nil?(value) do
+    for { field, value } <- data, not nil?(value) do
       { field, to_attr_value(value) }
     end
   end
@@ -245,14 +247,14 @@ defmodule Eml.Markup do
   defp to_attr_value([data]), do: to_attr_value(data)
 
   defp to_attr_value(list) when is_list(list) do
-    res = lc data inlist list, not nil?(data) do
+    res = for data <- list, not nil?(data) do
       to_attr_value(data)
     end |> :lists.flatten()
     if res === [], do: nil, else: res
   end
 
   defp to_attr_value(param)
-  when is_record(param, Eml.Parameter), do: param
+  when Record.record?(param, Eml.Parameter), do: param
   defp to_attr_value(param)
   when is_atom(param)
   and not param in [true, false], do: Eml.Parameter.new(param, :attr)
@@ -262,7 +264,7 @@ defmodule Eml.Markup do
   defp insert_attr_value(old, new) do
     old = ensure_list(old)
     new = ensure_list(new)
-    lc v inlist new do
+    for v <- new do
       to_attr_value(v)
     end ++ old
   end

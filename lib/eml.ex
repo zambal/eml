@@ -5,6 +5,7 @@ defmodule Eml do
   use Eml.Markup.Record
   alias Eml.Markup.Record, as: R
   use Eml.Template.Record
+  require Record
 
 
   @default_lang Eml.Language.Html
@@ -140,7 +141,7 @@ defmodule Eml do
   end
 
   def select(template, _opts)
-  when is_record(template, Template), do: []
+  when Record.record?(template, Template), do: []
 
   def select(element, opts) do
     tag            = opts[:tag] || :any
@@ -478,7 +479,7 @@ defmodule Eml do
   def transform(eml, fun, lang \\ Eml.Language.Native)
 
   def transform(eml, fun, lang) when is_list(eml) do
-    lc element inlist eml, t = transform(element, fun, lang), do: t
+    for element <- eml, t = transform(element, fun, lang), do: t
   end
 
   def transform(element, fun, lang) do
@@ -662,7 +663,7 @@ defmodule Eml do
   def unpackr(element),                       do: element
 
   defp unpack_content(content) do
-    lc element inlist content, do: unpackr(element)
+    for element <- content, do: unpackr(element)
   end
 
   @spec funpackr(t) :: funpackr_result
@@ -720,7 +721,7 @@ defmodule Eml do
   def type(templ()), do: :template
 
   def type(param)
-  when is_record(param, Eml.Parameter), do: :parameter
+  when Record.record?(param, Eml.Parameter), do: :parameter
 
   def type(_), do: :undefined
 

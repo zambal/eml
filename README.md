@@ -18,7 +18,7 @@ Eml.write! eml do
 
   div %{class: "person"} do
     div %{}, [ span(%{}, "name: "), span(%{}, name) ]
-    div [ span(%{}, "age: "), span(%{}, age) ]
+    div %{}, [ span(%{}, "age: "), span(%{}, age) ]
   end
 end
 ```

@@ -1,36 +1,36 @@
 defmodule EmlTest do
   use ExUnit.Case
   use Eml
-  use Eml.Markup.Record
+  alias Eml.Markup, as: M
 
   defp doc() do
-    [m(tag: :html, content: [
-      m(tag: :head, class: "test", content: [
-        m(tag: :title, class: "title", content: ["Eml is Html for developers"])
-      ]),
-      m(tag: :body, class: ["test", "main"], content: [
-        m(tag: :h1, class: "title", content: ["Eml is Html for developers"]),
-        m(tag: :article, class: "content", attrs: [_custom: "some custom attribute"],
-           content: ["Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."]),
-        m(tag: :div, id: "main-side-bar", class: ["content", "side-bar"], content: [
-          m(tag: :span, class: "test", content: ["Some notes..."])
-        ])
-      ])
-    ])]
+    [%M{tag: :html, content: [
+      %M{tag: :head, attrs: %{class: "test"}, content: [
+        %M{tag: :title, attrs: %{class: "title"}, content: ["Eml is Html for developers"]}
+      ]},
+      %M{tag: :body, attrs: %{class: ["test", "main"]}, content: [
+        %M{tag: :h1, attrs: %{class: "title"}, content: ["Eml is Html for developers"]},
+        %M{tag: :article, attrs: %{class: "content", "data-custom": "some custom attribute"},
+           content: ["Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."]},
+        %M{tag: :div, attrs: %{id: "main-side-bar", class: ["content", "side-bar"]}, content: [
+          %M{tag: :span, attrs: %{class: "test"}, content: ["Some notes..."]}
+        ]}
+      ]}
+    ]}]
   end
 
   test "Markup macro" do
     doc = eml do
       html do
-        head [class: "test"] do
-          title [class: "title"], "Eml is Html for developers"
+        head %{class: "test"} do
+          title %{class: "title"}, "Eml is Html for developers"
         end
-        body [class: ["test", "main"]] do
-          h1 [class: "title"], "Eml is Html for developers"
-          article [class: "content", _custom: "some custom attribute"],
+        body %{class: ["test", "main"]} do
+          h1 %{class: "title"}, "Eml is Html for developers"
+          article %{class: "content", "data-custom": "some custom attribute"},
           "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."
-          div [id: "main-side-bar", class: ["content", "side-bar"]] do
-            span [class: "test"], "Some notes..."
+          div %{id: "main-side-bar", class: ["content", "side-bar"]} do
+            span %{class: "test"}, "Some notes..."
           end
         end
       end
@@ -39,20 +39,55 @@ defmodule EmlTest do
     assert doc() == doc
   end
 
+  test "Markup macro as match pattern" do
+    e = eml do
+      span(%{id: id}, _) = %M{tag: :span, attrs: %{id: "test"}, content: []}
+      id
+    end
+    assert "test" == unpack(e)
+  end
+
+  test "Enumerate markup" do
+    assert true == Enum.member?(unpack(doc()), "Some notes...")
+
+    e = eml do
+      h1 %{class: "title"}, ["Eml is Html for developers"]
+    end
+    assert e == Enum.filter(unpack(doc()), &Markup.has?(&1, tag: :h1))
+
+    e = eml do
+      [
+        head %{class: "test"} do
+          title %{class: "title"}, "Eml is Html for developers"
+        end,
+        body %{class: ["test", "main"]} do
+          h1 %{class: "title"}, "Eml is Html for developers"
+          article %{class: "content", "data-custom": "some custom attribute"},
+          "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."
+          div %{id: "main-side-bar", class: ["content", "side-bar"]} do
+            span %{class: "test"}, "Some notes..."
+          end
+        end,
+        span(%{class: "test"}, "Some notes...")
+      ]
+    end
+    assert e == Enum.filter(unpack(doc()), &Markup.has?(&1, class: "test"))
+  end
+
   test "Write => Read => Compare" do
     assert doc() == doc() |> Eml.write!() |> Eml.read!()
   end
 
   test "Types" do
-    assert :content   == Eml.type eml(do: div 42)
+    assert :content   == Eml.type eml(do: div(%{}, 42))
     assert :content   == Eml.type eml(do: [1,2,"z"])
     assert :content   == Eml.type eml(do: "")
     assert :content   == Eml.type eml(do: [])
     assert :content   == Eml.type eml(do: nil)
     assert :markup    == Eml.type Eml.Markup.new()
-    assert :markup    == Eml.type unpack eml(do: div 42)
+    assert :markup    == Eml.type unpack eml(do: div(%{}, 42))
     assert :binary    == Eml.type "strings are binaries"
-    assert :binary    == Eml.type Eml.unpackr eml(do: div 42)
+    assert :binary    == Eml.type Eml.unpackr eml(do: div(%{}, 42))
     assert :binary    == Eml.type unpack eml(do: [1,2,"z"])
     assert :binary    == Eml.type Eml.write! eml(do: :name)
     assert :binary    == Eml.type eml(do: :name)
@@ -64,8 +99,8 @@ defmodule EmlTest do
     assert :template  == Eml.type eml(do: [:name, :age])
                                   |> Eml.write!(bindings: [age: 36])
     assert :template  == Eml.type Eml.compile eml(do: :name)
-    assert :template  == Eml.type Eml.compile eml(do: [div(1), div(2), div(:param), "..."])
-    assert :parameter == Eml.type Eml.Parameter.new(:param)
+    assert :template  == Eml.type Eml.compile eml(do: [div(%{}, 1), div(%{}, 2), div(%{}, :param), "..."])
+    assert :parameter == Eml.type %Eml.Parameter{}
     assert :parameter == Eml.type unpack eml(do: :param)
   end
 
@@ -74,7 +109,7 @@ defmodule EmlTest do
     assert ["truefalse"]       == eml do: [true, false]
     assert ["12345678"]        == eml do: Enum.to_list(1..8)
     assert ["Hello world"]     == eml do: ["H", ["el", "lo", [" "]], ["wor", ["ld"]]]
-    assert ["Happy new 2014!"] == eml do: ["Happy new ", 2, 0, 1, 4, "!"]
+    assert ["Happy new 2015!"] == eml do: ["Happy new ", 2, 0, 1, 5, "!"]
   end
 
   test "Native read" do
@@ -83,18 +118,24 @@ defmodule EmlTest do
   end
 
   test "Unpack" do
-    e = eml do: div 42
+    e = eml do: div(%{}, 42)
     assert "42" == unpack unpack e
     assert "42" == unpack ["42"]
     assert "42" == unpack "42"
-    assert "42" == unpack Eml.Markup.new(content: 42)
+    assert "42" == unpack Eml.Markup.new(:div, %{}, 42)
 
-    e = eml do: [div(1), div(2)]
+    e = eml do: [div(%{}, 1), div(%{}, 2)]
     assert e == unpack e
   end
 
   test "Single unpackr" do
-    single = eml do: 42 |> div |> body |> html
+    single = eml do
+      html do
+        body do
+          div(%{}, 42)
+        end
+      end
+    end
     assert "42" == Eml.unpackr(single)
   end
 
@@ -102,8 +143,8 @@ defmodule EmlTest do
     multi = eml do
       html do
         body do
-          div [ span(1), span(2) ]
-          div [ span(3) ]
+          div %{}, [ span(%{}, 1), span(%{}, 2) ]
+          div %{}, [ span(%{}, 3) ]
         end
       end
     end
@@ -114,8 +155,8 @@ defmodule EmlTest do
     multi = eml do
       html do
         body do
-          div [ span(1), span(2) ]
-          div [ span(3) ]
+          div %{}, [ span(%{}, 1), span(%{}, 2) ]
+          div %{}, [ span(%{}, 3) ]
         end
       end
     end
@@ -123,9 +164,9 @@ defmodule EmlTest do
   end
 
   test "Add markup" do
-    input = eml do: body([id: "test"], "")
-    to_add = eml do: div("Hello world!")
-    expected = eml do: body([id: "test"], to_add)
+    input = eml do: body(%{id: "test"})
+    to_add = eml do: div(%{}, "Hello world!")
+    expected = eml do: body(%{id: "test"}, to_add)
 
     assert expected == Eml.add(input, to_add, id: "test")
   end
@@ -133,8 +174,8 @@ defmodule EmlTest do
   test "Select by class1" do
     expected = eml do
       [
-       title([class: "title"], "Eml is Html for developers"),
-       h1([class: "title"], "Eml is Html for developers")
+       title(%{class: "title"}, "Eml is Html for developers"),
+       h1(%{class: "title"}, "Eml is Html for developers")
       ]
     end
     result = Eml.select(doc(), class: "title")
@@ -148,16 +189,16 @@ defmodule EmlTest do
   test "Select by class 2" do
     expected = eml do
       [
-       head([class: "test"], title([class: "title"], "Eml is Html for developers")),
-       body class: ["test", "main"] do
-         h1 [class: "title"], "Eml is Html for developers"
-         article [class: "content", _custom: "some custom attribute"],
+       head(%{class: "test"}, title(%{class: "title"}, "Eml is Html for developers")),
+       body %{class: ["test", "main"]} do
+         h1 %{class: "title"}, "Eml is Html for developers"
+         article %{class: "content", "data-custom": "some custom attribute"},
          "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."
-         div [id: "main-side-bar", class: ["content", "side-bar"]] do
-           span [class: "test"], "Some notes..."
+         div %{id: "main-side-bar", class: ["content", "side-bar"]} do
+           span %{class: "test"}, "Some notes..."
          end
        end,
-       span([class: "test"], "Some notes...")
+       span(%{class: "test"}, "Some notes...")
       ]
     end
     result = Eml.select(doc(), class: "test")
@@ -167,8 +208,8 @@ defmodule EmlTest do
 
   test "Select by id" do
     expected = eml do
-      div [id: "main-side-bar", class: ["content", "side-bar"]] do
-        span([class: "test"], "Some notes...")
+      div %{id: "main-side-bar", class: ["content", "side-bar"]} do
+        span(%{class: "test"}, "Some notes...")
       end
     end
     result = Eml.select(doc(), id: "main-side-bar")
@@ -178,8 +219,8 @@ defmodule EmlTest do
 
   test "Select by id and class 1" do
     expected = eml do
-      div [id: "main-side-bar", class: ["content", "side-bar"]] do
-        span([class: "test"], "Some notes...")
+      div %{id: "main-side-bar", class: ["content", "side-bar"]} do
+        span(%{class: "test"}, "Some notes...")
       end
     end
 
@@ -202,9 +243,9 @@ defmodule EmlTest do
   test "Remove by class 1" do
     expected = eml do
       html do
-        head [class: "test"], do: title([class: "title"], "Eml is Html for developers")
-        body class: ["test", "main"] do
-          h1 [class: "title"], "Eml is Html for developers"
+        head %{class: "test"}, do: title(%{class: "title"}, "Eml is Html for developers")
+        body %{class: ["test", "main"]} do
+          h1 %{class: "title"}, "Eml is Html for developers"
         end
       end
     end
@@ -214,7 +255,7 @@ defmodule EmlTest do
   end
 
   test "Remove by class 2" do
-    expected = eml do: html []
+    expected = eml do: html(%{}, [])
     result   = Eml.remove(doc(), class: "test")
 
     assert expected == result
@@ -223,10 +264,10 @@ defmodule EmlTest do
   test "Remove by id" do
     expected = eml do
       html do
-        head [class: "test"], do: title([class: "title"], "Eml is Html for developers")
-        body class: ["test", "main"] do
-          h1 [class: "title"], "Eml is Html for developers"
-          article [class: "content", _custom: "some custom attribute"],
+        head %{class: "test"}, do: title(%{class: "title"}, "Eml is Html for developers")
+        body %{class: ["test", "main"]} do
+          h1 %{class: "title"}, "Eml is Html for developers"
+          article %{class: "content", "data-custom": "some custom attribute"},
           "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."
         end
       end
@@ -239,10 +280,10 @@ defmodule EmlTest do
   test "Remove by id and class" do
     expected = eml do
       html do
-        head [class: "test"], do: title([class: "title"], "Eml is Html for developers")
-        body class: ["test", "main"] do
-          h1 [class: "title"], "Eml is Html for developers"
-          article [class: "content", _custom: "some custom attribute"],
+        head %{class: "test"}, do: title(%{class: "title"}, "Eml is Html for developers")
+        body %{class: ["test", "main"]} do
+          h1 %{class: "title"}, "Eml is Html for developers"
+          article %{class: "content", "data-custom": "some custom attribute"},
           "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."
         end
       end
@@ -257,16 +298,16 @@ defmodule EmlTest do
   end
 
   test "Parameters" do
-    param = Eml.Parameter.new(:a_parameter)
+    param = %Eml.Parameter{id: :a_parameter}
     assert [param]               == eml do: :a_parameter
     assert [param, "and", param] == eml do: [:a_parameter, "and", :a_parameter]
   end
 
   test "Templates 1" do
     e = eml do
-      div [id: :myid] do
-        div :fruit
-        div :fruit
+      div %{id: :myid} do
+        div(%{}, :fruit)
+        div(%{}, :fruit)
       end
     end
     t = Eml.compile(e)
@@ -280,24 +321,20 @@ defmodule EmlTest do
 
     t = Template.bind(t, fruit: ["orange", "lemon"])
     assert Template.bound?(t)
-
-    assert "<div id='double-fruit'>\n  <div>orange</div>\n  <div>lemon</div>\n</div>" ==
-      Eml.write!(t, pretty: true)
   end
 
   test "Templates 2" do
     e = eml do
-      [div(:fruit),
-       div(:fruit),
-       div(:fruit),
-       div(:fruit)]
+      [div(%{}, :fruit),
+       div(%{}, :fruit),
+       div(%{}, :fruit),
+       div(%{}, :fruit)]
     end
     t = Eml.compile(e)
 
     assert :template == Eml.type t
     assert false == Template.bound?(t)
     assert [fruit: 4] == Template.unbound(t)
-
 
     t = Template.bind(t, fruit: ["orange", "lemon"])
     assert [fruit: 2] == Template.unbound(t)
@@ -307,15 +344,15 @@ defmodule EmlTest do
   end
 
   test "Templates in eml" do
-    fruit  = eml do: section(:fruit)
+    fruit  = eml do: section(%{}, :fruit)
     tfruit = Eml.compile(fruit)
-    aside  = eml do: aside tfruit
+    aside  = eml do: aside(%{}, tfruit)
     taside = Eml.compile(aside)
 
     assert :template == Eml.type taside
 
     expected = eml do
-      aside [ section "lemon" ]
+      aside(%{}, section(%{}, "lemon"))
     end
 
     assert Eml.write!(expected) == Eml.write!(taside, bindings: [fruit: "lemon"])
@@ -324,8 +361,8 @@ defmodule EmlTest do
 
   test "Read parameters from html" do
     html       = "<div><span>#param{name}</span><span>#param{age}</span></div"
-    name_param = Eml.Parameter.new(:name)
-    age_param  = Eml.Parameter.new(:age)
+    name_param = %Eml.Parameter{id: :name}
+    age_param  = %Eml.Parameter{id: :age}
     eml        = Eml.read(html)
 
     assert [name_param, age_param] == Eml.unpackr eml
@@ -333,17 +370,16 @@ defmodule EmlTest do
 
   test "Parameterized attribute rendering" do
     e = eml do
-      div [id: :id_param,
+      div %{id: :id_param,
            class: [:class1, "class2", :class3],
            _custom1: :custom,
-           _custom2: :custom], []
+           _custom2: :custom}
     end
 
-    expected1 = "<div id='#param{id_param}' class='#param{class1} class2 #param{class3}'" <>
-                " data-custom1='#param{custom}' data-custom2='#param{custom}'></div>"
+    expected1 = "<div data-custom1='#param{custom}' data-custom2='#param{custom}' class='#param{class1} class2 #param{class3}' id='#param{id_param}'></div>"
     assert expected1 == Eml.write!(e)
 
-    expected2 = "<div id='parameterized' class='class1 class2 class3' data-custom1='1' data-custom2='2'></div>"
+    expected2 = "<div data-custom1='1' data-custom2='2' class='class1 class2 class3' id='parameterized'></div>"
     assert expected2 == Eml.write!(e, bindings: [id_param: "parameterized",
                                                  class1: "class1",
                                                  class3: "class3",
@@ -351,7 +387,7 @@ defmodule EmlTest do
 
     t = Eml.write!(e, bindings: [class3: "class3", custom: 1])
     assert :template == Eml.type t
-    assert [id_param: 1, class1: 1, custom: 1] == Template.unbound(t)
+    assert Enum.sort(id_param: 1, class1: 1, custom: 1) == Enum.sort(Template.unbound(t))
     assert expected2 == Eml.write!(t, bindings: [id_param: "parameterized", class1: "class1", custom: 2])
   end
 end

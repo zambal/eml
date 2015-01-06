@@ -1,59 +1,41 @@
-defmodule Eml.Template.Record do
-  @moduledoc false
-
-  defmacro __using__(_) do
-    quote do
-      defrecordp :templ, Eml.Template, chunks: [], params: [], bindings: []
-    end
-  end
-
-end
-
 defmodule Eml.Template do
-  use Eml.Template.Record
   alias Eml.Readable, as: Read
+  alias __MODULE__, as: M
+
+  defstruct chunks: [], params: [], bindings: []
 
   @type chunks   :: [binary | Eml.Parameter.t]
   @type params   :: [{ Eml.Parameter.id, integer }]
   @type bindings :: [{ Eml.Parameter.id, [Eml.element] }]
-  @type t        :: { Eml.Template, chunks, params, bindings }
+  @type t        :: %M{ chunks: chunks, params: params, bindings: bindings }
 
   @lang Eml.Language.Native
 
-  @spec params(t) :: params
-  def params(templ(params: params)), do: params
-
-  @spec bindings(t) :: bindings
-  def bindings(templ(bindings: bindings)), do: bindings
-
-  @spec bindings(t, bindings) :: t
-  def bindings(t, bindings), do: templ(t, bindings: bindings)
-
   @spec get(t, Eml.Parameter.id) :: Read.t | nil
-  def get(templ(bindings: bindings), param_id)
+  def get(%M{bindings: bindings}, param_id)
   when is_atom(param_id), do: Keyword.get(bindings, param_id, [])
 
   @spec set(t, Eml.Parameter.id, Eml.data) :: t
-  def set(templ(bindings: bindings) = t, param_id, data)
+  def set(%M{bindings: bindings} = t, param_id, data)
   when is_atom(param_id) do
-    templ(t, bindings: Keyword.put(bindings, param_id, Eml.read(data, @lang)))
+    %M{t| bindings: Keyword.put(bindings, param_id, Eml.read(data, @lang))}
   end
 
   @spec unset(t, Eml.Parameter.id) :: Read.t | nil
-  def unset(templ(bindings: bindings) = t, param_id)
-  when is_atom(param_id), do: templ(t, bindings: Keyword.delete(bindings, param_id))
+  def unset(%M{bindings: bindings} = t, param_id)
+  when is_atom(param_id), do: %M{t| bindings: Keyword.delete(bindings, param_id)}
 
   @spec bind(t, bindings) :: t
-  def bind(templ(bindings: current) = t, new) do
-    new = lc { id, data } inlist new do
+  def bind(%M{bindings: current} = t, new) do
+    new = for { id, data } <- new do
       readed = if is_list(data) do
-                 lc d inlist data, do: Eml.read(d, @lang)
+                 for d <- data, do: Eml.read(d, @lang)
                else
                  Eml.read(data, @lang)
                end
       { id, get(t, id) ++ readed }
     end
-    templ(t, bindings: Keyword.merge(current, new))
+    %M{t| bindings: Keyword.merge(current, new)}
   end
 
   @spec bind(t, Eml.Parameter.id, Eml.data) :: t
@@ -61,12 +43,12 @@ defmodule Eml.Template do
   when is_atom(param_id), do: bind(t, [{ param_id, data }])
 
   @spec unbind(t, bindings) :: t
-  def unbind(templ(bindings: current) = t, unbinds) do
-    removed = lc { id, data } inlist unbinds do
-      readed = lc d inlist data, do: Eml.read(d, @lang)
+  def unbind(%M{bindings: current} = t, unbinds) do
+    removed = for { id, data } <- unbinds do
+      readed = for d <- data, do: Eml.read(d, @lang)
       { id, get(t, id) -- readed }
     end
-    templ(t, bindings: Keyword.merge(current, removed))
+    %M{t| bindings: Keyword.merge(current, removed)}
   end
 
   @spec unbind(t, Eml.Parameter.id, Eml.data) :: t
@@ -85,13 +67,13 @@ defmodule Eml.Template do
   end
 
   @spec pop(t, Eml.Parameter.id) :: { Eml.element | nil, t }
-  def pop(templ(bindings: bindings) = t, param_id) when is_atom(param_id) do
+  def pop(%M{bindings: bindings} = t, param_id) when is_atom(param_id) do
     { element, bindings } = pop(bindings, param_id)
-    { element, templ(t, bindings: bindings) }
+    { element, %M{t| bindings: bindings} }
   end
 
   @spec unbound(t) :: params
-  def unbound(templ(bindings: bindings, params: params)) do
+  def unbound(%M{bindings: bindings, params: params}) do
     Enum.reduce(params, [], fn { id, count }, acc ->
       case count - length(Keyword.get(bindings, id, [])) do
         0 -> acc

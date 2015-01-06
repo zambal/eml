@@ -3,7 +3,7 @@ defmodule Eml.Language do
 
   @type type :: atom
   @type opts :: Keyword.t
-  
+
   defcallback markup?() :: true | false
 
   defcallback read(Eml.Readable.t, type) :: Eml.t | Eml.error

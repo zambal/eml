@@ -8,15 +8,15 @@ defmodule Eml.Language.Native do
   end
 
   def read(data, Atom) do
-    atom_to_binary(data)
+    Atom.to_string(data)
   end
 
   def read(data, Integer) do
-    integer_to_binary(data)
+    Integer.to_string(data)
   end
 
   def read(data, Float) do
-    float_to_binary(data)
+    Float.to_string(data)
   end
 
   def read(data, Tuple) do
@@ -24,5 +24,4 @@ defmodule Eml.Language.Native do
   end
 
   def write(data, _opts), do: data
-
 end

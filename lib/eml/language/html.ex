@@ -27,12 +27,12 @@ defmodule Eml.Language.Html do
   def write(eml, opts) do
     Eml.Language.Html.Writer.write(eml, opts)
   end
-  
+
   defmacro __using__(_opts) do
     quote do
       import Kernel, except: [div: 2]
       import unquote(__MODULE__).Markup
       alias unquote(__MODULE__).Presets, warn: false
     end
-  end 
+  end
 end

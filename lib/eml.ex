@@ -2,10 +2,6 @@ defmodule Eml do
   alias Eml.Markup
   alias Eml.Template
   alias Eml.Readable
-  use Eml.Markup.Record
-  alias Eml.Markup.Record, as: R
-  use Eml.Template.Record
-
 
   @default_lang Eml.Language.Html
 
@@ -14,7 +10,7 @@ defmodule Eml do
   @type t        :: element | content
   @type data     :: Eml.Readable.t
   @type error    :: { :error, term }
-  @type lang  :: atom
+  @type lang     :: atom
   @type path     :: binary
 
   @type unpackr_result  :: funpackr_result | [unpackr_result]
@@ -37,7 +33,7 @@ defmodule Eml do
 
   * `eml do: div 42`
   * `Eml.Markup.new(tag: :div, content: 42) |> Eml.read!(Eml.Language.Native)`
-  * `Eml.Markup.Html.div(42) |> Eml.read!(Eml.Language.Native)`
+  * `Eml.Markup.Html.div(%{}, 42) |> Eml.read!(Eml.Language.Native)`
 
   Note that since the Elixir `Kernel` module by default imports the `div/2`
   macro in to the global namespace, this macro is inside an eml block only
@@ -63,11 +59,11 @@ defmodule Eml do
 
   This:
 
-  `defmarkup mydiv(content), do: div content`
+  `defmarkup mydiv(content), do: div(%{}, content)`
 
   is effectively the same as:
 
-  `def mydiv(content), do: eml do div content end`
+  `def mydiv(content), do: eml do div(%{}, content) end`
 
   """
   defmacro defmarkup(call, do_block) do
@@ -108,19 +104,19 @@ defmodule Eml do
 
       iex> e = eml do
       ...>   div do
-      ...>     span [id: "inner1", class: "inner"], "hello "
-      ...>     span [id: "inner2", class: "inner"], "world"
+      ...>     span %{id: "inner1", class: "inner"}, "hello "
+      ...>     span %{id: "inner2", class: "inner"}, "world"
       ...>   end
       ...> end
-      [#div<[#span<[id: "inner1", class: "inner"] ["hello "]>,
-        #span<[id: "inner2", class: "inner"] ["world"]>]>]
+      [#div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
+        #span<%{id: "inner2", class: "inner"} ["world"]>]>]
 
       iex> Eml.select(e, id: "inner1")
-      [#span<[id: "inner1", class: "inner"] ["hello "]>]
+      [#span<%{id: "inner1", class: "inner"} ["hello "]>]
 
       iex> Eml.select(e, class: "inner")
-      [#span<[id: "inner1", class: "inner"] ["hello "]>,
-       #span<[id: "inner2", class: "inner"] ["world"]>]
+      [#span<%{id: "inner1", class: "inner"} ["hello "]>,
+       #span<%{id: "inner2", class: "inner"} ["world"]>]
 
       iex> Eml.select(e, class: "inner", id: "test")
       []
@@ -129,7 +125,7 @@ defmodule Eml do
       ["hello "]
 
       iex> Eml.select(e, pat: ~r/H.*o/, parent: true)
-      [#span<[id: "inner1", class: "inner"] ["hello "]>]
+      [#span<%{id: "inner1", class: "inner"} ["hello "]>]
 
   """
   @spec select(t) :: t
@@ -139,8 +135,7 @@ defmodule Eml do
     Enum.flat_map(content, &select(&1, opts))
   end
 
-  def select(template, _opts)
-  when is_record(template, Template), do: []
+  def select(%Template{}, _opts), do: []
 
   def select(element, opts) do
     tag            = opts[:tag] || :any
@@ -152,13 +147,13 @@ defmodule Eml do
       if pat do
         pat_fun = fn element ->
           markup?(element) and
-          Enum.any?(content(element), fn el -> is_binary(el) and Regex.match?(pat, el) end)
+          Enum.any?(element.content, fn el -> is_binary(el) and Regex.match?(pat, el) end)
         end
         Enum.filter(element, pat_fun)
       else
         idclass_fun = fn element ->
           markup?(element) and
-          Enum.any?(content(element), fn el -> Markup.match?(el, tag, id, class) end)
+          Enum.any?(element.content, fn el -> Markup.match?(el, tag, id, class) end)
         end
         Enum.filter(element, idclass_fun)
       end
@@ -293,14 +288,14 @@ defmodule Eml do
        if pat do
           fn element ->
             if markup?(element) and
-            Enum.any?(content(element), fn el -> is_binary(el) and Regex.match?(pat, el) end),
+            Enum.any?(element.content, fn el -> is_binary(el) and Regex.match?(pat, el) end),
               do: fun.(element),
             else: element
           end
         else
           fn element ->
             if markup?(element) and
-            Enum.any?(content(element), fn el -> Markup.match?(el, tag, id, class) end),
+            Enum.any?(element.content, fn el -> Markup.match?(el, tag, id, class) end),
               do: fun.(element),
             else: element
           end
@@ -362,14 +357,14 @@ defmodule Eml do
         if pat do
           fn element ->
             if markup?(element) and
-            Enum.any?(content(element), fn el -> is_binary(el) and Regex.match?(pat, el) end),
+            Enum.any?(element.content, fn el -> is_binary(el) and Regex.match?(pat, el) end),
               do: nil,
             else: element
           end
         else
           fn element ->
             if markup?(element) and
-            Enum.any?(content(element), fn el -> Markup.match?(el, tag, id, class) end),
+            Enum.any?(element.content, fn el -> Markup.match?(el, tag, id, class) end),
               do: nil,
             else: element
           end
@@ -478,7 +473,7 @@ defmodule Eml do
   def transform(eml, fun, lang \\ Eml.Language.Native)
 
   def transform(eml, fun, lang) when is_list(eml) do
-    lc element inlist eml, t = transform(element, fun, lang), do: t
+    for element <- eml, t = transform(element, fun, lang), do: t
   end
 
   def transform(element, fun, lang) do
@@ -486,7 +481,7 @@ defmodule Eml do
       { :error, _ } -> nil
       element ->
         if markup?(element),
-          do: m(element, content: transform(content(element), fun, lang)),
+          do: %Markup{element| content: transform(element.content, fun, lang)},
         else: element
     end
   end
@@ -545,6 +540,9 @@ defmodule Eml do
 
   # Optimize for most comon cases
 
+  defp add_element(element, [], _) when is_list(element),
+  do: element
+
   defp add_element(element, [], _),
   do: [element]
 
@@ -602,7 +600,7 @@ defmodule Eml do
   @spec write(t, Keyword.t) :: { :ok, binary } | error
   def write(eml, opts \\ [])
 
-  def write(templ() = t, opts) do
+  def write(%Template{} = t, opts) do
     { lang, opts } = Keyword.pop(opts, :lang, @default_lang)
     lang.write(t, Keyword.put(opts, :mode, :compile))
   end
@@ -637,7 +635,7 @@ defmodule Eml do
   @spec compile(t, lang) :: Eml.Template.t | error
   def compile(eml, lang \\ @default_lang)
 
-  def compile(templ() = t, _), do: t
+  def compile(%Template{} = t, _), do: t
   def compile(eml, lang) do
     # for consistence, when compiling eml we always want to return a template, even if
     # there are no parameters at all, or all of them are bound.
@@ -649,59 +647,34 @@ defmodule Eml do
 
 
   @spec unpack(t) :: t
-  def unpack(m(content: [element])), do: element
-  def unpack(m(content: content)),   do: content
-  def unpack([element]),             do: element
-  def unpack(eml),                   do: eml
+  def unpack(%Markup{content: [element]}), do: element
+  def unpack(%Markup{content: content}),   do: content
+  def unpack([element]),                   do: element
+  def unpack(eml),                         do: eml
 
   @spec unpackr(t) :: unpackr_result
-  def unpackr(m(content: [element])),         do: unpackr(element)
-  def unpackr(m(content: content)),           do: unpack_content(content)
+  def unpackr(%Markup{content: [element]}),   do: unpackr(element)
+  def unpackr(%Markup{content: content}),     do: unpack_content(content)
   def unpackr([element]),                     do: unpackr(element)
   def unpackr(content) when is_list(content), do: unpack_content(content)
   def unpackr(element),                       do: element
 
   defp unpack_content(content) do
-    lc element inlist content, do: unpackr(element)
+    for element <- content, do: unpackr(element)
   end
 
   @spec funpackr(t) :: funpackr_result
   def funpackr(eml), do: unpackr(eml) |> :lists.flatten
 
-  @spec content(Eml.Markup.t) :: t
-  def content(m(content: content)), do: content
-
   @spec markup?(term) :: boolean
-  def markup?(m()), do: true
+  def markup?(%Markup{}), do: true
   def markup?(_),   do: false
 
   @spec empty?(term) :: boolean
   def empty?(nil), do: true
   def empty?([]), do: true
-  def empty?(m(content: [])), do: true
+  def empty?(%Markup{content: []}), do: true
   def empty?(_), do: false
-
-  defmacro match!(opts \\ []) do
-    any      = quote do: _
-    tag      = Keyword.get(opts, :tag, any)
-    id       = Keyword.get(opts, :id, any)
-    class    = Keyword.get(opts, :class, any)
-    attrs    = Keyword.get(opts, :attrs, any)
-    content  = Keyword.get(opts, :content, any)
-    to_match = R.to_quote(tag, id, class, attrs, content)
-    quote do
-      unquote(to_match)
-    end
-  end
-
-  defmacro match?(markup, opts \\ []) do
-    quote do
-      case unquote(markup) do
-        Eml.match!(unquote(opts)) -> true
-        _no_match                 -> false
-      end
-    end
-  end
 
   def type(content)
   when is_list(content) do
@@ -715,12 +688,11 @@ defmodule Eml do
   def type(bin)
   when is_binary(bin), do: :binary
 
-  def type(m()), do: :markup
+  def type(%Markup{}), do: :markup
 
-  def type(templ()), do: :template
+  def type(%Template{}), do: :template
 
-  def type(param)
-  when is_record(param, Eml.Parameter), do: :parameter
+  def type(%Eml.Parameter{}), do: :parameter
 
   def type(_), do: :undefined
 
@@ -730,7 +702,7 @@ defmodule Eml do
     imports =
       if opts[:imports] != false do
         quote do
-          import Eml, only: [eml: 1, defmarkup: 2, unpack: 1, content: 1, match!: 0, match!: 1]
+          import Eml, only: [eml: 1, defmarkup: 2, unpack: 1]
         end
       else
         quote do: require Eml

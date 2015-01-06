@@ -26,13 +26,13 @@ defimpl Eml.Readable, for: Atom do
   def read(nil, _lang),   do: nil
   def read(true, lang),   do: lang.read(true, Atom)
   def read(false, lang),  do: lang.read(false, Atom)
-  def read(param, _lang), do: Eml.Parameter.new(param)
+  def read(param, _lang), do: %Eml.Parameter{id: param}
 end
 
 defimpl Eml.Readable, for: [Eml.Markup, Eml.Parameter, Eml.Template] do
   def read(data, _lang), do: data
 end
 
-defimpl Eml.Readable, for: [Function, PID, Port, Reference, List] do
+defimpl Eml.Readable, for: [Function, PID, Port, Reference, List, Map] do
   def read(data, _lang), do: { :error, "Unreadable data: #{inspect data}" }
 end

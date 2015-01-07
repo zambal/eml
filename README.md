@@ -16,9 +16,9 @@ Eml.write! eml do
   name = "Vincent"
   age  = 36
 
-  div %{class: "person"} do
-    div %{}, [ span(%{}, "name: "), span(%{}, name) ]
-    div %{}, [ span(%{}, "age: "), span(%{}, age) ]
+  div class: "person" do
+    div [], [ span([], "name: "), span([], name) ]
+    div [], [ span([], "age: "), span([], age) ]
   end
 end
 ```
@@ -77,7 +77,7 @@ When used inside a match, the macro will be translated to the for %Eml.Markup{..
 elements. Elements can be of the type `binary`, `Eml.Markup.t`, `Eml.Parameter.t`,
 or `Eml.Template.t`. We'll focus on binaries and markup for now.
 ```elixir
-iex(2)> eml do: div(%{}, 42)
+iex(2)> eml do: div([], 42)
 [#div<["42"]>]
 ```
 Here we created a `div` element with `"42"` as it contents. Since content element's
@@ -91,19 +91,19 @@ it were in an `eml` do block.
 
 To access the `div` element from the returned contents, you can use `unpack`
 ```elixir
-iex(3)> unpack eml do: div(%{}, 42)
+iex(3)> unpack eml do: div([], 42)
 #div<["42"]>
 ```
 If you want to get the contents of the div element, you can use unpack again
 ```elixir
-iex(4)> unpack unpack eml do: div(%{}, 42)
+iex(4)> unpack unpack eml do: div([], 42)
 "42"
 ```
 Since unpacking recursive data this way gets tiring pretty fast, Eml also provides
 a recursive version called `unpackr`. Note that this function, as most others,
 is not automatically imported in to local scope.
 ```elixir
-iex(5)> Eml.unpackr eml do: div(%{}, 42)
+iex(5)> Eml.unpackr eml do: div([], 42)
 "42"
 ```
 
@@ -114,13 +114,13 @@ Contents can be written to a string by calling `Eml.write`.
 Notice that Eml automatically inserts a doctype declaration when
 the html element is the root.
 ```elixir
-iex(6)> Eml.write(eml(do: html(body(div(%{}, 42)))))
+iex(6)> Eml.write(eml(do: html(body(div([], 42)))))
 {:ok,
  "<!doctype html>\n<html><body><div>42</div></body>\n</html>"}
 ```
 Eml also provides a version of write that either succeeds, or raises an exception.
 ```elixir
-iex(7)> Eml.write!(eml(do: html(body(div(%{}, 42)))))
+iex(7)> Eml.write!(eml(do: html(body(div([], 42)))))
 "<!doctype html>\n<html><body><div>42</div></body></html>"
 ```
 In practice, you rarely encounter situations that need as much brackets as in this
@@ -165,7 +165,7 @@ performs.
 iex(10)> Eml.read(nil, Eml.Language.Native)
 []
 
-iex(11)> Eml.read([1, 2, (eml do: h1(%{}, "hello")), 4], Eml.Language.Native)
+iex(11)> Eml.read([1, 2, (eml do: h1([], "hello")), 4], Eml.Language.Native)
 ["12", #h1<["hello"]>, "4"]
 
 iex(12)> Eml.read([a: 1, b: 2], Eml.Language.Native)
@@ -189,15 +189,15 @@ elements. Let's start with creating something to query
 ```elixir
 iex(14)> e = eml do
 ...(14)>   html do
-...(14)>     head %{class: "head"} do
-...(14)>       meta %{charset: "UTF-8"}
+...(14)>     head class: "head" do
+...(14)>       meta charset: "UTF-8"
 ...(14)>     end
 ...(14)>     body do
-...(14)>       article %{id: "main-content"} do
-...(14)>         section %{class: ["intro", "article"]} do
-...(14)>           h3 %{}, "Hello world"
+...(14)>       article id: "main-content" do
+...(14)>         section class: ["intro", "article"] do
+...(14)>           h3 [], "Hello world"
 ...(14)>         end
-...(14)>         section %{class: ["conclusion", "article"]} do
+...(14)>         section class: ["conclusion", "article"] do
 ...(14)>           "TODO"
 ...(14)>         end
 ...(14)>       end

@@ -1,5 +1,7 @@
 # Eml
 
+[![Build Status](https://api.travis-ci.org/zambal/eml.svg?branch=master)](https://travis-ci.org/zambal/eml)
+
 ## Markup for developers
 
 ### What is it?

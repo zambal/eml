@@ -79,29 +79,29 @@ defmodule EmlTest do
   end
 
   test "Types" do
-    assert :content   == Eml.type eml(do: div([], 42))
-    assert :content   == Eml.type eml(do: [1,2,"z"])
-    assert :content   == Eml.type eml(do: "")
-    assert :content   == Eml.type eml(do: [])
-    assert :content   == Eml.type eml(do: nil)
+    assert :content   == Eml.type eml do: div([], 42)
+    assert :content   == Eml.type eml do: [1,2,"z"]
+    assert :content   == Eml.type eml do: ""
+    assert :content   == Eml.type eml do: []
+    assert :content   == Eml.type eml do: nil
     assert :markup    == Eml.type Eml.Markup.new()
-    assert :markup    == Eml.type unpack eml(do: div([], 42))
+    assert :markup    == Eml.type unpack(eml do: div([], 42))
     assert :binary    == Eml.type "strings are binaries"
-    assert :binary    == Eml.type Eml.unpackr eml(do: div([], 42))
-    assert :binary    == Eml.type unpack eml(do: [1,2,"z"])
-    assert :binary    == Eml.type Eml.write! eml(do: :name)
-    assert :binary    == Eml.type eml(do: :name)
+    assert :binary    == Eml.type Eml.unpackr(eml do: div([], 42))
+    assert :binary    == Eml.type unpack(eml do: [1,2,"z"])
+    assert :binary    == Eml.type Eml.write!(eml do: :name)
+    assert :binary    == Eml.type (eml do: :name)
                                   |> Eml.compile()
                                   |> Eml.write!(bindings: [name: "Vincent"])
-    assert :template  == Eml.type eml(do: [:name, :age])
+    assert :template  == Eml.type (eml do: [:name, :age])
                                   |> Eml.compile()
                                   |> Eml.write!(bindings: [age: 36])
-    assert :template  == Eml.type eml(do: [:name, :age])
+    assert :template  == Eml.type (eml do: [:name, :age])
                                   |> Eml.write!(bindings: [age: 36])
-    assert :template  == Eml.type Eml.compile eml(do: :name)
-    assert :template  == Eml.type Eml.compile eml(do: [div([], 1), div([], 2), div([], :param), "..."])
+    assert :template  == Eml.type Eml.compile(eml do: :name)
+    assert :template  == Eml.type Eml.compile(eml do: [div([], 1), div([], 2), div([], :param), "..."])
     assert :parameter == Eml.type %Eml.Parameter{}
-    assert :parameter == Eml.type unpack eml(do: :param)
+    assert :parameter == Eml.type unpack(eml do: :param)
   end
 
   test "Native" do
@@ -132,7 +132,7 @@ defmodule EmlTest do
     single = eml do
       html do
         body do
-          div([], 42)
+          div [], 42
         end
       end
     end
@@ -144,7 +144,7 @@ defmodule EmlTest do
       html do
         body do
           div [], [ span([], 1), span([], 2) ]
-          div [], [ span([], 3) ]
+          div [], span([], 3)
         end
       end
     end
@@ -155,8 +155,8 @@ defmodule EmlTest do
     multi = eml do
       html do
         body do
-          div [], [ span([], 1), span([], 2) ]
-          div [], [ span([], 3) ]
+          div [], [span([], 1), span([], 2)]
+          div [], span([], 3)
         end
       end
     end
@@ -209,7 +209,7 @@ defmodule EmlTest do
   test "Select by id" do
     expected = eml do
       div id: "main-side-bar", class: ["content", "side-bar"] do
-        span([class: "test"], "Some notes...")
+        span [class: "test"], "Some notes..."
       end
     end
     result = Eml.select(doc(), id: "main-side-bar")
@@ -220,7 +220,7 @@ defmodule EmlTest do
   test "Select by id and class 1" do
     expected = eml do
       div id: "main-side-bar", class: ["content", "side-bar"] do
-        span([class: "test"], "Some notes...")
+        span [class: "test"], "Some notes..."
       end
     end
 
@@ -243,7 +243,9 @@ defmodule EmlTest do
   test "Remove by class 1" do
     expected = eml do
       html do
-        head [class: "test"], do: title([class: "title"], "Eml is Html for developers")
+        head [class: "test"] do
+          title [class: "title"], "Eml is Html for developers"
+        end
         body class: ["test", "main"] do
           h1 [class: "title"], "Eml is Html for developers"
         end
@@ -306,8 +308,8 @@ defmodule EmlTest do
   test "Templates 1" do
     e = eml do
       div id: :myid do
-        div([], :fruit)
-        div([], :fruit)
+        div [], :fruit
+        div [], :fruit
       end
     end
     t = Eml.compile(e)
@@ -325,10 +327,9 @@ defmodule EmlTest do
 
   test "Templates 2" do
     e = eml do
-      [div([], :fruit),
-       div([], :fruit),
-       div([], :fruit),
-       div([], :fruit)]
+      for _ <- 1..4 do
+        div [], :fruit
+      end
     end
     t = Eml.compile(e)
 
@@ -352,7 +353,9 @@ defmodule EmlTest do
     assert :template == Eml.type taside
 
     expected = eml do
-      aside([], section([], "lemon"))
+      aside do
+        section [], "lemon"
+      end
     end
 
     assert Eml.write!(expected) == Eml.write!(taside, bindings: [fruit: "lemon"])
@@ -370,10 +373,10 @@ defmodule EmlTest do
 
   test "Parameterized attribute rendering" do
     e = eml do
-      div [id: :id_param,
-           class: [:class1, "class2", :class3],
-           _custom1: :custom,
-           _custom2: :custom]
+      div id: :id_param,
+          class: [:class1, "class2", :class3],
+          _custom1: :custom,
+          _custom2: :custom
     end
 
     expected1 = "<div data-custom1='#param{custom}' data-custom2='#param{custom}' class='#param{class1} class2 #param{class3}' id='#param{id_param}'></div>"

@@ -3,7 +3,7 @@ defmodule Eml.Mixfile do
 
   def project do
     [ app: :eml,
-      version: "0.3.1",
+      version: "0.4.0",
       description: description,
       package: package ]
   end

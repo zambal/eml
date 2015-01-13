@@ -16,6 +16,10 @@ defmodule Eml do
   @type unpackr_result  :: funpackr_result | [unpackr_result]
   @type funpackr_result :: binary | Eml.Parameter.t | Eml.Template.t | [binary | Eml.Parameter | Eml.Template.t]
 
+  @moduledoc """
+  TODO
+  """
+
   @doc """
   Define eml content.
 
@@ -26,61 +30,188 @@ defmodule Eml do
 
   It does this by doing two things:
 
-  * Provide a lexical scope where al markup macro's are imported to
+  * Provide a lexical scope where all markup macro's are imported to
   * Read the last expression of the block in order to guarantee valid eml content
 
   To illustrate, the expressions below all produce the same output:
 
-  * `eml do: div 42`
-  * `Eml.Markup.new(tag: :div, content: 42) |> Eml.read!(Eml.Language.Native)`
-  * `Eml.Markup.Html.div(%{}, 42) |> Eml.read!(Eml.Language.Native)`
+  * `eml do: div([], 42)`
+  * `Eml.Markup.new(:div, %{}, 42) |> Eml.read!(Eml.Language.Native)`
+  * `Eml.Markup.Html.div([], 42) |> Eml.read!(Eml.Language.Native)`
 
   Note that since the Elixir `Kernel` module by default imports the `div/2`
-  macro in to the global namespace, this macro is inside an eml block only
-  available as `Kernel.div/2`
+  function in to the global namespace, this function is inside an eml block
+  only available as `Kernel.div/2`.
+
+  Instead of defining a do block, you can also provide a path to a file
+  with eml content. See `Eml.precompile_template/2` for an example with
+  an external file.
 
   """
-  defmacro eml(opts \\ [], do_block) do
-    opts    = Keyword.merge(opts, do_block)
-    lang = opts[:use] || @default_lang
-    expr    = opts[:do]
-    quote do
-      (fn ->
-         use unquote(lang)
-         Eml.read! unquote(expr), Eml.Language.Native
-       end).()
+  defmacro eml(opts, block \\ []) do
+    block = block[:do] || opts[:do]
+    opts  = Keyword.put(opts, :type, :eml)
+    do_eml(block, opts)
+  end
+
+  @doc false
+  def do_eml(quoted \\ nil, opts) do
+    type   = opts[:type] || :template
+    lang   = opts[:use] || @default_lang
+    file   = opts[:file]
+    eval   = opts[:eval]
+    env    = opts[:env] || __ENV__
+    quoted = if file do
+             file
+             |> File.read!()
+             |> Code.string_to_quoted!(file: file)
+           else
+             quoted || opts[:do]
+           end
+    ast  = case type do
+            :template ->
+              quote do
+                use unquote(lang)
+                Eml.compile unquote(quoted)
+              end
+            :html ->
+              quote do
+                use unquote(lang)
+                Eml.write! unquote(quoted)
+              end
+            :eml ->
+              quote do
+                use unquote(lang)
+                Eml.read! unquote(quoted), Eml.Language.Native
+              end
+          end
+    if eval do
+      { expr, _ } = Code.eval_quoted(ast, [] , env)
+      Macro.escape(expr)
+    else
+      ast
     end
   end
 
   @doc """
-  Define a function that produces eml. This macro is
-  provided both for convenience and to be able to show
-  intention of code.
+  Define a function that produces eml.
+
+  This macro is provided both for convenience and
+  to be able to show intention of code.
 
   This:
 
-  `defmarkup mydiv(content), do: div(%{}, content)`
+  `defeml mydiv(content), do: div(%{}, content)`
 
   is effectively the same as:
 
   `def mydiv(content), do: eml do div(%{}, content) end`
 
   """
-  defmacro defmarkup(call, do_block) do
-    markup   = do_block[:use] || @default_lang
-    expr     = do_block[:do]
+  defmacro defeml(call, do_block) do
+    block = do_block[:do]
+    ast   = do_eml(block, type: :eml)
     quote do
       def unquote(call) do
-        use unquote(markup)
-        Eml.read! unquote(expr), Eml.Language.Native
+        unquote(ast)
       end
     end
   end
 
   @doc """
-  Selects content from arbritary eml. It will traverse the
-  complete eml tree, so all elements are evaluated. There
-  is however currently no way to select templates or parameters.
+  Define a function that compiles eml to a template during compile time.
+
+  The function that this macro defines accepts optionally a bindings
+  object as argument for binding values to parameters. Note that because
+  the code in the do block is evaluated at compile time, it's not possible
+  to call other functions from the same module.
+
+  Instead of defining a do block, you can also provide a path to a file with
+  eml content.
+
+  ### Example:
+
+      iex> File.write! "test.eml.exs", "div [id: "name"], :name"
+      iex> defmodule MyTemplates do
+      ...>   use Eml
+      ...>
+      ...>   precompile_template test do
+      ...>     prefix = "fruit"
+      ...>     div do
+      ...>       span [class: "prefix"], prefix
+      ...>       span [class: "content"], :fruit
+      ...>     end
+      ...>   end
+      ...>
+      ...>   precompile_template from_file, file: "test.eml.exs"
+      ...> end
+      iex> MyTemplates.test
+      #Template<[fruit: 1]>
+      iex> MyTemplates.test fruit: "lemon"
+      "<div><span class='prefix'>fruit</span><span class='content'>lemon</span></div>"
+      iex> MyTemplates.from_file name: "Vincent"
+      "<div id='name'>Vincent</div>"
+      iex> File.rm! "test.eml.exs"
+  """
+  defmacro precompile_template(name, opts) do
+    { name, _, nil } = name
+    ast = opts
+    |> Keyword.put(:type, :template)
+    |> Keyword.put(:eval, true)
+    |> do_eml()
+    quote do
+      def unquote(name)(bindings \\ []) do
+        Eml.write!(unquote(ast), bindings: bindings)
+      end
+    end
+  end
+
+  @doc """
+  Define a function that compiles eml to html during compile time.
+
+  Note that because the code in the do block is evaluated at compile
+  time, it's not possible to call other functions from the same module.
+
+  Instead of defining a do block, you can also provide a path to a file
+  with eml content. See `Eml.precompile_template/2` for an example with
+  an external file.
+
+  ### Example:
+
+      iex> defmodule MyHtml do
+      ...>   use Eml
+      ...>
+      ...>   precompile_html test do
+      ...>     prefix  = "fruit"
+      ...>     content = "lemon"
+      ...>     div do
+      ...>       span [class: "prefix"], prefix
+      ...>       span [class: "content"], content
+      ...>     end
+      ...>   end
+      ...> end
+      iex> MyHtml.test
+      "<div><span class='prefix'>fruit</span><span class='content'>lemon</span></div>"
+
+  """
+  defmacro precompile_html(name, opts) do
+    ast = opts
+    |> Keyword.put(:type, :html)
+    |> Keyword.put(:eval, true)
+    |> do_eml()
+    quote do
+      def unquote(name) do
+        unquote(ast)
+      end
+    end
+  end
+
+  @doc """
+  Selects content from arbritary eml.
+
+  It will traverse the complete eml tree, so all elements are
+  evaluated. There is however currently no way to select templates
+  or parameters.
 
   Content is matched depending on the provided options.
 
@@ -808,7 +939,7 @@ defmodule Eml do
     imports =
       if opts[:imports] != false do
         quote do
-          import Eml, only: [eml: 1, defmarkup: 2, unpack: 1]
+          import Eml, only: [eml: 1, defeml: 2, precompile_template: 2, precompile_html: 2, unpack: 1]
         end
       else
         quote do: require Eml

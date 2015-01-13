@@ -84,7 +84,7 @@ iex(2)> eml do: div([], 42)
 ```
 Here we created a `div` element with `"42"` as it contents. Since content element's
 only primitive data type is binaries, the integer automatically gets converted.
-Eml also provides the `defmarkup` macro. It works like defining a regular Elixir
+Eml also provides the `defeml` macro. It works like defining a regular Elixir
 function, but anything you write in the function definition get's evaluated as if
 it were in an `eml` do block.
 

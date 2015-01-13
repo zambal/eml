@@ -100,30 +100,25 @@ defmodule Eml do
   be ignored.
 
 
-  ## Examples:
+  ### Examples:
 
       iex> e = eml do
       ...>   div do
-      ...>     span %{id: "inner1", class: "inner"}, "hello "
-      ...>     span %{id: "inner2", class: "inner"}, "world"
+      ...>     span [id: "inner1", class: "inner"], "hello "
+      ...>     span [id: "inner2", class: "inner"], "world"
       ...>   end
       ...> end
       [#div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
         #span<%{id: "inner2", class: "inner"} ["world"]>]>]
-
       iex> Eml.select(e, id: "inner1")
       [#span<%{id: "inner1", class: "inner"} ["hello "]>]
-
       iex> Eml.select(e, class: "inner")
       [#span<%{id: "inner1", class: "inner"} ["hello "]>,
        #span<%{id: "inner2", class: "inner"} ["world"]>]
-
       iex> Eml.select(e, class: "inner", id: "test")
       []
-
       iex> Eml.select(e, pat: ~r/h.*o/)
       ["hello "]
-
       iex> Eml.select(e, pat: ~r/H.*o/, parent: true)
       [#span<%{id: "inner1", class: "inner"} ["hello "]>]
 
@@ -171,9 +166,9 @@ defmodule Eml do
   end
 
   @doc """
-  Adds content to matched markup. It traverses and returns the
-  complete eml tree.
+  Adds content to matched markup.
 
+  It traverses and returns the complete eml tree.
   Markup is matched depending on the provided options.
 
   Those options can be:
@@ -188,7 +183,7 @@ defmodule Eml do
   selected that satisfies all conditions.
 
 
-  ## Examples:
+  ### Examples:
 
       iex> e = eml do
       ...>   div do
@@ -196,17 +191,14 @@ defmodule Eml do
       ...>     span [id: "inner2", class: "inner"], "world"
       ...>   end
       ...> end
-      [#div<[#span<[id: "inner1", class: "inner"] ["hello "]>,
-        #span<[id: "inner2", class: "inner"] ["world"]>]>]
-
+      [#div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
+        #span<%{id: "inner2", class: "inner"} ["world"]>]>]
       iex> Eml.add(e, "dear ", id: "inner1")
-      [#div<[#span<[id: "inner1", class: "inner"] ["hello dear "]>,
-        #span<[id: "inner2", class: "inner"] ["world"]>]>]
-
+      [#div<[#span<%{id: "inner1", class: "inner"} ["hello dear "]>,
+        #span<%{id: "inner2", class: "inner"} ["world"]>]>]
       iex> Eml.add(e, "__", class: "inner", at: :begin)
-      [#div<[#span<[id: "inner1", class: "inner"] ["__hello "]>,
-        #span<[id: "inner2", class: "inner"] ["__world"]>]>]
-
+      [#div<[#span<%{id: "inner1", class: "inner"} ["__hello "]>,
+        #span<%{id: "inner2", class: "inner"} ["__world"]>]>]
       iex> Eml.add(e, (eml do: span "!"), tag: :div) |> Eml.write!(pretty: false)
       "<div><span id='inner1' class='inner'>hello </span><span id='inner2' class='inner'>world</span><span>!</span></div>"
 
@@ -225,9 +217,10 @@ defmodule Eml do
   end
 
   @doc """
-  Updates matched content. When content is matched,
-  the provided function will be evaluated with the
-  matched content as argument.
+  Updates matched content.
+
+  When content is matched, the provided function will be evaluated
+  with the matched content as argument.
 
   When the provided function returns `nil`, the the content will
   be removed from the eml tree. Any other returned value will be
@@ -251,7 +244,7 @@ defmodule Eml do
   be ignored.
 
 
-  ## Examples:
+  ### Examples:
 
       iex> e = eml do
       ...>   div do
@@ -259,19 +252,16 @@ defmodule Eml do
       ...>     span [id: "inner2", class: "inner"], "world"
       ...>   end
       ...> end
-      [#div<[#span<[id: "inner1", class: "inner"] ["hello "]>,
-        #span<[id: "inner2", class: "inner"] ["world"]>]>]
-
+      [#div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
+        #span<%{id: "inner2", class: "inner"} ["world"]>]>]
       iex> Eml.update(e, fn m -> Markup.id(m, "outer") end, tag: :div)
-      [#div<[id: "outer"]
-       [#span<[id: "inner1", class: "inner"] ["hello "]>,
-        #span<[id: "inner2", class: "inner"] ["world"]>]>]
-
+      [#div<%{id: "outer"}
+       [#span<%{id: "inner1", class: "inner"} ["hello "]>,
+        #span<%{id: "inner2", class: "inner"} ["world"]>]>]
       iex> Eml.update(e, fn m -> Markup.id(m, "outer") end, id: "inner2", parent: true)
-      [#div<[id: "outer"]
-       [#span<[id: "inner1", class: "inner"] ["hello "]>,
-        #span<[id: "inner2", class: "inner"] ["world"]>]>]
-
+      [#div<%{id: "outer"}
+       [#span<%{id: "inner1", class: "inner"} ["hello "]>,
+        #span<%{id: "inner2", class: "inner"} ["world"]>]>]
       iex> Eml.update(e, fn s -> String.upcase(s) end, pat: ~r/.*/) |> Eml.write!(pretty: false)
       "<div><span id='inner1' class='inner'>HELLO </span><span id='inner2' class='inner'>WORLD</span></div>"
 
@@ -323,7 +313,7 @@ defmodule Eml do
 
   See `update/3` for a description of the provided options.
 
-  ## Examples:
+  ### Examples:
 
       iex> e = eml do
       ...>   div do
@@ -331,18 +321,15 @@ defmodule Eml do
       ...>     span [id: "inner2", class: "inner"], "world"
       ...>   end
       ...> end
-      [#div<[#span<[id: "inner1", class: "inner"] ["hello "]>,
-        #span<[id: "inner2", class: "inner"] ["world"]>]>]
-
+      [#div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
+        #span<%{id: "inner2", class: "inner"} ["world"]>]>]
       iex> Eml.remove(e, tag: :div)
       []
-
       iex> Eml.remove(e, id: "inner1")
-      [#div<[#span<[id: "inner2", class: "inner"] ["world"]>]>]
-
+      [#div<[#span<%{id: "inner2", class: "inner"} ["world"]>]>]
       iex> Eml.remove(e, pat: ~r/.*/)
-      [#div<[#span<[id: "inner1", class: "inner"]>,
-        #span<[id: "inner2", class: "inner"]>]>]
+      [#div<[#span<%{id: "inner1", class: "inner"}>,
+        #span<%{id: "inner2", class: "inner"}>]>]
 
   """
   @spec remove(t, Keyword.t) :: t
@@ -389,12 +376,14 @@ defmodule Eml do
 
   @doc """
   Returns true if there's at least one match with
-  the provided options, returns false otherwise. In other words,
-  returns true when the same select query would return a non-empty list.
+  the provided options, returns false otherwise.
+
+  In other words, returns true when the same select query
+  would return a non-empty list.
 
   See `select/3` for a description of the provided options.
 
-  ## Examples:
+  ### Examples:
 
       iex> e = eml do
       ...>   div do
@@ -402,15 +391,12 @@ defmodule Eml do
       ...>     span [id: "inner2", class: "inner"], "world"
       ...>   end
       ...> end
-      [#div<[#span<[id: "inner1", class: "inner"] ["hello "]>,
-        #span<[id: "inner2", class: "inner"] ["world"]>]>]
-
+      [#div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
+        #span<%{id: "inner2", class: "inner"} ["world"]>]>]
       iex> Eml.member?(e, id: "inner1")
       true
-
       iex> Eml.member?(e, class: "inner", id: "test")
       false
-
       iex> Eml.member?(e, pat: ~r/h.*o/)
       true
 
@@ -424,9 +410,11 @@ defmodule Eml do
   end
 
   @doc """
-  Recursively transforms content. This is the most low level operation
-  provided by Eml for manipulating eml content. For example, `update/3`
-  and `remove/2` are implemented by using this function.
+  Recursively transforms content.
+
+  This is the most low level operation provided by Eml for manipulating
+  eml content. For example, `update/3` and `remove/2` are implemented by
+  using this function.
 
   It accepts any eml and traverses all elements of the provided eml tree.
   The provided transform function will be evaluated for every element `transform/3`
@@ -443,7 +431,7 @@ defmodule Eml do
   Accepts a lang as optional 3rd argument, in order to specify how transformed data
   should be interpreted, defaults to `Eml.Language.Native`
 
-  ## Examples:
+  ### Examples:
 
       iex> e = eml do
       ...>   div do
@@ -451,23 +439,21 @@ defmodule Eml do
       ...>     span [id: "inner2", class: "inner"], "world"
       ...>   end
       ...> end
-      [#div<[#span<[id: "inner1", class: "inner"] ["hello "]>,
-        #span<[id: "inner2", class: "inner"] ["world"]>]>]
-
+      [#div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
+        #span<%{id: "inner2", class: "inner"} ["world"]>]>]
       iex> Eml.transform(e, fn x -> if Markup.has?(x, tag: :span), do: "matched", else: x end)
       [#div<["matched", "matched"]>]
-
       iex> Eml.transform(e, fn x ->
       ...> IO.puts(inspect x)
       ...> x end)
-      #div<[#span<[id: "inner1", class: "inner"] ["hello "]>, #span<[id: "inner2", class: "inner"] ["world"]>]>
-      #span<[id: "inner1", class: "inner"] ["hello "]>
+      #div<[#span<%{id: "inner1", class: "inner"} ["hello "]>, #span<%{id: "inner2", class: "inner"} ["world"]>]>
+      #span<%{id: "inner1", class: "inner"} ["hello "]>
       "hello "
-      #span<[id: "inner2", class: "inner"] ["world"]>
+      #span<%{id: "inner2", class: "inner"} ["world"]>
       "world"
+      [#div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
+        #span<%{id: "inner2", class: "inner"} ["world"]>]>]
 
-      [#div<[#span<[id: "inner1", class: "inner"] ["hello "]>,
-        #span<[id: "inner2", class: "inner"] ["world"]>]>]
   """
   @spec transform(t, (element -> data), lang) :: t | nil
   def transform(eml, fun, lang \\ Eml.Language.Native)
@@ -486,11 +472,35 @@ defmodule Eml do
     end
   end
 
+  @doc """
+  Reads data and converts it to eml
+
+  How the data is interpreted depends on the `lang` argument.
+  The default value is `Eml.Language.Html', which means that
+  strings are parsed as html. The other language that is supported
+  by default is `Eml.Language.Native`, which is for example used when
+  setting content in an `Eml.Markup` element. Appart from the provided
+  language, this function performs some conversions on its own. Mainly
+  flattening of lists and concatenating binaries in a list.
+
+  ### Examples:
+
+      iex> Eml.read("<body><h1 id='main-title'>The title</h1></body>")
+      [#body<[#h1<%{id: "main-title"} ["The title"]>]>]
+
+      iex> Eml.read([1, 2, 3,[4, 5, "6"], " ", true, " ", [false]], Eml.Language.Native)
+      ["123456 true false"]
+
+  """
   @spec read(data, lang) :: t | error
   def read(data, lang \\ @default_lang) do
     read(data, [], :begin, lang)
   end
 
+  @doc """
+  Same as `Eml.read/2`, except that it raises an exception, instead of returning an
+  error tuple in case of an error.
+  """
   @spec read!(data, lang) :: t
   def read!(data, lang \\ @default_lang) do
     case read(data, lang) do
@@ -500,6 +510,9 @@ defmodule Eml do
     end
   end
 
+  @doc """
+  Same as `Eml.read/2`, except that it reads data from a file
+  """
   @spec read_file(path, lang) :: t | error
   def read_file(path, lang \\ @default_lang) do
     case File.read(path) do
@@ -508,11 +521,16 @@ defmodule Eml do
     end
   end
 
+  @doc """
+  Same as `Eml.read_file/2`, except that it raises an exception, instead of
+  returning an error tuple in case of an error.
+  """
   @spec read_file!(path, lang) :: t | error
   def read_file!(path, lang \\ @default_lang) do
     File.read!(path) |> read!(lang)
   end
 
+  @doc false
   @spec read(data | error, content, atom, lang) :: t | error
   def read(data, content, at, lang \\ Eml.Languages.Native)
 
@@ -588,6 +606,7 @@ defmodule Eml do
   defp add_content([], content, _, _),
   do: content
 
+  @doc false
   @spec read!(data | error, content, atom, lang) :: t
   def read!(data, content, at, lang \\ @default_lang) do
     case read(data, content, at, lang) do
@@ -597,6 +616,31 @@ defmodule Eml do
     end
   end
 
+  @doc """
+  Writes eml content to the specified language, which is
+  html by default.
+
+  The accepted options are:
+
+  * `:lang` - The language to write to, by default `Eml.Language.Html`
+  * `:quote` - The type of quotes used for attribute values. Accepted values are `:single` (default) and `:double`.
+  * `:escape` - Escape `&`, `<` and `>` in attribute values and content to HTML entities.
+     Accepted values are `true` (default) and `false`.
+  * `:bindings` - When the provided eml contains a template, you can bind its parameters by providing a
+     Keyword list where the keys are the parameter id's. See `Eml.compile/2` for an example.
+
+  ### Examples:
+
+      iex> Eml.write (eml do: body([], h1([id: "main-title"], "A title")))
+      {:ok, "<body><h1 id='main-title'>A title</h1></body>"}
+
+      iex> Eml.write (eml do: body([], h1([id: "main-title"], "A title"))), quote: :double
+      {:ok, "<body><h1 id=\"main-title\">A title</h1></body>"}
+
+      iex> Eml.write (eml do: p([], "Tom & Jerry"))
+      {:ok, "<p>Tom &amp; Jerry</p>"}
+
+  """
   @spec write(t, Keyword.t) :: { :ok, binary } | error
   def write(eml, opts \\ [])
 
@@ -610,6 +654,10 @@ defmodule Eml do
     lang.write(eml, Keyword.put(opts, :mode, :render))
   end
 
+  @doc """
+  Same as `Eml.write/2`, except that it raises an exception, instead of returning an
+  error tuple in case of an error.
+  """
   @spec write!(t, Keyword.t) :: binary
   def write!(eml, opts \\ []) do
     case write(eml, opts) do
@@ -618,6 +666,9 @@ defmodule Eml do
     end
   end
 
+  @doc """
+  Same as `Eml.write/2`, except that it writes the results to a file
+  """
   @spec write_file(path, t, Keyword.t) :: :ok | error
   def write_file(path, eml, opts \\ []) do
     case write(eml, opts) do
@@ -626,12 +677,27 @@ defmodule Eml do
     end
   end
 
+  @doc """
+  Same as `Eml.write_file/2`, except that it raises an exception, instead of returning an
+  error tuple in case of an error.
+  """
   @spec write_file!(path, t, Keyword.t) :: :ok
   def write_file!(path, eml, opts \\ []) do
     File.write!(path, write!(eml, opts))
   end
 
 
+  @doc """
+  Same as `Eml.write/2` except that it always returns a template.
+
+  ### Examples:
+
+      iex> t = Eml.compile (eml do: body([], h1([id: "main-title"], :the_title)))
+      #Template<[the_title: 1]>
+      iex> Eml.write(t, bindings: [the_title: "The Title"])
+      {:ok, "<body><h1 id='main-title'>The Title</h1></body>"}
+
+  """
   @spec compile(t, lang) :: Eml.Template.t | error
   def compile(eml, lang \\ @default_lang)
 
@@ -645,13 +711,42 @@ defmodule Eml do
     end
   end
 
+  @doc """
+  Extracts a value from content (which is always a list) or markup
 
+  ### Examples
+
+      iex> unpack ["42"]
+      "42"
+
+      iex> unpack 42
+      42
+
+      iex> unpack (eml do: div([], "hallo"))
+      #div<["hallo"]>
+
+      iex> unpack unpack (eml do: div([], "hallo"))
+      "hallo"
+
+  """
   @spec unpack(t) :: t
   def unpack(%Markup{content: [element]}), do: element
   def unpack(%Markup{content: content}),   do: content
   def unpack([element]),                   do: element
   def unpack(eml),                         do: eml
 
+  @doc """
+  Extracts a value recursively from content or markup
+
+  ### Examples
+
+      iex> Eml.unpackr eml do: div([], 42)
+      "42"
+
+      iex> Eml.unpackr eml do: div([], [span([], "Hallo"), span([], " world")])
+      ["Hallo", " world"]
+
+  """
   @spec unpackr(t) :: unpackr_result
   def unpackr(%Markup{content: [element]}),   do: unpackr(element)
   def unpackr(%Markup{content: content}),     do: unpack_content(content)
@@ -663,19 +758,30 @@ defmodule Eml do
     for element <- content, do: unpackr(element)
   end
 
+  @doc """
+  Extracts a value recursively from content or markup and flatten the results.
+  """
   @spec funpackr(t) :: funpackr_result
   def funpackr(eml), do: unpackr(eml) |> :lists.flatten
 
+  @doc "Checks if a term is a `Eml.Markup` struct."
   @spec markup?(term) :: boolean
   def markup?(%Markup{}), do: true
   def markup?(_),   do: false
 
+  @doc "Checks if a value is regarded as empty by Eml."
   @spec empty?(term) :: boolean
   def empty?(nil), do: true
   def empty?([]), do: true
   def empty?(%Markup{content: []}), do: true
   def empty?(_), do: false
 
+  @doc """
+  Returns the type of content.
+
+  The types are `:content`, `:binary`, `:markup`, `:template`, `:parameter`, or `:undefined`.
+  """
+  @spec type(content) :: :content | :binary | :markup | :template | :parameter | :undefined
   def type(content)
   when is_list(content) do
     if Enum.any?(content, fn el -> type(el) === :undefined end) do

@@ -32,7 +32,6 @@ defmodule Eml.Language.Html do
     quote do
       import Kernel, except: [div: 2]
       import unquote(__MODULE__).Markup
-      alias unquote(__MODULE__).Presets, warn: false
     end
   end
 end

@@ -87,7 +87,7 @@ defmodule Eml do
           end
     if eval do
       { expr, _ } = Code.eval_quoted(ast, [] , env)
-      Macro.escape(expr)
+      expr
     else
       ast
     end
@@ -159,6 +159,7 @@ defmodule Eml do
     |> Keyword.put(:type, :template)
     |> Keyword.put(:eval, true)
     |> do_eml()
+    |> Macro.escape()
     quote do
       def unquote(name)(bindings \\ []) do
         Eml.write!(unquote(ast), bindings: bindings)
@@ -199,6 +200,7 @@ defmodule Eml do
     |> Keyword.put(:type, :html)
     |> Keyword.put(:eval, true)
     |> do_eml()
+    |> Macro.escape()
     quote do
       def unquote(name) do
         unquote(ast)

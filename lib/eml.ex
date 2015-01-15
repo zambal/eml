@@ -50,7 +50,8 @@ defmodule Eml do
   """
   defmacro eml(opts, block \\ []) do
     block = block[:do] || opts[:do]
-    opts  = Keyword.put(opts, :type, :eml)
+    opts  = Keyword.put_new(opts, :type, :eml)
+    opts  = Keyword.put(opts, :precompile, false)
     do_eml(block, opts)
   end
 
@@ -59,12 +60,11 @@ defmodule Eml do
     type   = opts[:type] || :template
     lang   = opts[:use] || @default_lang
     file   = opts[:file]
-    eval   = opts[:eval]
     env    = opts[:env] || __ENV__
     quoted = if file do
              file
              |> File.read!()
-             |> Code.string_to_quoted!(file: file)
+             |> Code.string_to_quoted!(file: file, line: 1)
            else
              quoted || opts[:do]
            end
@@ -72,20 +72,23 @@ defmodule Eml do
             :template ->
               quote do
                 use unquote(lang)
+                import Eml.Template, only: [bind: 2]
                 Eml.compile unquote(quoted)
               end
             :html ->
               quote do
                 use unquote(lang)
+                import Eml.Template, only: [bind: 2]
                 Eml.write! unquote(quoted)
               end
             :eml ->
               quote do
                 use unquote(lang)
+                import Eml.Template, only: [bind: 2]
                 Eml.read! unquote(quoted), Eml.Language.Native
               end
           end
-    if eval do
+    if opts[:precompile] do
       { expr, _ } = Code.eval_quoted(ast, [] , env)
       expr
     else
@@ -153,57 +156,22 @@ defmodule Eml do
       "<div id='name'>Vincent</div>"
       iex> File.rm! "test.eml.exs"
   """
-  defmacro precompile_template(name, opts) do
-    { name, _, nil } = name
+  defmacro precompile(name \\ nil, opts) do
     ast = opts
     |> Keyword.put(:type, :template)
-    |> Keyword.put(:eval, true)
+    |> Keyword.put(:precompile, true)
     |> do_eml()
     |> Macro.escape()
-    quote do
-      def unquote(name)(bindings \\ []) do
-        Eml.write!(unquote(ast), bindings: bindings)
-      end
-    end
-  end
-
-  @doc """
-  Define a function that compiles eml to html during compile time.
-
-  Note that because the code in the do block is evaluated at compile
-  time, it's not possible to call other functions from the same module.
-
-  Instead of defining a do block, you can also provide a path to a file
-  with eml content. See `Eml.precompile_template/2` for an example with
-  an external file.
-
-  ### Example:
-
-      iex> defmodule MyHtml do
-      ...>   use Eml
-      ...>
-      ...>   precompile_html test do
-      ...>     prefix  = "fruit"
-      ...>     content = "lemon"
-      ...>     div do
-      ...>       span [class: "prefix"], prefix
-      ...>       span [class: "content"], content
-      ...>     end
-      ...>   end
-      ...> end
-      iex> MyHtml.test
-      "<div><span class='prefix'>fruit</span><span class='content'>lemon</span></div>"
-
-  """
-  defmacro precompile_html(name, opts) do
-    ast = opts
-    |> Keyword.put(:type, :html)
-    |> Keyword.put(:eval, true)
-    |> do_eml()
-    |> Macro.escape()
-    quote do
-      def unquote(name) do
+    if is_nil(name) do
+      quote do
         unquote(ast)
+      end      
+    else
+      { name, _, nil } = name
+      quote do
+        def unquote(name)(bindings \\ []) do
+          Eml.compile(unquote(ast), bindings)
+        end
       end
     end
   end

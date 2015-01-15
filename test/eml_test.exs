@@ -89,15 +89,10 @@ defmodule EmlTest do
     assert :binary    == Eml.type "strings are binaries"
     assert :binary    == Eml.type Eml.unpackr(eml do: div([], 42))
     assert :binary    == Eml.type unpack(eml do: [1,2,"z"])
-    assert :binary    == Eml.type Eml.write!(eml do: :name)
+    assert :binary    == Eml.type Eml.write!((eml do: :name), [], render_params: true)
     assert :binary    == Eml.type (eml do: :name)
                                   |> Eml.compile()
-                                  |> Eml.write!(bindings: [name: "Vincent"])
-    assert :template  == Eml.type (eml do: [:name, :age])
-                                  |> Eml.compile()
-                                  |> Eml.write!(bindings: [age: 36])
-    assert :template  == Eml.type (eml do: [:name, :age])
-                                  |> Eml.write!(bindings: [age: 36])
+                                  |> Eml.write!(name: "Vincent")
     assert :template  == Eml.type Eml.compile(eml do: :name)
     assert :template  == Eml.type Eml.compile(eml do: [div([], 1), div([], 2), div([], :param), "..."])
     assert :parameter == Eml.type %Eml.Parameter{}
@@ -341,7 +336,7 @@ defmodule EmlTest do
     assert [fruit: 2] == Template.unbound(t)
 
     assert "<div>orange</div><div>lemon</div><div>blackberry</div><div>strawberry</div>" ==
-      Eml.write!(t, bindings: [fruit: ["blackberry", "strawberry"]])
+      Eml.write!(t, fruit: ["blackberry", "strawberry"])
   end
 
   test "Templates in eml" do
@@ -358,7 +353,7 @@ defmodule EmlTest do
       end
     end
 
-    assert Eml.write!(expected) == Eml.write!(taside, bindings: [fruit: "lemon"])
+    assert Eml.write!(expected) == Eml.write!(taside, fruit: "lemon")
 
   end
 
@@ -380,17 +375,17 @@ defmodule EmlTest do
     end
 
     expected1 = "<div data-custom1='#param{custom}' data-custom2='#param{custom}' class='#param{class1} class2 #param{class3}' id='#param{id_param}'></div>"
-    assert expected1 == Eml.write!(e)
+    assert expected1 == Eml.write!(e, [], render_params: true)
 
     expected2 = "<div data-custom1='1' data-custom2='2' class='class1 class2 class3' id='parameterized'></div>"
-    assert expected2 == Eml.write!(e, bindings: [id_param: "parameterized",
-                                                 class1: "class1",
-                                                 class3: "class3",
-                                                 custom: [1, 2]])
+    assert expected2 == Eml.write!(e, id_param: "parameterized",
+                                   class1: "class1",
+                                   class3: "class3",
+                                   custom: [1, 2])
 
-    t = Eml.write!(e, bindings: [class3: "class3", custom: 1])
+    t = Eml.compile(e, class3: "class3", custom: 1)
     assert :template == Eml.type t
     assert Enum.sort(id_param: 1, class1: 1, custom: 1) == Enum.sort(Template.unbound(t))
-    assert expected2 == Eml.write!(t, bindings: [id_param: "parameterized", class1: "class1", custom: 2])
+    assert expected2 == Eml.write!(t, id_param: "parameterized", class1: "class1", custom: 2)
   end
 end

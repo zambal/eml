@@ -122,6 +122,31 @@ defmodule Eml do
   end
 
   @doc """
+  Define a function that produces html.
+
+  This macro is provided both for convenience and
+  to be able to show intention of code.
+
+  This:
+
+  `defhtml mydiv(content), do: div(%{}, content)`
+
+  is effectively the same as:
+
+  `def mydiv(content), do: eml do div(%{}, content) end |> Eml.write()`
+
+  """
+  defmacro defhtml(call, do_block) do
+    block = do_block[:do]
+    ast   = do_eml(block, type: :eml)
+    quote do
+      def unquote(call) do
+        Eml.write! unquote(ast)
+      end
+    end
+  end
+
+  @doc """
   Define a function that compiles eml to a template during compile time.
 
   The function that this macro defines accepts optionally a bindings
@@ -742,37 +767,36 @@ defmodule Eml do
       {:ok, "<p>Tom &amp; Jerry</p>"}
 
   """
-  @spec write(t, Keyword.t) :: { :ok, binary } | error
-  def write(eml, opts \\ [])
-
-  def write(%Template{} = t, opts) do
+  @spec write(t, Keyword.t, Keyword.t) :: { :ok, binary } | error
+  def write(eml, bindings \\ [], opts \\ []) do
     { lang, opts } = Keyword.pop(opts, :lang, @default_lang)
-    lang.write(t, Keyword.put(opts, :mode, :compile))
-  end
-
-  def write(eml, opts) do
-    { lang, opts } = Keyword.pop(opts, :lang, @default_lang)
-    lang.write(eml, Keyword.put(opts, :mode, :render))
+    opts = Keyword.put(opts, :bindings, bindings)
+    opts = Keyword.put(opts, :mode, :render)
+    lang.write(eml, opts)
   end
 
   @doc """
   Same as `Eml.write/2`, except that it raises an exception, instead of returning an
   error tuple in case of an error.
   """
-  @spec write!(t, Keyword.t) :: binary
-  def write!(eml, opts \\ []) do
-    case write(eml, opts) do
-      { :ok, str }  -> str
-      { :error, e } -> raise ArgumentError, message: inspect(e, pretty: true)
+  @spec write!(t, Keyword.t, Keyword.t) :: binary
+  def write!(eml, bindings \\ [], opts \\ []) do
+    case write(eml, bindings, opts) do
+      { :ok, str } ->
+        str
+      { :error, { :unbound_params, params } } ->
+        raise ArgumentError, message: "Unbound parameters in template: #{inspect params}"
+      { :error, e } ->
+        raise ArgumentError, message: inspect(e, pretty: true)
     end
   end
 
   @doc """
   Same as `Eml.write/2`, except that it writes the results to a file
   """
-  @spec write_file(path, t, Keyword.t) :: :ok | error
-  def write_file(path, eml, opts \\ []) do
-    case write(eml, opts) do
+  @spec write_file(path, t, Keyword.t, Keyword.t) :: :ok | error
+  def write_file(path, eml, bindings \\ [], opts \\ []) do
+    case write(eml, bindings, opts) do
       { :ok, str } -> File.write(path, str)
       error        -> error
     end
@@ -782,9 +806,9 @@ defmodule Eml do
   Same as `Eml.write_file/2`, except that it raises an exception, instead of returning an
   error tuple in case of an error.
   """
-  @spec write_file!(path, t, Keyword.t) :: :ok
-  def write_file!(path, eml, opts \\ []) do
-    File.write!(path, write!(eml, opts))
+  @spec write_file!(path, t, Keyword.t, Keyword.t) :: :ok
+  def write_file!(path, eml, bindings, opts \\ []) do
+    File.write!(path, write!(eml, bindings, opts))
   end
 
 
@@ -799,16 +823,16 @@ defmodule Eml do
       {:ok, "<body><h1 id='main-title'>The Title</h1></body>"}
 
   """
-  @spec compile(t, lang) :: Eml.Template.t | error
-  def compile(eml, lang \\ @default_lang)
-
-  def compile(%Template{} = t, _), do: t
-  def compile(eml, lang) do
+  @spec compile(t, Keyword.t) :: Eml.Template.t | error
+  def compile(eml, bindings \\ [], opts \\ []) do
     # for consistence, when compiling eml we always want to return a template, even if
     # there are no parameters at all, or all of them are bound.
-    case lang.write(eml, [mode: :compile, force_templ: true]) do
+    { lang, opts } = Keyword.pop(opts, :lang, @default_lang)
+    opts = Keyword.put(opts, :bindings, bindings)
+    opts = Keyword.put(opts, :mode, :compile)
+    case lang.write(eml, opts) do
       { :ok, t } -> t
-      error      -> error
+      error -> error
     end
   end
 
@@ -909,7 +933,7 @@ defmodule Eml do
     imports =
       if opts[:imports] != false do
         quote do
-          import Eml, only: [eml: 1, defeml: 2, precompile_template: 2, precompile_html: 2, unpack: 1]
+          import Eml, only: [eml: 1, eml: 2, defeml: 2, defhtml: 2, precompile: 1, precompile: 2, unpack: 1]
         end
       else
         quote do: require Eml

@@ -6,6 +6,6 @@ defmodule Eml.Language do
 
   defcallback markup?() :: true | false
 
-  defcallback read(Eml.Readable.t, type) :: Eml.t | Eml.error
-  defcallback write(Eml.t, opts) :: { :ok, Eml.Readable.t } | Eml.error
+  defcallback parse(Eml.Parsable.t, type) :: Eml.t | Eml.error
+  defcallback render(Eml.t, opts) :: { :ok, Eml.Parsable.t } | Eml.error
 end

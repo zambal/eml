@@ -1,5 +1,5 @@
 defmodule Eml.Template do
-  alias Eml.Readable, as: Read
+  alias Eml.Parsable, as: Parse
   alias __MODULE__, as: M
 
   defstruct chunks: [], params: [], bindings: []
@@ -11,29 +11,29 @@ defmodule Eml.Template do
 
   @lang Eml.Language.Native
 
-  @spec get(t, Eml.Parameter.id) :: Read.t | nil
+  @spec get(t, Eml.Parameter.id) :: Parse.t | nil
   def get(%M{bindings: bindings}, param_id)
   when is_atom(param_id), do: Keyword.get(bindings, param_id, [])
 
   @spec set(t, Eml.Parameter.id, Eml.data) :: t
   def set(%M{bindings: bindings} = t, param_id, data)
   when is_atom(param_id) do
-    %M{t| bindings: Keyword.put(bindings, param_id, Eml.read(data, @lang))}
+    %M{t| bindings: Keyword.put(bindings, param_id, Eml.parse(data, @lang))}
   end
 
-  @spec unset(t, Eml.Parameter.id) :: Read.t | nil
+  @spec unset(t, Eml.Parameter.id) :: Parse.t | nil
   def unset(%M{bindings: bindings} = t, param_id)
   when is_atom(param_id), do: %M{t| bindings: Keyword.delete(bindings, param_id)}
 
   @spec bind(t, bindings) :: t
   def bind(%M{bindings: current} = t, new) do
     new = for { id, data } <- new do
-      readed = if is_list(data) do
-                 for d <- data, do: Eml.read(d, @lang)
+      parsed = if is_list(data) do
+                 for d <- data, do: Eml.parse(d, @lang)
                else
-                 Eml.read(data, @lang)
+                 Eml.parse(data, @lang)
                end
-      { id, get(t, id) ++ readed }
+      { id, get(t, id) ++ parsed }
     end
     %M{t| bindings: Keyword.merge(current, new)}
   end
@@ -45,8 +45,8 @@ defmodule Eml.Template do
   @spec unbind(t, bindings) :: t
   def unbind(%M{bindings: current} = t, unbinds) do
     removed = for { id, data } <- unbinds do
-      readed = for d <- data, do: Eml.read(d, @lang)
-      { id, get(t, id) -- readed }
+      parsed = for d <- data, do: Eml.parse(d, @lang)
+      { id, get(t, id) -- parsed }
     end
     %M{t| bindings: Keyword.merge(current, removed)}
   end

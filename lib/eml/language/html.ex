@@ -20,12 +20,12 @@ defmodule Eml.Language.Html do
 
   def markup?(), do: true
 
-  def read(data, type) do
-    Eml.Language.Html.Reader.read(data, type)
+  def parse(data, type) do
+    Eml.Language.Html.Parseer.parse(data, type)
   end
 
-  def write(eml, opts) do
-    Eml.Language.Html.Writer.write(eml, opts)
+  def render(eml, opts) do
+    Eml.Language.Html.Renderer.render(eml, opts)
   end
 
   defmacro __using__(_opts) do

@@ -1,14 +1,14 @@
 defmodule Eml do
   alias Eml.Markup
   alias Eml.Template
-  alias Eml.Readable
+  alias Eml.Parsable
 
   @default_lang Eml.Language.Html
 
   @type element  :: binary | Eml.Markup.t | Eml.Parameter.t | Eml.Template.t
   @type content  :: [element]
   @type t        :: element | content
-  @type data     :: Eml.Readable.t
+  @type data     :: Eml.Parsable.t
   @type error    :: { :error, term }
   @type lang     :: atom
   @type path     :: binary
@@ -26,18 +26,18 @@ defmodule Eml do
   Just like in other Elixir blocks, evaluates all expressions
   and returns the last. Code inside an eml block is just
   regular Elixir code. The purpose of the `eml/2` macro
-  is to make it more convenient to write eml.
+  is to make it more convenient to render eml.
 
   It does this by doing two things:
 
   * Provide a lexical scope where all markup macro's are imported to
-  * Read the last expression of the block in order to guarantee valid eml content
+  * Parse the last expression of the block in order to guarantee valid eml content
 
   To illustrate, the expressions below all produce the same output:
 
   * `eml do: div([], 42)`
-  * `Eml.Markup.new(:div, %{}, 42) |> Eml.read!(Eml.Language.Native)`
-  * `Eml.Markup.Html.div([], 42) |> Eml.read!(Eml.Language.Native)`
+  * `Eml.Markup.new(:div, %{}, 42) |> Eml.parse!(Eml.Language.Native)`
+  * `Eml.Markup.Html.div([], 42) |> Eml.parse!(Eml.Language.Native)`
 
   Note that since the Elixir `Kernel` module by default imports the `div/2`
   function in to the global namespace, this function is inside an eml block
@@ -50,7 +50,8 @@ defmodule Eml do
   """
   defmacro eml(opts, block \\ []) do
     block = block[:do] || opts[:do]
-    opts  = Keyword.put(opts, :type, :eml)
+    opts  = Keyword.put_new(opts, :type, :eml)
+    opts  = Keyword.put(opts, :precompile, false)
     do_eml(block, opts)
   end
 
@@ -59,12 +60,11 @@ defmodule Eml do
     type   = opts[:type] || :template
     lang   = opts[:use] || @default_lang
     file   = opts[:file]
-    eval   = opts[:eval]
     env    = opts[:env] || __ENV__
     quoted = if file do
              file
              |> File.read!()
-             |> Code.string_to_quoted!(file: file)
+             |> Code.string_to_quoted!(file: file, line: 1)
            else
              quoted || opts[:do]
            end
@@ -72,20 +72,23 @@ defmodule Eml do
             :template ->
               quote do
                 use unquote(lang)
+                import Eml.Template, only: [bind: 2]
                 Eml.compile unquote(quoted)
               end
             :html ->
               quote do
                 use unquote(lang)
-                Eml.write! unquote(quoted)
+                import Eml.Template, only: [bind: 2]
+                Eml.render! unquote(quoted)
               end
             :eml ->
               quote do
                 use unquote(lang)
-                Eml.read! unquote(quoted), Eml.Language.Native
+                import Eml.Template, only: [bind: 2]
+                Eml.parse! unquote(quoted), Eml.Language.Native
               end
           end
-    if eval do
+    if opts[:precompile] do
       { expr, _ } = Code.eval_quoted(ast, [] , env)
       expr
     else
@@ -114,6 +117,31 @@ defmodule Eml do
     quote do
       def unquote(call) do
         unquote(ast)
+      end
+    end
+  end
+
+  @doc """
+  Define a function that produces html.
+
+  This macro is provided both for convenience and
+  to be able to show intention of code.
+
+  This:
+
+  `defhtml mydiv(content), do: div(%{}, content)`
+
+  is effectively the same as:
+
+  `def mydiv(content), do: eml do div(%{}, content) end |> Eml.render()`
+
+  """
+  defmacro defhtml(call, do_block) do
+    block = do_block[:do]
+    ast   = do_eml(block, type: :eml)
+    quote do
+      def unquote(call) do
+        Eml.render! unquote(ast)
       end
     end
   end
@@ -153,57 +181,22 @@ defmodule Eml do
       "<div id='name'>Vincent</div>"
       iex> File.rm! "test.eml.exs"
   """
-  defmacro precompile_template(name, opts) do
-    { name, _, nil } = name
+  defmacro precompile(name \\ nil, opts) do
     ast = opts
     |> Keyword.put(:type, :template)
-    |> Keyword.put(:eval, true)
+    |> Keyword.put(:precompile, true)
     |> do_eml()
     |> Macro.escape()
-    quote do
-      def unquote(name)(bindings \\ []) do
-        Eml.write!(unquote(ast), bindings: bindings)
-      end
-    end
-  end
-
-  @doc """
-  Define a function that compiles eml to html during compile time.
-
-  Note that because the code in the do block is evaluated at compile
-  time, it's not possible to call other functions from the same module.
-
-  Instead of defining a do block, you can also provide a path to a file
-  with eml content. See `Eml.precompile_template/2` for an example with
-  an external file.
-
-  ### Example:
-
-      iex> defmodule MyHtml do
-      ...>   use Eml
-      ...>
-      ...>   precompile_html test do
-      ...>     prefix  = "fruit"
-      ...>     content = "lemon"
-      ...>     div do
-      ...>       span [class: "prefix"], prefix
-      ...>       span [class: "content"], content
-      ...>     end
-      ...>   end
-      ...> end
-      iex> MyHtml.test
-      "<div><span class='prefix'>fruit</span><span class='content'>lemon</span></div>"
-
-  """
-  defmacro precompile_html(name, opts) do
-    ast = opts
-    |> Keyword.put(:type, :html)
-    |> Keyword.put(:eval, true)
-    |> do_eml()
-    |> Macro.escape()
-    quote do
-      def unquote(name) do
+    if is_nil(name) do
+      quote do
         unquote(ast)
+      end
+    else
+      { name, _, nil } = name
+      quote do
+        def unquote(name)(bindings \\ []) do
+          Eml.compile(unquote(ast), bindings: bindings)
+        end
       end
     end
   end
@@ -332,7 +325,7 @@ defmodule Eml do
       iex> Eml.add(e, "__", class: "inner", at: :begin)
       [#div<[#span<%{id: "inner1", class: "inner"} ["__hello "]>,
         #span<%{id: "inner2", class: "inner"} ["__world"]>]>]
-      iex> Eml.add(e, (eml do: span "!"), tag: :div) |> Eml.write!(pretty: false)
+      iex> Eml.add(e, (eml do: span "!"), tag: :div) |> Eml.render!(pretty: false)
       "<div><span id='inner1' class='inner'>hello </span><span id='inner2' class='inner'>world</span><span>!</span></div>"
 
   """
@@ -357,7 +350,7 @@ defmodule Eml do
 
   When the provided function returns `nil`, the the content will
   be removed from the eml tree. Any other returned value will be
-  evaluated by `Eml.read!/2` in order to guarantee valid eml.
+  evaluated by `Eml.parse!/2` in order to guarantee valid eml.
 
   Content is matched depending on the provided options.
 
@@ -395,7 +388,7 @@ defmodule Eml do
       [#div<%{id: "outer"}
        [#span<%{id: "inner1", class: "inner"} ["hello "]>,
         #span<%{id: "inner2", class: "inner"} ["world"]>]>]
-      iex> Eml.update(e, fn s -> String.upcase(s) end, pat: ~r/.*/) |> Eml.write!(pretty: false)
+      iex> Eml.update(e, fn s -> String.upcase(s) end, pat: ~r/.*/) |> Eml.render!(pretty: false)
       "<div><span id='inner1' class='inner'>HELLO </span><span id='inner2' class='inner'>WORLD</span></div>"
 
   """
@@ -556,7 +549,7 @@ defmodule Eml do
 
   When the provided function returns `nil`, the the content will
   be removed from the eml tree. Any other returned value will be
-  evaluated by `Eml.read!/2` in order to guarantee valid eml.
+  evaluated by `Eml.parse!/2` in order to guarantee valid eml.
 
   Note that because parent elements are evaluated before their children,
   no children will be evaluated if the parent is removed.
@@ -596,7 +589,7 @@ defmodule Eml do
   end
 
   def transform(element, fun, lang) do
-    case element |> fun.() |> Readable.read(lang) do
+    case element |> fun.() |> Parsable.parse(lang) do
       { :error, _ } -> nil
       element ->
         if markup?(element),
@@ -606,7 +599,7 @@ defmodule Eml do
   end
 
   @doc """
-  Reads data and converts it to eml
+  Parses data and converts it to eml
 
   How the data is interpreted depends on the `lang` argument.
   The default value is `Eml.Language.Html', which means that
@@ -618,72 +611,52 @@ defmodule Eml do
 
   ### Examples:
 
-      iex> Eml.read("<body><h1 id='main-title'>The title</h1></body>")
+      iex> Eml.parse("<body><h1 id='main-title'>The title</h1></body>")
       [#body<[#h1<%{id: "main-title"} ["The title"]>]>]
 
-      iex> Eml.read([1, 2, 3,[4, 5, "6"], " ", true, " ", [false]], Eml.Language.Native)
+      iex> Eml.parse([1, 2, 3,[4, 5, "6"], " ", true, " ", [false]], Eml.Language.Native)
       ["123456 true false"]
 
   """
-  @spec read(data, lang) :: t | error
-  def read(data, lang \\ @default_lang) do
-    read(data, [], :begin, lang)
+  @spec parse(data, lang) :: t | error
+  def parse(data, lang \\ @default_lang) do
+    parse(data, [], :begin, lang)
   end
 
   @doc """
-  Same as `Eml.read/2`, except that it raises an exception, instead of returning an
+  Same as `Eml.parse/2`, except that it raises an exception, instead of returning an
   error tuple in case of an error.
   """
-  @spec read!(data, lang) :: t
-  def read!(data, lang \\ @default_lang) do
-    case read(data, lang) do
+  @spec parse!(data, lang) :: t
+  def parse!(data, lang \\ @default_lang) do
+    case parse(data, lang) do
       { :error, e } ->
         raise ArgumentError, message: "Error #{inspect e}"
       eml -> eml
     end
   end
 
-  @doc """
-  Same as `Eml.read/2`, except that it reads data from a file
-  """
-  @spec read_file(path, lang) :: t | error
-  def read_file(path, lang \\ @default_lang) do
-    case File.read(path) do
-      { :ok, data }  -> read(data, [], :begin, lang)
-      { :error, e }  -> { :error, e }
-    end
-  end
-
-  @doc """
-  Same as `Eml.read_file/2`, except that it raises an exception, instead of
-  returning an error tuple in case of an error.
-  """
-  @spec read_file!(path, lang) :: t | error
-  def read_file!(path, lang \\ @default_lang) do
-    File.read!(path) |> read!(lang)
-  end
-
   @doc false
-  @spec read(data | error, content, atom, lang) :: t | error
-  def read(data, content, at, lang \\ Eml.Languages.Native)
+  @spec parse(data | error, content, atom, lang) :: t | error
+  def parse(data, content, at, lang \\ Eml.Languages.Native)
 
   # Error pass through
-  def read({ :error, e }, _, _, _), do: { :error, e }
+  def parse({ :error, e }, _, _, _), do: { :error, e }
 
   # No-ops
-  def read(nondata, content, _, _)
+  def parse(nondata, content, _, _)
   when nondata in [nil, "", []], do: content
 
   # Handle lists
 
-  def read(data, content, :end, lang)
+  def parse(data, content, :end, lang)
   when is_list(data), do: add_content(data, :lists.reverse(content), :end, lang) |> :lists.reverse()
 
-  def read(data, content, :begin, lang)
+  def parse(data, content, :begin, lang)
   when is_list(data), do: add_content(:lists.reverse(data), content, :begin, lang)
 
-  def read(data, content, mode, lang) do
-    case Readable.read(data, lang) do
+  def parse(data, content, mode, lang) do
+    case Parsable.parse(data, lang) do
       { :error, e } -> { :error, e }
       element       -> add_element(element, content, mode)
     end
@@ -732,7 +705,7 @@ defmodule Eml do
   defp add_content([h | t], content, mode, lang) do
     content = if is_list(h) and mode === :end,
                 do: add_content(h, content, mode, lang),
-              else: read(h, content, mode, lang)
+              else: parse(h, content, mode, lang)
     add_content(t, content, mode, lang)
   end
 
@@ -740,9 +713,9 @@ defmodule Eml do
   do: content
 
   @doc false
-  @spec read!(data | error, content, atom, lang) :: t
-  def read!(data, content, at, lang \\ @default_lang) do
-    case read(data, content, at, lang) do
+  @spec parse!(data | error, content, atom, lang) :: t
+  def parse!(data, content, at, lang \\ @default_lang) do
+    case parse(data, content, at, lang) do
       { :error, e } ->
         raise ArgumentError, message: "Error #{e}"
       content -> content
@@ -750,12 +723,12 @@ defmodule Eml do
   end
 
   @doc """
-  Writes eml content to the specified language, which is
+  Renders eml content to the specified language, which is
   html by default.
 
   The accepted options are:
 
-  * `:lang` - The language to write to, by default `Eml.Language.Html`
+  * `:lang` - The language to render to, by default `Eml.Language.Html`
   * `:quote` - The type of quotes used for attribute values. Accepted values are `:single` (default) and `:double`.
   * `:escape` - Escape `&`, `<` and `>` in attribute values and content to HTML entities.
      Accepted values are `true` (default) and `false`.
@@ -764,83 +737,61 @@ defmodule Eml do
 
   ### Examples:
 
-      iex> Eml.write (eml do: body([], h1([id: "main-title"], "A title")))
+      iex> Eml.render (eml do: body([], h1([id: "main-title"], "A title")))
       {:ok, "<body><h1 id='main-title'>A title</h1></body>"}
 
-      iex> Eml.write (eml do: body([], h1([id: "main-title"], "A title"))), quote: :double
+      iex> Eml.render (eml do: body([], h1([id: "main-title"], "A title"))), quote: :double
       {:ok, "<body><h1 id=\"main-title\">A title</h1></body>"}
 
-      iex> Eml.write (eml do: p([], "Tom & Jerry"))
+      iex> Eml.render (eml do: p([], "Tom & Jerry"))
       {:ok, "<p>Tom &amp; Jerry</p>"}
 
   """
-  @spec write(t, Keyword.t) :: { :ok, binary } | error
-  def write(eml, opts \\ [])
-
-  def write(%Template{} = t, opts) do
+  @spec render(t, Keyword.t, Keyword.t) :: { :ok, binary } | error
+  def render(eml, bindings \\ [], opts \\ []) do
     { lang, opts } = Keyword.pop(opts, :lang, @default_lang)
-    lang.write(t, Keyword.put(opts, :mode, :compile))
-  end
-
-  def write(eml, opts) do
-    { lang, opts } = Keyword.pop(opts, :lang, @default_lang)
-    lang.write(eml, Keyword.put(opts, :mode, :render))
+    opts = Keyword.put(opts, :bindings, bindings)
+    opts = Keyword.put(opts, :mode, :render)
+    lang.render(eml, opts)
   end
 
   @doc """
-  Same as `Eml.write/2`, except that it raises an exception, instead of returning an
+  Same as `Eml.render/2`, except that it raises an exception, instead of returning an
   error tuple in case of an error.
   """
-  @spec write!(t, Keyword.t) :: binary
-  def write!(eml, opts \\ []) do
-    case write(eml, opts) do
-      { :ok, str }  -> str
-      { :error, e } -> raise ArgumentError, message: inspect(e, pretty: true)
+  @spec render!(t, Keyword.t, Keyword.t) :: binary
+  def render!(eml, bindings \\ [], opts \\ []) do
+    case render(eml, bindings, opts) do
+      { :ok, str } ->
+        str
+      { :error, { :unbound_params, params } } ->
+        raise ArgumentError, message: "Unbound parameters in template: #{inspect params}"
+      { :error, e } ->
+        raise ArgumentError, message: inspect(e, pretty: true)
     end
   end
 
   @doc """
-  Same as `Eml.write/2`, except that it writes the results to a file
-  """
-  @spec write_file(path, t, Keyword.t) :: :ok | error
-  def write_file(path, eml, opts \\ []) do
-    case write(eml, opts) do
-      { :ok, str } -> File.write(path, str)
-      error        -> error
-    end
-  end
-
-  @doc """
-  Same as `Eml.write_file/2`, except that it raises an exception, instead of returning an
-  error tuple in case of an error.
-  """
-  @spec write_file!(path, t, Keyword.t) :: :ok
-  def write_file!(path, eml, opts \\ []) do
-    File.write!(path, write!(eml, opts))
-  end
-
-
-  @doc """
-  Same as `Eml.write/2` except that it always returns a template.
+  Same as `Eml.render/2` except that it always returns a template.
 
   ### Examples:
 
       iex> t = Eml.compile (eml do: body([], h1([id: "main-title"], :the_title)))
       #Template<[the_title: 1]>
-      iex> Eml.write(t, bindings: [the_title: "The Title"])
+      iex> Eml.render(t, bindings: [the_title: "The Title"])
       {:ok, "<body><h1 id='main-title'>The Title</h1></body>"}
 
   """
-  @spec compile(t, lang) :: Eml.Template.t | error
-  def compile(eml, lang \\ @default_lang)
-
-  def compile(%Template{} = t, _), do: t
-  def compile(eml, lang) do
+  @spec compile(t, Keyword.t) :: Eml.Template.t | error
+  def compile(eml, bindings \\ [], opts \\ []) do
     # for consistence, when compiling eml we always want to return a template, even if
     # there are no parameters at all, or all of them are bound.
-    case lang.write(eml, [mode: :compile, force_templ: true]) do
+    { lang, opts } = Keyword.pop(opts, :lang, @default_lang)
+    opts = Keyword.put(opts, :bindings, bindings)
+    opts = Keyword.put(opts, :mode, :compile)
+    case lang.render(eml, opts) do
       { :ok, t } -> t
-      error      -> error
+      error -> error
     end
   end
 
@@ -941,7 +892,7 @@ defmodule Eml do
     imports =
       if opts[:imports] != false do
         quote do
-          import Eml, only: [eml: 1, defeml: 2, precompile_template: 2, precompile_html: 2, unpack: 1]
+          import Eml, only: [eml: 1, eml: 2, defeml: 2, defhtml: 2, precompile: 1, precompile: 2, unpack: 1]
         end
       else
         quote do: require Eml

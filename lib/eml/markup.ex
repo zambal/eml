@@ -22,7 +22,7 @@ defmodule Eml.Markup do
   @spec new(atom, fields, data, Eml.lang) :: t
   def new(tag, attrs \\ %{}, content \\ [], lang \\ @default_lang) when is_atom(tag) and (is_map(attrs) or is_list(attrs)) do
     attrs   = to_attrs(attrs)
-    content = Eml.read!(content, lang)
+    content = Eml.parse!(content, lang)
     %M{tag: tag, attrs: attrs, content: content}
   end
 
@@ -52,21 +52,21 @@ defmodule Eml.Markup do
 
   @spec content(t, data, Eml.lang) :: t
   def content(%M{} = markup, data, lang \\ @default_lang) do
-    %M{markup| content: Eml.read!(data, lang)}
+    %M{markup| content: Eml.parse!(data, lang)}
   end
 
   @spec add(t, data, Keyword.t) :: t
   def add(%M{content: current} = markup, data, opts \\ []) do
     at      = opts[:at] || :end
     lang  = opts[:lang] || @default_lang
-    content = Eml.read!(data, current, at, lang)
+    content = Eml.parse!(data, current, at, lang)
     %M{markup| content: content}
   end
 
   @spec update(t, (Eml.element -> data), Eml.lang) :: t
   def update(%M{content: content} = markup, fun, lang \\ @default_lang) do
     content = for element <- content, data = fun.(element) do
-      Eml.Readable.read(data, lang)
+      Eml.Parsable.parse(data, lang)
     end
     %M{markup| content: content}
   end
@@ -122,7 +122,7 @@ defmodule Eml.Markup do
     { id, opts }       = Keyword.pop(opts, :id, :any)
     { class, opts }    = Keyword.pop(opts, :class, :any)
     { content, attrs } = Keyword.pop(opts, :content)
-    content            = Eml.read!(content, @default_lang)
+    content            = Eml.parse!(content, @default_lang)
     content            = if content == [], do: :any, else: content
 
     has_tag?(markup, tag)         and

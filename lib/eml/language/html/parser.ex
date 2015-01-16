@@ -1,9 +1,9 @@
-defmodule Eml.Language.Html.Reader do
+defmodule Eml.Language.Html.Parseer do
 
   # API
 
-  @spec read(binary, atom) :: Eml.element | Eml.error
-  def read(html, BitString) do
+  @spec parse(binary, atom) :: Eml.element | Eml.error
+  def parse(html, BitString) do
     res = case parse(html, { :blank, [] }, [], :blank) do
             { :error, state } ->
               { :error, state }

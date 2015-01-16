@@ -14,7 +14,7 @@ To start off:
 
 This piece of code
 ```elixir
-Eml.write! eml do
+Eml.render! eml do
   name = "Vincent"
   age  = 36
 
@@ -85,7 +85,7 @@ iex(2)> eml do: div([], 42)
 Here we created a `div` element with `"42"` as it contents. Since content element's
 only primitive data type is binaries, the integer automatically gets converted.
 Eml also provides the `defeml` macro. It works like defining a regular Elixir
-function, but anything you write in the function definition get's evaluated as if
+function, but anything you write in the function definition gets evaluated as if
 it were in an `eml` do block.
 
 
@@ -112,17 +112,17 @@ iex(5)> Eml.unpackr eml do: div([], 42)
 
 #### Writing
 
-Contents can be written to a string by calling `Eml.write`.
+Contents can be written to a string by calling `Eml.render`.
 Notice that Eml automatically inserts a doctype declaration when
 the html element is the root.
 ```elixir
-iex(6)> Eml.write(eml(do: html(body(div([], 42)))))
+iex(6)> Eml.render(eml(do: html(body(div([], 42)))))
 {:ok,
  "<!doctype html>\n<html><body><div>42</div></body>\n</html>"}
 ```
-Eml also provides a version of write that either succeeds, or raises an exception.
+Eml also provides a version of render that either succeeds, or raises an exception.
 ```elixir
-iex(7)> Eml.write!(eml(do: html(body(div([], 42)))))
+iex(7)> Eml.render!(eml(do: html(body(div([], 42)))))
 "<!doctype html>\n<html><body><div>42</div></body></html>"
 ```
 In practice, you rarely encounter situations that need as much brackets as in this
@@ -131,12 +131,12 @@ is more convenient most of the time.
 
 #### Languages
 Let's turn back to Eml's data types. Mostly you'll be using binaries and markup. In
-order to provide translations from custom data types, Eml provides the `Eml.Readable`
+order to provide translations from custom data types, Eml provides the `Eml.Parsable`
 protocol. Primitive types are handles by languages.
 
-A language implements the Eml.Language behaviour, providing a `read`, `write` and
-`markup?` function. The `read` function converts types like strings, integers and
-floats in to eml. The `write` function converts eml in to whatever representation the
+A language implements the Eml.Language behaviour, providing a `parse`, `render` and
+`markup?` function. The `parse` function converts types like strings, integers and
+floats in to eml. The `render` function converts eml in to whatever representation the
 language has. In practice this will be mostly binary. The `markup?` function tells
 if the language provides markup macros. By default Eml provides two languages:
 `Eml.Language.Native` and `Eml.Language.Html`. `Eml.Language.Native` is a bit of a
@@ -144,42 +144,42 @@ special case, as it has no markup and is used internally in Eml. It is responsib
 for all conversions inside an `eml` block, like the conversion from a integer we saw
 in previous examples. `Eml.Language.Html` however is a language that the Eml core has
 no knowledge of, other than that it is specified as the default language when defining
-markup and is used by default in all read and write functions. Other languages can be
+markup and is used by default in all parse and render functions. Other languages can be
 implemented as long as it implements the Eml.Language behaviour.
 
-#### Reading
+#### Parsing
 
-The `Eml.Language.Html` reader provides a translation from binaries in to Eml markup.
+The `Eml.Language.Html` parser provides a translation from binaries in to Eml markup.
 ```elixir
-iex(8)> Eml.read "<!doctype html>\n<html><body><div>42</div></body></html>"
+iex(8)> Eml.parse "<!doctype html>\n<html><body><div>42</div></body></html>"
 [#html<[#body<[#div<["42"]>]>]>]
 ```
-`Eml.read` also accepts `Eml.Language.Native` as a reader,
+`Eml.parse` also accepts `Eml.Language.Native` as a parser,
 because it follows the Eml.Language behaviour too.
 ```elixir
-iex(9)> Eml.read("<div>42</div>", Eml.Language.Native)
+iex(9)> Eml.parse("<div>42</div>", Eml.Language.Native)
 ["<div>42</div>"]
 ```
-No conversion of strings is performed by the native reader.
-Here are a few other examples of conversion the native reader
+No conversion of strings is performed by the native parser.
+Here are a few other examples of conversion the native parser
 performs.
 ```elixir
-iex(10)> Eml.read(nil, Eml.Language.Native)
+iex(10)> Eml.parse(nil, Eml.Language.Native)
 []
 
-iex(11)> Eml.read([1, 2, (eml do: h1([], "hello")), 4], Eml.Language.Native)
+iex(11)> Eml.parse([1, 2, (eml do: h1([], "hello")), 4], Eml.Language.Native)
 ["12", #h1<["hello"]>, "4"]
 
-iex(12)> Eml.read([a: 1, b: 2], Eml.Language.Native)
-{:error, "Unreadable data: {:a, 1}"}
+iex(12)> Eml.parse([a: 1, b: 2], Eml.Language.Native)
+{:error, "Unparsable data: {:a, 1}"}
 
-iex(13)> Eml.read(["Hello ", [2014, ["!"]]], Eml.Language.Native)
+iex(13)> Eml.parse(["Hello ", [2014, ["!"]]], Eml.Language.Native)
 ["Hello 2014!"]
 ```
 `nil` is a non-existing value in Eml. As will be later shown, it can be used to discard
-elements when traversing an eml tree. The other examples show the reader also tries to
+elements when traversing an eml tree. The other examples show the parser also tries to
 concatenate all binary data. Furthermore, although Eml content is always a list, its
-elements can not be lists. The native reader thus flattens all input data in order to
+elements can not be lists. The native parser thus flattens all input data in order to
 guarantee Eml content always is a single list. Tuples aren't supported by default,
 as can be seen in the last example.
 
@@ -324,7 +324,7 @@ implemented with it. `Eml.transform` mostly works like enumeration. The key
 difference is that `Eml.transform` returns a modified version of the eml tree that
 was passed as an argument, instead of collecting elements in a single list.
 `Eml.transform` passes any element it encounters to the provided transformation
-function. The transformation function can return any readable data or `nil`,
+function. The transformation function can return any parsable data or `nil`,
 in which case the element is discarded, so it works a bit like a map and filter
 function in one pass.
 ```elixir
@@ -357,10 +357,10 @@ iex(33)> e = eml do: [:atoms, " ", :are, " ", :converted, " ", :to_parameters]
 [#param:atoms, " ", #param:are, " ", #param:converted, " ",
  #param:to_parameters]
 
-iex(34)> Eml.write!(e)
+iex(34)> Eml.render!(e)
 "#param{atoms} #param{are} #param{converted} #param{to_parameters}"
 
-iex(35)> Eml.write!(e, bindings: [atoms: "Atoms", are: "are", converted: "converted", to_parameters: "to parameters."])
+iex(35)> Eml.render!(e, atoms: "Atoms", are: "are", converted: "converted", to_parameters: "to parameters.")
 "Atoms are converted to parameters."
 
 iex(36)> unbound = Eml.compile(e)
@@ -373,29 +373,28 @@ iex(37)> t = Template.bind(unbound, atoms: "Atoms", are: "are")
 iex(38)> bound = Template.bind(t, converted: "converted", to_parameters: "to parameters.")
 #Template<BOUND>
 
-iex(39)> Eml.write!(bound)
+iex(39)> Eml.render!(bound)s
 "Atoms are converted to parameters."
 ```
 When creating eml, atoms are automatically converted to parameters.
-Whenever you try to write eml that contains parameters, the parameters
+Whenever you render eml with the `render: true` option, parameters
 are converted in to a string representation. If you have a parameter with
 id `:myparam`, the string representation will be `#param{myparam}`. If Eml
-reads back html that contains these strings, it will automatically convert
+parses back html that contains these strings, it will automatically convert
 those in to parameters. To bind data to parameters in eml, you can either
 compile eml data to a template and use its various binding options, or you
-can directly bind data to parameters by calling `Eml.write` with the
-`:bindings` option. If there are still unbound parameters left, `Eml.write`
-will also return a template. The output of templates on Elixir's shell
-provides some information about their state. The returned template at
-`iex(36)` tells that it has four parameters. The returned template at
-`iex(38)` tells that whatever parameters it has, they are all bound and the
-template is ready to render. Parameters with the same name can occur
-multiple times in a template. You can either call `Eml.Template.bind` as
-many times as needed in order to bind all instances, or you can provide a
+can directly bind data to parameters by providing bindings to `Eml.render`.
+If there are still unbound parameters left, `Eml.render` will return a error.
+The output of templates on Elixir's shell provides some information about their
+state. The returned template at `iex(36)` tells that it has four parameters.
+The returned template at `iex(38)` tells that whatever parameters it has,
+they are all bound and the template is ready to render. Parameters with the
+same name can occur multiple times in a template. You can either call `Eml.Template.bind`
+as many times as needed in order to bind all instances, or you can provide a
 list of values who's length is at least as long as the number of
 occurrences of the parameter in the template.
 ```elixir
-iex(40)> e = eml do: [div(:fruit), div(:fruit)]
+iex(40)> e = eml do: [div(s:fruit), div(:fruit)]
 [#div<[#param:fruit]>, #div<[#param:fruit]>]
 
 iex(41)> unbound = Eml.compile(e)
@@ -404,13 +403,13 @@ iex(41)> unbound = Eml.compile(e)
 iex(42)> t = Template.bind(unbound, fruit: "orange")
 #Template<[fruit: 1]>
 
-iex(43)> Eml.write!(t, bindings: [fruit: "lemon"])
+iex(43)> Eml.render!(t, fruit: "lemon")
 "<div>orange</div><div>lemon</div>"
 
 iex(44)> t = Template.bind(unbound, fruit: ["blackberry", "strawberry"])
 #Template<BOUND>
 
-iex(45)> Eml.write!(t)
+iex(45)> Eml.render!(t)
 "<div>blackberry</div><div>strawberry</div>"
 ```
 
@@ -437,12 +436,12 @@ Eml doesn't perform any validation on the produced output.
 You can add any attribute name to any element and Eml won't
 complain, as it has no knowledge of the type of markup that
 is to be generated. If you want to make sure that your eml code
-will be valid html, write it to an html file and use this file with any
+will be valid html, render it to an html file and use this file with any
 existing html validator. In this sense Eml is the same as hand
 written html.
 
 #### Html Parser
-The main purpose of the html parser is to read back generated html
+The main purpose of the html parser is to parse back generated html
 from Eml. It's a custom parser written in about 500 LOC,
 so don't expect it to successfully parse every html in the wild.
 
@@ -451,7 +450,7 @@ closing, like `<div>`. An element should always be written as `<div/>`,
 or `<div></div>`. However, explicit exceptions are made for void elements
 that are expected to never have any child elements.
 
-The bottom line is that whenever the parser fails to read back generated
+The bottom line is that whenever the parser fails to parse back generated
 html from Eml, it is a bug and please report it. Whenever it fails to
 parse some external html, I'm still interested to hear about it, but I
 can't guarantee I can or will fix it.

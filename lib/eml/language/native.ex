@@ -3,25 +3,29 @@ defmodule Eml.Language.Native do
 
   def markup?(), do: false
 
-  def read(data, BitString) do
+  def parse(data, BitString) do
     data
   end
 
-  def read(data, Atom) do
+  def parse(data, Atom) do
     Atom.to_string(data)
   end
 
-  def read(data, Integer) do
+  def parse(data, Integer) do
     Integer.to_string(data)
   end
 
-  def read(data, Float) do
+  def parse(data, Float) do
     Float.to_string(data)
   end
 
-  def read(data, Tuple) do
-    { :error, "Unreadable data: #{inspect data}" }
+  def parse({ :escaped, string }, Tuple) do
+    { :escaped, string }
+  end
+  def parse(data, Tuple) do
+    { :error, "Unparsable data: #{inspect data}" }
   end
 
-  def write(data, _opts), do: data
+
+  def render(data, _opts), do: data
 end

@@ -44,7 +44,7 @@ defmodule Eml do
   only available as `Kernel.div/2`.
 
   Instead of defining a do block, you can also provide a path to a file
-  with eml content. See `Eml.precompile_template/2` for an example with
+  with eml content. See `Eml.precompile/2` for an example with
   an external file.
 
   """
@@ -157,13 +157,16 @@ defmodule Eml do
   Instead of defining a do block, you can also provide a path to a file with
   eml content.
 
+  When you ommit the name, this macro can also be used to precompile a
+  block or file inside any function.
+
   ### Example:
 
       iex> File.write! "test.eml.exs", "div [id: "name"], :name"
       iex> defmodule MyTemplates do
       ...>   use Eml
       ...>
-      ...>   precompile_template test do
+      ...>   precompile test1 do
       ...>     prefix = "fruit"
       ...>     div do
       ...>       span [class: "prefix"], prefix
@@ -171,15 +174,30 @@ defmodule Eml do
       ...>     end
       ...>   end
       ...>
-      ...>   precompile_template from_file, file: "test.eml.exs"
+      ...>   precompile from_file, file: "test.eml.exs"
+      ...>
+      ...>   defhtml test2 do
+      ...>     precompiled = precompile do
+      ...>       # Everything inside this block is evaluated at compile time
+      ...>       p [], :fruit
+      ...>     end
+      ...>
+      ...>     # the rest of the function is evaluated at runtime
+      ...>     body do
+      ...>       bind precompiled, fruit: "Strawberry"
+      ...>     end
+      ...>   end
       ...> end
-      iex> MyTemplates.test
+      iex> MyTemplates.test1
       #Template<[fruit: 1]>
       iex> MyTemplates.test fruit: "lemon"
       "<div><span class='prefix'>fruit</span><span class='content'>lemon</span></div>"
       iex> MyTemplates.from_file name: "Vincent"
       "<div id='name'>Vincent</div>"
       iex> File.rm! "test.eml.exs"
+      iex> MyTemplated.test2
+      "<body><p>Strawberry</p></body>"
+
   """
   defmacro precompile(name \\ nil, opts) do
     ast = opts
@@ -195,7 +213,7 @@ defmodule Eml do
       { name, _, nil } = name
       quote do
         def unquote(name)(bindings \\ []) do
-          Eml.compile(unquote(ast), bindings: bindings)
+          Eml.compile(unquote(ast), bindings)
         end
       end
     end
@@ -726,14 +744,16 @@ defmodule Eml do
   Renders eml content to the specified language, which is
   html by default.
 
+  When the provided eml contains a template, you can bind
+  its parameters by providing a Keyword list as the
+  second argument where the keys are the parameter id's.
+
   The accepted options are:
 
   * `:lang` - The language to render to, by default `Eml.Language.Html`
   * `:quote` - The type of quotes used for attribute values. Accepted values are `:single` (default) and `:double`.
   * `:escape` - Escape `&`, `<` and `>` in attribute values and content to HTML entities.
      Accepted values are `true` (default) and `false`.
-  * `:bindings` - When the provided eml contains a template, you can bind its parameters by providing a
-     Keyword list where the keys are the parameter id's. See `Eml.compile/2` for an example.
 
   ### Examples:
 

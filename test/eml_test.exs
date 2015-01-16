@@ -354,7 +354,6 @@ defmodule EmlTest do
     end
 
     assert Eml.render!(expected) == Eml.render!(taside, fruit: "lemon")
-
   end
 
   test "Parse parameters from html" do

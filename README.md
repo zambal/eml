@@ -1,6 +1,6 @@
-# Eml
-
 [![Build Status](https://api.travis-ci.org/zambal/eml.svg?branch=master)](https://travis-ci.org/zambal/eml)
+
+# Eml
 
 ## Markup for developers
 
@@ -110,9 +110,9 @@ iex(5)> Eml.unpackr eml do: div([], 42)
 ```
 
 
-#### Writing
+#### Rendering
 
-Contents can be written to a string by calling `Eml.render`.
+Contents can be rendered to a string by calling `Eml.render`.
 Notice that Eml automatically inserts a doctype declaration when
 the html element is the root.
 ```elixir
@@ -357,62 +357,37 @@ iex(33)> e = eml do: [:atoms, " ", :are, " ", :converted, " ", :to_parameters]
 [#param:atoms, " ", #param:are, " ", #param:converted, " ",
  #param:to_parameters]
 
-iex(34)> Eml.render!(e)
-"#param{atoms} #param{are} #param{converted} #param{to_parameters}"
-
-iex(35)> Eml.render!(e, atoms: "Atoms", are: "are", converted: "converted", to_parameters: "to parameters.")
+iex(34)> Eml.render!(e, atoms: "Atoms", are: "are", converted: "converted", to_parameters: "to parameters.")
 "Atoms are converted to parameters."
 
+iex(34)> Eml.render!(e, [], render_params: true)
+"#param{atoms} #param{are} #param{converted} #param{to_parameters}"
+
 iex(36)> unbound = Eml.compile(e)
-#Template<[atoms: 1, are: 1, converted: 1, to_parameters: 1]>
+#Template<[:atoms, :are, :converted, :to_parameters]>
 
 # `Eml.Template` is automatically aliased as `Template` when `use Eml` is invoked.
 iex(37)> t = Template.bind(unbound, atoms: "Atoms", are: "are")
-#Template<[converted: 1, to_parameters: 1]>
+#Template<[:converted, :to_parameters]>
 
 iex(38)> bound = Template.bind(t, converted: "converted", to_parameters: "to parameters.")
 #Template<BOUND>
 
-iex(39)> Eml.render!(bound)s
+iex(39)> Eml.render!(bound)
 "Atoms are converted to parameters."
 ```
 When creating eml, atoms are automatically converted to parameters.
-Whenever you render eml with the `render: true` option, parameters
-are converted in to a string representation. If you have a parameter with
-id `:myparam`, the string representation will be `#param{myparam}`. If Eml
-parses back html that contains these strings, it will automatically convert
-those in to parameters. To bind data to parameters in eml, you can either
-compile eml data to a template and use its various binding options, or you
-can directly bind data to parameters by providing bindings to `Eml.render`.
-If there are still unbound parameters left, `Eml.render` will return a error.
-The output of templates on Elixir's shell provides some information about their
-state. The returned template at `iex(36)` tells that it has four parameters.
-The returned template at `iex(38)` tells that whatever parameters it has,
-they are all bound and the template is ready to render. Parameters with the
-same name can occur multiple times in a template. You can either call `Eml.Template.bind`
-as many times as needed in order to bind all instances, or you can provide a
-list of values who's length is at least as long as the number of
-occurrences of the parameter in the template.
-```elixir
-iex(40)> e = eml do: [div(s:fruit), div(:fruit)]
-[#div<[#param:fruit]>, #div<[#param:fruit]>]
-
-iex(41)> unbound = Eml.compile(e)
-#Template<[fruit: 2]>
-
-iex(42)> t = Template.bind(unbound, fruit: "orange")
-#Template<[fruit: 1]>
-
-iex(43)> Eml.render!(t, fruit: "lemon")
-"<div>orange</div><div>lemon</div>"
-
-iex(44)> t = Template.bind(unbound, fruit: ["blackberry", "strawberry"])
-#Template<BOUND>
-
-iex(45)> Eml.render!(t)
-"<div>blackberry</div><div>strawberry</div>"
-```
-
+Whenever you render eml with the `render_params: true` option, parameters
+are converted in to a string representation. If Eml parses back html that
+contains these strings, it will automatically convert those in to parameters.
+To bind data to parameters in eml, you can either compile eml data to a template
+and use its various binding options, or you can directly bind data to parameters
+by providing bindings to `Eml.render`. If there are still unbound parameters left,
+`Eml.render` will return a error. The output of templates on Elixir's shell provide
+s some information about their state. The returned template at `iex(36)` tells that
+it has four unbound parameters. The returned template at `iex(38)` tells that
+whatever parameters it has, they are all bound and the template is ready to render.
+Parameters with the same name can occur multiple times in a template. 
 
 ### Notes
 

@@ -12,7 +12,6 @@ defmodule Eml.Language.Html.Renderer do
 
   @defstate %{type: :content,
               chunks: [],
-              params: [],
               bindings: [],
               current_tag: nil}
 
@@ -55,53 +54,47 @@ defmodule Eml.Language.Html.Renderer do
     end)
   end
 
-  defp parse_eml(%Parameter{} = param, %{render_params: false} = opts, %{chunks: chunks, params: params, bindings: bindings} = s) do
-    case Template.pop(bindings, param.id) do
-      { nil, b }   -> %{s| type: :templ, chunks: [param | chunks], params: add_param(params, param), bindings: b}
-      { value, b } -> parse_eml(value, opts, %{s| bindings: b})
+  defp parse_eml(%Parameter{} = param, %{render_params: false} = opts, %{chunks: chunks, bindings: bindings} = s) do
+    case bindings[param.id] do
+      nil   -> %{s| type: :templ, chunks: [param | chunks]}
+      value -> parse_eml(value, opts, s)
     end
   end
 
-  defp parse_eml(%Parameter{} = param, %{render_params: true}, %{chunks: chunks, params: params} = s) do
+  defp parse_eml(%Parameter{} = param, %{render_params: true}, %{chunks: chunks} = s) do
     param = parse_param(param)
-    %{s| chunks: [param | chunks], params: params}
+    %{s| chunks: [param | chunks]}
   end
 
-  defp parse_eml(%Template{} = t, %{render_params: false} = opts, %{chunks: chunks, params: params, bindings: bindings} = s) do
-    cond do
-      # If bound, render template and add it to chunks.
-      Template.bound?(t) ->
-        %{chunks: rchunks, bindings: rbindings} = parse_templ(t, opts, @defstate)
-        %{s| chunks: rchunks ++ chunks, bindings: rbindings ++ bindings}
+  defp parse_eml(%Template{} = t, %{render_params: false} = opts, %{chunks: chunks, bindings: bindings} = s) do
+    # If bound, render template and add it to chunks.
+    if Template.bound?(t) do
+        %{chunks: rchunks} = parse_templ(t, opts, @defstate)
+        %{s| chunks: rchunks ++ chunks}
       # If not bound, but there are bindings left in the parse state,
       # try to render the template with them.
       # If still a template, make a new parse state of type template
-      # and add all chunks, params and leftover bindings to it.
+      # and add all chunks and leftover bindings to it.
       # If rendered, add to chunks.
-      bindings !== [] ->
+    else
         t = Template.bind(t, bindings)
         case parse_templ(t, opts, @defstate) do
-          %{type: :templ, chunks: tchunks, params: tparams, bindings: tbindings} ->
-            %{s| type: :templ, chunks: tchunks ++ chunks, params: merge_params(params, tparams), bindings: tbindings}
-          %{chunks: rchunks, bindings: rbindings} ->
-            %{s| chunks: rchunks ++ chunks, bindings: rbindings}
+          %{type: :templ, chunks: tchunks} ->
+            %{s| type: :templ, chunks: tchunks ++ chunks}
+          %{chunks: rchunks} ->
+            %{s| chunks: rchunks ++ chunks}
         end
-      # otherwise make a new parse state of type template
-      # and add the all chunks and params to it.
-      true ->
-        %Template{chunks: tchunks, params: tparams} = t
-        state(type: :templ, chunks: :lists.reverse(tchunks) ++ chunks, params: merge_params(params, tparams))
     end
   end
 
   # If mode is render, convert all parameters of the template to strings.
-  defp parse_eml(%Template{chunks: tchunks, params: tparams}, %{render_params: true}, %{chunks: chunks, params: params} = s) do
+  defp parse_eml(%Template{chunks: tchunks}, %{render_params: true}, %{chunks: chunks} = s) do
     tchunks = Enum.reduce(tchunks, [], fn chunk, acc ->
       if Eml.type(chunk) === :parameter,
         do: [parse_param(chunk) | acc],
       else: [chunk | acc]
     end)
-    %{s| chunks: tchunks ++ chunks, params: merge_params(params, tparams)}
+    %{s| chunks: tchunks ++ chunks}
   end
 
   defp parse_eml(data, opts, %{chunks: chunks, current_tag: tag} = s) do
@@ -133,32 +126,32 @@ defmodule Eml.Language.Html.Renderer do
     qchar  = qchar(q)
     field  = attr_field(field)
     chunks = [" #{field}=#{qchar}" | chunks]
-    s      = %{chunks: chunks} = parse_attr_value(value, opts, %{s| chunks: chunks})
+    %{chunks: chunks} = s = parse_attr_value(value, opts, %{s| chunks: chunks})
     chunks = ["#{qchar}" | chunks]
     %{s| chunks: chunks}
   end
 
-  defp parse_attr_value(list, opts, %{chunks: chunks, params: params, bindings: bindings} = s) when is_list(list) do
+  defp parse_attr_value(list, opts, %{chunks: chunks, bindings: bindings} = s) when is_list(list) do
     attr_s = Enum.reduce(list, state(type: :attr, bindings: bindings), fn value, s  ->
       parse_attr_value(value, opts, s)
     end)
     case attr_s do
-      %{type: :templ, chunks: tchunks, params: tparams, bindings: tbindings} ->
+      %{type: :templ, chunks: tchunks} ->
         tchunks = insert_whitespace(tchunks)
-        %{type: :templ, chunks: tchunks ++ chunks, params: merge_params(params, tparams), bindings: tbindings}
-      %{chunks: rchunks, bindings: rbindings} ->
+        %{s| type: :templ, chunks: tchunks ++ chunks}
+      %{chunks: rchunks} ->
         rchunks = insert_whitespace(rchunks)
-        %{s| chunks: rchunks ++ chunks, bindings: rbindings}
+        %{s| chunks: rchunks ++ chunks}
     end
   end
 
-  defp parse_attr_value(%Parameter{} = param, %{render_params: render_params} = opts, %{chunks: chunks, params: params, bindings: bindings} = s) do
+  defp parse_attr_value(%Parameter{} = param, %{render_params: render_params} = opts, %{chunks: chunks, bindings: bindings} = s) do
     if render_params do
       %{s| chunks: [parse_param(param) | chunks]}
     else
-      case Template.pop(bindings, param.id) do
-        { nil, b }   -> %{s| type: :templ, chunks: [param | chunks], params: add_param(params, param), bindings: b}
-        { value, b } -> parse_attr_value(value, opts, %{s| bindings: b})
+      case bindings[param.id] do
+        nil   -> %{s| type: :templ, chunks: [param | chunks]}
+        value -> parse_attr_value(value, opts, s)
       end
     end
   end
@@ -261,18 +254,6 @@ defmodule Eml.Language.Html.Renderer do
   defp chunk_type(_, :templ), do: :templ
   defp chunk_type(type, _),   do: type
 
-  # Template helpers
-
-  defp add_param(params, param) do
-    Keyword.update(params, param.id, 1, &(&1 + 1))
-  end
-
-  defp merge_params(params1, params2) do
-    Keyword.merge(params1, params2, fn _k, v1, v2 ->
-      v1 + v2
-    end)
-  end
-
   # Bindings helpers
 
   defp parse_bindings(bindings) do
@@ -297,11 +278,12 @@ defmodule Eml.Language.Html.Renderer do
 
   # Create final result, depending on state type and output option.
 
-  defp to_result(%{type: :templ, chunks: chunks, params: params, bindings: bindings}, opts) do
+  defp to_result(%{type: :templ, chunks: chunks}, opts) do
+    t = %Template{chunks: chunks |> consolidate_chunks()}
     if opts.mode == :compile do
-      { :ok, %Template{chunks: chunks |> consolidate_chunks(), params: params, bindings: bindings} }
+      { :ok, t }
     else
-      { :error, { :unbound_params, params } }
+      { :error, { :unbound_params, Template.unbound(t) } }
     end
   end
 

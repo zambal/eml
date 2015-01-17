@@ -303,20 +303,20 @@ defmodule EmlTest do
   test "Templates 1" do
     e = eml do
       div id: :myid do
-        div [], :fruit
-        div [], :fruit
+        div [], :fruit1
+        div [], :fruit2
       end
     end
     t = Eml.compile(e)
 
     assert :template == Eml.type t
     assert false == Template.bound?(t)
-    assert [myid: 1, fruit: 2] == Template.unbound(t)
+    assert [:myid, :fruit1, :fruit2] == Template.unbound(t)
 
     t = Template.bind(t, :myid, "double-fruit")
-    assert [fruit: 2] == Template.unbound(t)
+    assert [:fruit1, :fruit2] == Template.unbound(t)
 
-    t = Template.bind(t, fruit: ["orange", "lemon"])
+    t = Template.bind(t, fruit1: "orange", fruit2: "lemon")
     assert Template.bound?(t)
   end
 
@@ -330,13 +330,13 @@ defmodule EmlTest do
 
     assert :template == Eml.type t
     assert false == Template.bound?(t)
-    assert [fruit: 4] == Template.unbound(t)
+    assert [:fruit] == Template.unbound(t)
 
-    t = Template.bind(t, fruit: ["orange", "lemon"])
-    assert [fruit: 2] == Template.unbound(t)
+    t = Template.bind(t, fruit: "lemon")
+    assert [] == Template.unbound(t)
 
-    assert "<div>orange</div><div>lemon</div><div>blackberry</div><div>strawberry</div>" ==
-      Eml.render!(t, fruit: ["blackberry", "strawberry"])
+    assert "<div>lemon</div><div>lemon</div><div>lemon</div><div>lemon</div>" ==
+      Eml.render!(t)
   end
 
   test "Templates in eml" do
@@ -376,15 +376,15 @@ defmodule EmlTest do
     expected1 = "<div data-custom1='#param{custom}' data-custom2='#param{custom}' class='#param{class1} class2 #param{class3}' id='#param{id_param}'></div>"
     assert expected1 == Eml.render!(e, [], render_params: true)
 
-    expected2 = "<div data-custom1='1' data-custom2='2' class='class1 class2 class3' id='parameterized'></div>"
+    expected2 = "<div data-custom1='1' data-custom2='1' class='class1 class2 class3' id='parameterized'></div>"
     assert expected2 == Eml.render!(e, id_param: "parameterized",
                                        class1: "class1",
                                        class3: "class3",
-                                       custom: [1, 2])
+                                       custom: 1)
 
     t = Eml.compile(e, [class3: "class3", custom: 1])
     assert :template == Eml.type t
-    assert Enum.sort(id_param: 1, class1: 1, custom: 1) == Enum.sort(Template.unbound(t))
-    assert expected2 == Eml.render!(t, id_param: "parameterized", class1: "class1", custom: 2)
+    assert Enum.sort([:id_param, :class1]) == Enum.sort(Template.unbound(t))
+    assert expected2 == Eml.render!(t, id_param: "parameterized", class1: "class1")
   end
 end

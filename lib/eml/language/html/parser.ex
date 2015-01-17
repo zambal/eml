@@ -4,11 +4,11 @@ defmodule Eml.Language.Html.Parseer do
 
   @spec parse(binary, atom) :: Eml.element | Eml.error
   def parse(html, BitString) do
-    res = case parse(html, { :blank, [] }, [], :blank) do
+    res = case tokenize(html, { :blank, [] }, [], :blank) do
             { :error, state } ->
               { :error, state }
             tokens ->
-              compile(tokens)
+              parse(tokens)
           end
     case res do
       { :error, state } ->

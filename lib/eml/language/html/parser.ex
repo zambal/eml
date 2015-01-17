@@ -20,36 +20,36 @@ defmodule Eml.Language.Html.Parseer do
     end
   end
 
-  # Html parsing
+  # Tokenize
 
   # Skip comments
-  defp parse(<<"<!--", rest::binary>>, buf, acc, _) do
-    parse(rest, buf, acc, :comment)
+  defp tokenize(<<"<!--", rest::binary>>, buf, acc, _) do
+    tokenize(rest, buf, acc, :comment)
   end
-  defp parse(<<"-->", rest::binary>>, buf, acc, :comment) do
+  defp tokenize(<<"-->", rest::binary>>, buf, acc, :comment) do
     { state, _ } = buf
-    parse(rest, buf, acc, state)
+    tokenize(rest, buf, acc, state)
   end
-  defp parse(<<_, rest::binary>>, buf, acc, :comment) do
-    parse(rest, buf, acc, :comment)
+  defp tokenize(<<_, rest::binary>>, buf, acc, :comment) do
+    tokenize(rest, buf, acc, :comment)
   end
 
   # Skip doctype
-  defp parse(<<"<!DOCTYPE", rest::binary>>, buf, acc, :blank) do
-    parse(rest, buf, acc, :doctype)
+  defp tokenize(<<"<!DOCTYPE", rest::binary>>, buf, acc, :blank) do
+    tokenize(rest, buf, acc, :doctype)
   end
-  defp parse(<<"<!doctype", rest::binary>>, buf, acc, :blank) do
-    parse(rest, buf, acc, :doctype)
+  defp tokenize(<<"<!doctype", rest::binary>>, buf, acc, :blank) do
+    tokenize(rest, buf, acc, :doctype)
   end
-  defp parse(<<">", rest::binary>>, buf, acc, :doctype) do
-    parse(rest, buf, acc, :blank)
+  defp tokenize(<<">", rest::binary>>, buf, acc, :doctype) do
+    tokenize(rest, buf, acc, :blank)
   end
-  defp parse(<<_, rest::binary>>, buf, acc, :doctype) do
-    parse(rest, buf, acc, :doctype)
+  defp tokenize(<<_, rest::binary>>, buf, acc, :doctype) do
+    tokenize(rest, buf, acc, :doctype)
   end
 
   # Parameters
-  defp parse(<<"#param{", rest::binary>>, buf, acc, state) do
+  defp tokenize(<<"#param{", rest::binary>>, buf, acc, state) do
     case state do
       s when s in [:content, :blank, :start_close, :end_close, :close] ->
         next(rest, buf, "", acc, :param_content)
@@ -59,26 +59,26 @@ defmodule Eml.Language.Html.Parseer do
         error("#param", rest, buf, acc, state)
     end
   end
-  defp parse(<<"}", rest::binary>>, buf, acc, :param_content) do
+  defp tokenize(<<"}", rest::binary>>, buf, acc, :param_content) do
     next(rest, buf, "", acc, :content)
   end
-  defp parse(<<"}", rest::binary>>, buf, acc, :param_attr) do
+  defp tokenize(<<"}", rest::binary>>, buf, acc, :param_attr) do
     next(rest, buf, "", acc, :attr_value)
   end
 
   # CDATA
-  defp parse(<<"<![CDATA[", rest::binary>>, buf, acc, state)
+  defp tokenize(<<"<![CDATA[", rest::binary>>, buf, acc, state)
   when state in [:content, :blank, :start_close, :end_close, :close] do
     next(rest, buf, "", acc, :cdata)
   end
-  defp parse(<<"]]>", rest::binary>>, buf, acc, :cdata) do
+  defp tokenize(<<"]]>", rest::binary>>, buf, acc, :cdata) do
     next(rest, buf, "", acc, :content)
   end
-  defp parse(<<char, rest::binary>>, buf, acc, :cdata) do
+  defp tokenize(<<char, rest::binary>>, buf, acc, :cdata) do
     consume(char, rest, buf, acc, :cdata)
   end
   # Makes it possible for elements to treat its contents as if cdata
-  defp parse(chars, buf, acc, { :cdata, end_tag } = state) do
+  defp tokenize(chars, buf, acc, { :cdata, end_tag } = state) do
     end_token = "</" <> end_tag <> ">"
     n = byte_size(end_token)
     case chars do
@@ -87,7 +87,7 @@ defmodule Eml.Language.Html.Parseer do
         acc = change({ :open, "<" }, acc)
         acc = change({ :slash, "/" }, acc)
         acc = change({ :end_tag, end_tag }, acc)
-        parse(rest, { :end_close, ">" }, acc, :end_close)
+        tokenize(rest, { :end_close, ">" }, acc, :end_close)
       <<char, rest::binary>> ->
         consume(char, rest, buf, acc, state)
       "" ->
@@ -96,19 +96,19 @@ defmodule Eml.Language.Html.Parseer do
   end
 
   # Entities
-  defp parse(<<"&", rest::binary>>, buf, acc, state) do
+  defp tokenize(<<"&", rest::binary>>, buf, acc, state) do
     { entity, rest } = get_entity(rest)
     consume(entity, rest, buf, acc, state)
   end
 
   # Attribute quotes
-  defp parse(<<"'", rest::binary>>, buf, acc, :attr_sep) do
+  defp tokenize(<<"'", rest::binary>>, buf, acc, :attr_sep) do
     next(rest, buf, "'", acc, :attr_single_open)
   end
-  defp parse(<<"\"", rest::binary>>, buf, acc, :attr_sep) do
+  defp tokenize(<<"\"", rest::binary>>, buf, acc, :attr_sep) do
     next(rest, buf, "\"", acc, :attr_double_open)
   end
-  defp parse(<<char, rest::binary>>, buf, acc, :attr_value) when char in [?\", ?\'] do
+  defp tokenize(<<char, rest::binary>>, buf, acc, :attr_value) when char in [?\", ?\'] do
     case { char, previous_state(acc, [:attr_value]) } do
       t when t in [{ ?\', :attr_single_open }, { ?\", :attr_double_open }] ->
         next(rest, buf, char, acc, :attr_close)
@@ -116,33 +116,33 @@ defmodule Eml.Language.Html.Parseer do
         consume(char, rest, buf, acc, :attr_value)
     end
   end
-  defp parse(<<char, rest::binary>>, buf, acc, state)
+  defp tokenize(<<char, rest::binary>>, buf, acc, state)
   when { char, state } in [{ ?\', :attr_single_open }, { ?\", :attr_double_open }] do
     next(rest, buf, char, acc, :attr_close)
   end
 
   # Attributes values accept any character
-  defp parse(<<char, rest::binary>>, buf, acc, state)
+  defp tokenize(<<char, rest::binary>>, buf, acc, state)
   when state in [:attr_single_open, :attr_double_open] do
     next(rest, buf, char, acc, :attr_value)
   end
-  defp parse(<<char, rest::binary>>, buf, acc, :attr_value) do
+  defp tokenize(<<char, rest::binary>>, buf, acc, :attr_value) do
     consume(char, rest, buf, acc, :attr_value)
   end
 
   # Attribute field/value seperator
-  defp parse(<<"=", rest::binary>>, buf, acc, :attr_field) do
+  defp tokenize(<<"=", rest::binary>>, buf, acc, :attr_field) do
     next(rest, buf, "=", acc, :attr_sep)
   end
 
   # Allow boolean attributes, ie. attributes with only a field name
-  defp parse(<<char, rest::binary>>, buf, acc, :attr_field)
+  defp tokenize(<<char, rest::binary>>, buf, acc, :attr_field)
   when char in [?\>, ?\s, ?\n, ?\r, ?\t] do
     next(<<char, rest::binary>>, buf, "\"", acc, :attr_close)
   end
 
   # Whitespace handling
-  defp parse(<<char, rest::binary>>, buf, acc, state)
+  defp tokenize(<<char, rest::binary>>, buf, acc, state)
   when char in [?\s, ?\n, ?\r, ?\t] do
     case state do
       :start_tag ->
@@ -156,12 +156,12 @@ defmodule Eml.Language.Html.Parseer do
       :content ->
         consume(char, rest, buf, acc, state)
       _ ->
-        parse(rest, buf, acc, state)
+        tokenize(rest, buf, acc, state)
     end
   end
 
   # Open tag
-  defp parse(<<"<", rest::binary>>, buf, acc, state) do
+  defp tokenize(<<"<", rest::binary>>, buf, acc, state) do
     case state do
       s when s in [:blank, :start_close, :end_close, :close, :content] ->
         next(rest, buf, "<", acc, :open)
@@ -171,10 +171,10 @@ defmodule Eml.Language.Html.Parseer do
   end
 
   # Close tag
-  defp parse(<<">", rest::binary>>, buf, acc, state) do
+  defp tokenize(<<">", rest::binary>>, buf, acc, state) do
     case state do
       s when s in [:attr_close, :start_tag] ->
-        # The html parser doesn't support arbitrary markup without proper closing.
+        # The html tokenizer doesn't support arbitrary markup without proper closing.
         # However, it does makes exceptions for tags specified in is_void_element?/1
         # and assume they never have children.
         tag = get_last_tag(acc, buf)
@@ -195,25 +195,25 @@ defmodule Eml.Language.Html.Parseer do
       :end_tag ->
         next(rest, buf, ">", acc, :end_close)
       _ ->
-        def_parse(<<">", rest::binary>>, buf, acc, state)
+        def_tokenize(<<">", rest::binary>>, buf, acc, state)
     end
   end
 
   # Slash
-  defp parse(<<"/", rest::binary>>, buf, acc, state)
+  defp tokenize(<<"/", rest::binary>>, buf, acc, state)
   when state in [:open, :attr_field, :attr_close, :start_tag, :start_tag_close] do
     next(rest, buf, "/", acc, :slash)
   end
 
-  defp parse("", buf, acc, _) do
+  defp tokenize("", buf, acc, _) do
     :lists.reverse([buf | acc])
   end
 
   # Default parsing
-  defp parse(chars, buf, acc, state), do: def_parse(chars, buf, acc, state)
+  defp tokenize(chars, buf, acc, state), do: def_tokenize(chars, buf, acc, state)
 
   # Either start or consume content, tag or parameter.
-  defp def_parse(<<char, rest::binary>>, buf, acc, state) do
+  defp def_tokenize(<<char, rest::binary>>, buf, acc, state) do
     case state do
       s when s in [:start_tag, :end_tag, :attr_field, :content, :param_content, :param_attr] ->
         consume(char, rest, buf, acc, state)
@@ -244,14 +244,14 @@ defmodule Eml.Language.Html.Parseer do
   # Consumes character and put it in the buffer
   defp consume(char, rest, { type, buf }, acc, state) do
     char = if is_integer(char), do: <<char>>, else: char
-    parse(rest, { type, buf <> char }, acc, state)
+    tokenize(rest, { type, buf <> char }, acc, state)
   end
 
   # Add the old buffer to the accumulator and start a new buffer
   defp next(rest, old_buf, new_buf, acc, new_state) do
     acc = change(old_buf, acc)
     new_buf = if is_integer(new_buf), do: <<new_buf>>, else: new_buf
-    parse(rest, { new_state, new_buf }, acc, new_state)
+    tokenize(rest, { new_state, new_buf }, acc, new_state)
   end
 
   # Add buffer to the accumulator if its content is not empty.
@@ -272,7 +272,7 @@ defmodule Eml.Language.Html.Parseer do
   end
   defp empty?(_), do: false
 
-  # Checks if last parsed tag is a tag that should always close.
+  # Checks if last tokenized tag is a tag that should always close.
   defp get_last_tag(tokens, { type, buf }) do
     get_last_tag([{ type, buf } | tokens])
   end
@@ -344,39 +344,39 @@ defmodule Eml.Language.Html.Parseer do
   end
   defp get_entity("", _, _, _), do: nil
 
-  # Compile the genrated tokens
+  # Parse the genrated tokens
 
-  defp compile(tokens) do
-    compile_content(tokens, [])
+  defp parse(tokens) do
+    parse_content(tokens, [])
   end
 
-  defp compile_content([{ type, token } | ts], acc) do
-    case precompile(type, token) do
+  defp parse_content([{ type, token } | ts], acc) do
+    case preparse(type, token) do
       :skip ->
-        compile_content(ts, acc)
+        parse_content(ts, acc)
       { :tag, tag } ->
-        { markup, tokens } = compile_markup(ts, [tag: tag, attrs: [], content: []])
-        compile_content(tokens, [markup | acc])
+        { markup, tokens } = parse_markup(ts, [tag: tag, attrs: [], content: []])
+        parse_content(tokens, [markup | acc])
       { :content, content } ->
-        compile_content(ts, [content | acc])
+        parse_content(ts, [content | acc])
       { :cdata, content } ->
         # tag cdata in order to skip whitespace trimming
-        compile_content(ts, [{ :cdata, content } | acc])
+        parse_content(ts, [{ :cdata, content } | acc])
       :end_el ->
         { :lists.reverse(acc), ts }
     end
   end
-  defp compile_content([], acc) do
+  defp parse_content([], acc) do
     { :lists.reverse(acc), [] }
   end
 
-  defp compile_markup([{ type, token } | ts], acc) do
-    case precompile(type, token) do
+  defp parse_markup([{ type, token } | ts], acc) do
+    case preparse(type, token) do
       :skip ->
-        compile_markup(ts, acc)
+        parse_markup(ts, acc)
       { :attr_field, field } ->
         attrs = [{ field, "" } | acc[:attrs]]
-        compile_markup(ts, Keyword.put(acc, :attrs, attrs))
+        parse_markup(ts, Keyword.put(acc, :attrs, attrs))
       { :attr_value, value } ->
         [{ field, current } | rest] = acc[:attrs]
         attrs = if is_binary(current) && is_binary(value) do
@@ -384,15 +384,15 @@ defmodule Eml.Language.Html.Parseer do
                 else
                   [{ field, Eml.Markup.ensure_list(current) ++ [value] } | rest]
                 end
-        compile_markup(ts, Keyword.put(acc, :attrs, attrs))
+        parse_markup(ts, Keyword.put(acc, :attrs, attrs))
       :start_content ->
-        { content, tokens } = compile_content(ts, [])
+        { content, tokens } = parse_content(ts, [])
         { make_markup(Keyword.put(acc, :content, content)), tokens }
       :end_el ->
         { make_markup(acc), ts }
     end
   end
-  defp compile_markup([], acc) do
+  defp parse_markup([], acc) do
     { make_markup(acc), [] }
   end
 
@@ -404,31 +404,31 @@ defmodule Eml.Language.Html.Parseer do
     Eml.Markup.new(acc[:tag], attrs, maybe_trim_whitespace(acc[:content], acc[:tag]))
   end
 
-  defp precompile(:blank, _),            do: :skip
-  defp precompile(:open, _),             do: :skip
-  defp precompile(:slash, _),            do: :skip
-  defp precompile(:attr_single_open, _), do: :skip
-  defp precompile(:attr_double_open, _), do: :skip
-  defp precompile(:attr_close, _),       do: :skip
-  defp precompile(:attr_sep, _),         do: :skip
-  defp precompile(:end_tag, _),          do: :skip
-  defp precompile(:start_tag_close, _),  do: :skip
+  defp preparse(:blank, _),            do: :skip
+  defp preparse(:open, _),             do: :skip
+  defp preparse(:slash, _),            do: :skip
+  defp preparse(:attr_single_open, _), do: :skip
+  defp preparse(:attr_double_open, _), do: :skip
+  defp preparse(:attr_close, _),       do: :skip
+  defp preparse(:attr_sep, _),         do: :skip
+  defp preparse(:end_tag, _),          do: :skip
+  defp preparse(:start_tag_close, _),  do: :skip
 
-  defp precompile(:attr_field, token) do
+  defp preparse(:attr_field, token) do
     { :attr_field, String.to_atom(token) }
   end
 
-  defp precompile(:attr_value, token), do: { :attr_value, token }
-  defp precompile(:start_tag, token), do: { :tag, String.to_atom(token) }
-  defp precompile(:start_close, _), do: :start_content
-  defp precompile(:content, token), do: { :content, token }
-  defp precompile(:end_close, _), do: :end_el
-  defp precompile(:close, _), do: :end_el
+  defp preparse(:attr_value, token), do: { :attr_value, token }
+  defp preparse(:start_tag, token), do: { :tag, String.to_atom(token) }
+  defp preparse(:start_close, _), do: :start_content
+  defp preparse(:content, token), do: { :content, token }
+  defp preparse(:end_close, _), do: :end_el
+  defp preparse(:close, _), do: :end_el
 
-  defp precompile(:cdata, token), do: { :cdata, token }
+  defp preparse(:cdata, token), do: { :cdata, token }
 
-  defp precompile(:param_content, id), do: { :content, String.to_atom(id) }
-  defp precompile(:param_attr, id), do: { :attr_value, String.to_atom(id) }
+  defp preparse(:param_content, id), do: { :content, String.to_atom(id) }
+  defp preparse(:param_attr, id), do: { :attr_value, String.to_atom(id) }
 
   defp maybe_trim_whitespace(content, tag)
   when tag in [:textarea, :pre], do: content

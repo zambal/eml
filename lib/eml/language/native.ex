@@ -1,4 +1,9 @@
 defmodule Eml.Language.Native do
+  @moduledoc """
+  The native language module is used for parsing and converting
+  some Elixir data types.
+  """
+
   @behaviour Eml.Language
 
   def markup?(), do: false

@@ -4,12 +4,18 @@ defmodule Eml.Mixfile do
   def project do
     [ app: :eml,
       version: "0.5.0-dev",
+      deps: deps,
       description: description,
       package: package ]
   end
 
   def application do
     []
+  end
+
+  def deps do
+    [ { :ex_doc, "~> 0.7", only: :docs },
+      {:earmark, "~> 0.1", only: :docs} ]
   end
 
   defp description do

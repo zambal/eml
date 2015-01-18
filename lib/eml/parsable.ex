@@ -1,6 +1,9 @@
 defprotocol Eml.Parsable do
   @moduledoc """
   The Eml Parsable protocol.
+
+  This protocol is used by `Eml.parse/2` function to
+  parse and convert different Elixir data types.
   """
 
   def parse(data, lang)

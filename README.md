@@ -39,9 +39,7 @@ produces
 </div>
 ```
 
-Except for some key functions in the `Eml` module, not much reference
-documentation exists currently. Please read on for a walk-through that
-tries to cover most of Eml's features.
+Please read on for a walk-through that tries to cover most of Eml's features.
 
 
 ### Why?

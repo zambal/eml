@@ -1,4 +1,43 @@
 defmodule Eml do
+  @moduledoc """
+  Eml stands for Elixir Markup Language. It provides a flexible and
+  modular toolkit for generating, parsing and manipulating markup,
+  written in the Elixir programming language. It's main focus is
+  html, but other markup languages could be implemented as well.
+
+  To start off:
+
+  This piece of code
+  ```elixir
+  Eml.render! eml do
+    name = "Vincent"
+    age  = 36
+
+    div class: "person" do
+      div [], [ span([], "name: "), span([], name) ]
+      div [], [ span([], "age: "), span([], age) ]
+    end
+  end
+  ```
+
+  produces
+  ```html
+  <div class='person'>
+    <div>
+      <span>name: </span>
+      <span>Vincent</span>
+    </div>
+    <div>
+      <span>age: </span>
+      <span>36</span>
+    </div>
+  </div>
+  ```
+
+  The functions and macro's in the `Eml` module are the bread and butter
+  of the Eml library.
+  """
+
   alias Eml.Markup
   alias Eml.Template
   alias Eml.Parsable
@@ -15,10 +54,6 @@ defmodule Eml do
 
   @type unpackr_result  :: funpackr_result | [unpackr_result]
   @type funpackr_result :: binary | Eml.Parameter.t | Eml.Template.t | [binary | Eml.Parameter | Eml.Template.t]
-
-  @moduledoc """
-  TODO
-  """
 
   @doc """
   Define eml content.

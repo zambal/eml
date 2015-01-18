@@ -1,5 +1,17 @@
 defmodule Eml.Markup.Generator do
-  @moduledoc false
+  @moduledoc """
+  This module defines some macro's and helper functions
+  for creating Eml element macro's.
+
+  ### Example
+
+      iex> defmodule MyElements do
+      ...>   use Eml.Markup.Generator tags: [:custom1, :custom2]
+      ...> end
+      iex> import MyElements
+      iex> eml do: custom1 [id: 42], "content in a custom element"
+      #custom1<%{id: "42"} ["content in a custom element"]>
+  """
 
   defmacro __using__(opts) do
     tags = opts[:tags] || []

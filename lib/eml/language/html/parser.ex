@@ -1,4 +1,7 @@
-defmodule Eml.Language.Html.Parseer do
+defmodule Eml.Language.Html.Parser do
+  @moduledoc """
+  Implementation of Eml's html parser.
+  """
 
   # API
 

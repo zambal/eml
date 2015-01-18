@@ -1,4 +1,7 @@
 defmodule Eml.Language.Html.Markup do
+  @moduledoc """
+  This is the container module of all the generated HTML element macro's.
+  """
 
   use Eml.Markup.Generator, tags: [:html, :head, :title, :base, :link, :meta, :style,
                                    :script, :noscript, :body, :div, :span, :article,
@@ -16,12 +19,18 @@ defmodule Eml.Language.Html.Markup do
 end
 
 defmodule Eml.Language.Html do
+  @moduledoc """
+  The html language module implements a parser and renderer for html.
+  You should never need to use this module directly. Use the `Eml.render/3` and
+  `Eml.parse/2` functions for rendering and parsing html.
+  """
+
   @behaviour Eml.Language
 
   def markup?(), do: true
 
   def parse(data, type) do
-    Eml.Language.Html.Parseer.parse(data, type)
+    Eml.Language.Html.Parser.parse(data, type)
   end
 
   def render(eml, opts) do

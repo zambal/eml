@@ -1,4 +1,8 @@
 defmodule Eml.Language.Html.Renderer do
+  @moduledoc """
+  Implementation of Eml's html renderer.
+  """
+
   alias Eml.Markup
   alias Eml.Template
   alias Eml.Parameter

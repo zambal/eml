@@ -70,9 +70,14 @@ defmodule Eml do
 
   To illustrate, the expressions below all produce the same output:
 
-  * `eml do: div([], 42)`
-  * `Eml.Element.new(:div, %{}, 42) |> Eml.parse!(Eml.Language.Native)`
-  * `Eml.Element.Html.div([], 42) |> Eml.parse!(Eml.Language.Native)`
+  * ```elixir
+    eml do: div([], 42)
+
+  * ```elixir
+    Eml.Element.new(:div, %{}, 42) |> Eml.parse!(Eml.Language.Native)
+
+  * ```elixir
+    Eml.Element.Html.div([], 42) |> Eml.parse!(Eml.Language.Native)
 
   Note that since the Elixir `Kernel` module by default imports the `div/2`
   function in to the global namespace, this function is inside an eml block
@@ -139,11 +144,15 @@ defmodule Eml do
 
   This:
 
-  `defeml mydiv(content), do: div(%{}, content)`
+  ```elixir
+  defeml mydiv(content), do: div(%{}, content)
+  ```
 
   is effectively the same as:
 
-  `def mydiv(content), do: eml do div(%{}, content) end`
+  ```elixir
+  def mydiv(content), do: eml do div(%{}, content) end
+  ```
 
   """
   defmacro defeml(call, do_block) do
@@ -164,11 +173,15 @@ defmodule Eml do
 
   This:
 
-  `defhtml mydiv(content), do: div(%{}, content)`
+  ```elixir
+  defhtml mydiv(content), do: div(%{}, content)
+  ```
 
   is effectively the same as:
 
-  `def mydiv(content), do: eml do div(%{}, content) end |> Eml.render()`
+  ```elixir
+  def mydiv(content), do: eml do div(%{}, content) end |> Eml.render()
+  ```
 
   """
   defmacro defhtml(call, do_block) do
@@ -379,7 +392,7 @@ defmodule Eml do
       iex> Eml.add(e, "__", class: "inner", at: :begin)
       [#div<[#span<%{id: "inner1", class: "inner"} ["__hello "]>,
         #span<%{id: "inner2", class: "inner"} ["__world"]>]>]
-      iex> Eml.add(e, (eml do: span "!"), tag: :div) |> Eml.render!(pretty: false)
+      iex> Eml.add(e, (eml do: span "!"), tag: :div) |> Eml.render!()
       "<div><span id='inner1' class='inner'>hello </span><span id='inner2' class='inner'>world</span><span>!</span></div>"
 
   """
@@ -442,7 +455,7 @@ defmodule Eml do
       [#div<%{id: "outer"}
        [#span<%{id: "inner1", class: "inner"} ["hello "]>,
         #span<%{id: "inner2", class: "inner"} ["world"]>]>]
-      iex> Eml.update(e, fn s -> String.upcase(s) end, pat: ~r/.*/) |> Eml.render!(pretty: false)
+      iex> Eml.update(e, fn s -> String.upcase(s) end, pat: ~r/.+/) |> Eml.render!()
       "<div><span id='inner1' class='inner'>HELLO </span><span id='inner2' class='inner'>WORLD</span></div>"
 
   """
@@ -803,7 +816,7 @@ defmodule Eml do
       {:ok, "<p>Tom &amp; Jerry</p>"}
 
   """
-  @spec render(t, Keyword.t, Keyword.t) :: { :ok, binary } | error
+  @spec render(t, Eml.Template.bindings, Keyword.t) :: { :ok, binary } | error
   def render(eml, bindings \\ [], opts \\ []) do
     { lang, opts } = Keyword.pop(opts, :lang, @default_lang)
     opts = Keyword.put(opts, :bindings, bindings)
@@ -812,10 +825,10 @@ defmodule Eml do
   end
 
   @doc """
-  Same as `Eml.render/2`, except that it raises an exception, instead of returning an
+  Same as `Eml.render/3`, except that it raises an exception, instead of returning an
   error tuple in case of an error.
   """
-  @spec render!(t, Keyword.t, Keyword.t) :: binary
+  @spec render!(t, Eml.Template.bindings, Keyword.t) :: binary
   def render!(eml, bindings \\ [], opts \\ []) do
     case render(eml, bindings, opts) do
       { :ok, str } ->
@@ -828,7 +841,8 @@ defmodule Eml do
   end
 
   @doc """
-  Same as `Eml.render/2` except that it always returns a template.
+  Same as `Eml.render/3` except that it doesn't return an error when
+  not all parameters are bound and always returns a template.
 
   ### Examples:
 
@@ -838,7 +852,7 @@ defmodule Eml do
       {:ok, "<body><h1 id='main-title'>The Title</h1></body>"}
 
   """
-  @spec compile(t, Keyword.t) :: { :ok, Eml.Template.t } | error
+  @spec compile(t, Eml.Template.bindings, Keyword.t) :: { :ok, Eml.Template.t } | error
   def compile(eml, bindings \\ [], opts \\ []) do
     # for consistence, when compiling eml we always want to return a template, even if
     # there are no parameters at all, or all of them are bound.
@@ -849,10 +863,10 @@ defmodule Eml do
   end
 
   @doc """
-  Same as `Eml.render/2`, except that it raises an exception, instead of returning an
+  Same as `Eml.compile/3`, except that it raises an exception, instead of returning an
   error tuple in case of an error.
   """
-  @spec compile!(t, Keyword.t) :: Eml.Template.t
+  @spec compile!(t, Eml.Template.bindings, Keyword.t) :: Eml.Template.t
   def compile!(eml, bindings \\ [], opts \\ []) do
      case compile(eml, bindings, opts) do
        { :ok, str } ->

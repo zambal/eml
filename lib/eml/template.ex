@@ -3,7 +3,7 @@ defmodule Eml.Template do
   Templates in Eml are simple structures that contain rendererd chunks of `eml`,
   optionally interleaved with parameters.
 
-  A template is generated when you compile some block of `eml`. Templates can
+  A template is created when you compile some block of `eml`. Templates can
   also be precompiled at compile time by using the `Eml.precompile/2` macro.
 
   ### Example:
@@ -30,7 +30,7 @@ defmodule Eml.Template do
   defstruct chunks: [], bindings: []
 
   @type chunks   :: [binary | Eml.Parameter.t]
-  @type bindings :: [{ Eml.Parameter.id, Eml.element }]
+  @type bindings :: [{ Eml.Parameter.id, Eml.data }]
   @type t        :: %M{ chunks: chunks, bindings: bindings }
 
   @lang Eml.Language.Native

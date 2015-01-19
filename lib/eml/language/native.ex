@@ -3,7 +3,7 @@ defmodule Eml.Language.Native do
 
   @behaviour Eml.Language
 
-  def markup?(), do: false
+  def element?(), do: false
 
   def parse(data, BitString) do
     data

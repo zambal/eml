@@ -64,23 +64,23 @@ nil
 ```
 Invoking `use Eml` translates to:
 ```elixir
-import Eml, only: [eml: 1, defmarkup: 2, unpack: 1]
-alias Eml.Markup
+import Eml, only: [eml: 1, eml: 2, defeml: 2, defhtml: 2, precompile: 1, precompile: 2, unpack: 1]
+alias Eml.Element
 alias Eml.Template
 ```
 
-The `eml` macro by default imports all generated html markup macros
-from `Eml.Markup.Html` in to its local scope. These macro's just translate
-to a call to `Eml.Markup.new`, except when used as a pattern in a match operation.
-When used inside a match, the macro will be translated to the for %Eml.Markup{...}.
-`eml` returns data of the type `Eml.content`, which is a list of `Eml.element`
-elements. Elements can be of the type `binary`, `Eml.Markup.t`, `Eml.Parameter.t`,
-or `Eml.Template.t`. We'll focus on binaries and markup for now.
+The `eml` macro by default imports all generated html element macros
+from `Eml.Language.Html.Elements` in to its local scope. These macro's just translate
+to a call to `Eml.Element.new`, except when used as a pattern in a match operation.
+When used inside a match, the macro will be translated to the for %Eml.Element{...}.
+`eml` returns data of the type `Eml.content`, which is a list of `Eml.eml_node`
+nodes. Nodes can be of the type `binary`, `Eml.Element.t`, `Eml.Parameter.t`,
+or `Eml.Template.t`. We'll focus on binaries and elements for now.
 ```elixir
 iex(2)> eml do: div([], 42)
 [#div<["42"]>]
 ```
-Here we created a `div` element with `"42"` as it contents. Since content element's
+Here we created a `div` element with `"42"` as it contents. Since Eml content's
 only primitive data type is binaries, the integer automatically gets converted.
 Eml also provides the `defeml` macro. It works like defining a regular Elixir
 function, but anything you write in the function definition gets evaluated as if
@@ -128,17 +128,17 @@ example. Using do blocks, as can be seen in the introductory example,
 is more convenient most of the time.
 
 #### Languages
-Let's turn back to Eml's data types. Mostly you'll be using binaries and markup. In
+Let's turn back to Eml's data types. Mostly you'll be using binaries and elements. In
 order to provide translations from custom data types, Eml provides the `Eml.Parsable`
 protocol. Primitive types are handles by languages.
 
 A language implements the Eml.Language behaviour, providing a `parse`, `render` and
-`markup?` function. The `parse` function converts types like strings, integers and
+`element?` function. The `parse` function converts types like strings, integers and
 floats in to eml. The `render` function converts eml in to whatever representation the
-language has. In practice this will be mostly binary. The `markup?` function tells
-if the language provides markup macros. By default Eml provides two languages:
+language has. In practice this will be mostly binary. The `element?` function tells
+if the language provides element macros. By default Eml provides two languages:
 `Eml.Language.Native` and `Eml.Language.Html`. `Eml.Language.Native` is a bit of a
-special case, as it has no markup and is used internally in Eml. It is responsible
+special case, as it has no elements and is used internally in Eml. It is responsible
 for all conversions inside an `eml` block, like the conversion from a integer we saw
 in previous examples. `Eml.Language.Html` however is a language that the Eml core has
 no knowledge of, other than that it is specified as the default language when defining
@@ -147,7 +147,7 @@ implemented as long as it implements the Eml.Language behaviour.
 
 #### Parsing
 
-The `Eml.Language.Html` parser provides a translation from binaries in to Eml markup.
+The `Eml.Language.Html` parser provides a translation from binaries in to Eml content.
 ```elixir
 iex(8)> Eml.parse "<!doctype html>\n<html><body><div>42</div></body></html>"
 [#html<[#body<[#div<["42"]>]>]>]
@@ -175,17 +175,17 @@ iex(13)> Eml.parse(["Hello ", [2014, ["!"]]], Eml.Language.Native)
 ["Hello 2014!"]
 ```
 `nil` is a non-existing value in Eml. As will be later shown, it can be used to discard
-elements when traversing an eml tree. The other examples show the parser also tries to
+nodes when traversing an eml tree. The other examples show the parser also tries to
 concatenate all binary data. Furthermore, although Eml content is always a list, its
-elements can not be lists. The native parser thus flattens all input data in order to
+nodes can not be lists. The native parser thus flattens all input data in order to
 guarantee Eml content always is a single list. Tuples aren't supported by default,
 as can be seen in the last example.
 
 
 #### Querying eml
 
-`Eml.Markup` implements the Elixir `Enumerable` protocol for traversing a tree of
-elements. Let's start with creating something to query
+`Eml.Element` implements the Elixir `Enumerable` protocol for traversing a tree of
+nodes. Let's start with creating something to query
 ```elixir
 iex(14)> e = eml do
 ...(14)>   html do
@@ -212,7 +212,7 @@ iex(14)> e = eml do
 
 If we want to traverse the complete tree, we should unpack the result from `eml`,
 because otherwise we would pass a list with one argument to an `Enum` function. To
-get an idea how the tree is traversed, first just print all elements
+get an idea how the tree is traversed, first just print all nodes
 ```elixir
 iex(15)> Enum.each(unpack(e), fn x -> IO.puts(inspect x) end)
 #html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>, #body<[#article<%{id: "main-content"} [#section<%{class: ["intro", "article"]} [#h3<["Hello world"]>]>, #section<%{class: ["conclusion", "article"]} ["TODO"]>]>]>]>
@@ -228,21 +228,21 @@ iex(15)> Enum.each(unpack(e), fn x -> IO.puts(inspect x) end)
 :ok
 ```
 
-As you can see every element of the tree is passed to `Enum`.
+As you can see every node of the tree is passed to `Enum`.
 Let's continue with some other examples
 ```elixir
 iex(16)> Enum.member?(unpack(e), "TODO")
 true
 
-# `Eml.Markup` is automatically aliased as `Markup` when `use Eml` is invoked.
-iex(17)> Enum.filter(unpack(e), &Markup.has?(&1, tag: :h3))
+# `Eml.Element` is automatically aliased as `Element` when `use Eml` is invoked.
+iex(17)> Enum.filter(unpack(e), &Element.has?(&1, tag: :h3))
 [#h3<["Hello world"]>]
 
-iex(18)> Enum.filter(unpack(e), &Markup.has?(&1, class: "article"))
+iex(18)> Enum.filter(unpack(e), &Element.has?(&1, class: "article"))
 [#section<%{class: ["intro", "article"]} [#h3<["Hello world"]>]>,
  #section<%{class: ["conclusion", "article"]} ["TODO"]>]
 
-iex(19)> Enum.filter(unpack(e), &Markup.has?(&1, tag: :h3, class: "article"))
+iex(19)> Enum.filter(unpack(e), &Element.has?(&1, tag: :h3, class: "article"))
 []
 ```
 
@@ -257,7 +257,7 @@ iex(20)> Eml.select(e, class: "article")
  #section<%{class: ["conclusion", "article"]} ["TODO"]>]
 
 # using `parent: true` instructs `Eml.select` to select the parent
-# of the matched element(s)
+# of the matched node(s)
 iex(21)> Eml.select(e, tag: :meta, parent: true)
 [#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>]
 
@@ -320,24 +320,24 @@ iex(30)> Eml.add(e, eml(do: section([class: "post-conclusion"}, "....")), id: "m
 Eml also provides `Eml.transform`. All functions from the previous section are
 implemented with it. `Eml.transform` mostly works like enumeration. The key
 difference is that `Eml.transform` returns a modified version of the eml tree that
-was passed as an argument, instead of collecting elements in a single list.
-`Eml.transform` passes any element it encounters to the provided transformation
+was passed as an argument, instead of collecting nodes in a single list.
+`Eml.transform` passes any node it encounters to the provided transformation
 function. The transformation function can return any parsable data or `nil`,
-in which case the element is discarded, so it works a bit like a map and filter
+in which case the node is discarded, so it works a bit like a map and filter
 function in one pass.
 ```elixir
-iex(31)> Eml.transform(e, fn x -> if Markup.has?(x, class: "article"), do: Markup.content(x, "#"), else: x end)
+iex(31)> Eml.transform(e, fn x -> if Element.has?(x, class: "article"), do: Element.content(x, "#"), else: x end)
 [#html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>,
   #body<[#article<%{id: "main-content"}
    [#section<%{class: ["intro", "article"]} ["#"]>,
     #section<%{class: ["conclusion", "article"]} ["#"]>]>]>]>]
 
-iex(32)> Eml.transform(e, fn x -> if Markup.has?(x, class: "article"), do: Markup.content(x, "#"), else: nil end)
+iex(32)> Eml.transform(e, fn x -> if Element.has?(x, class: "article"), do: Element.content(x, "#"), else: nil end)
 []
 ```
 The last result may seem unexpected, but the `section` elements aren't
-returned because `Eml.transform` first evaluates a parent element, before
-continuing with its children. If the parent element gets removed,
+returned because `Eml.transform` first evaluates a parent node, before
+continuing with its children. If the parent node gets removed,
 the children will be removed too and won't get evaluated.
 
 

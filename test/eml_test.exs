@@ -1,7 +1,7 @@
 defmodule EmlTest do
   use ExUnit.Case
   use Eml
-  alias Eml.Markup, as: M
+  alias Eml.Element, as: M
 
   defp doc() do
     [%M{tag: :html, content: [
@@ -19,7 +19,7 @@ defmodule EmlTest do
     ]}]
   end
 
-  test "Markup macro" do
+  test "Element macro" do
     doc = eml do
       html do
         head class: "test" do
@@ -39,7 +39,7 @@ defmodule EmlTest do
     assert doc() == doc
   end
 
-  test "Markup macro as match pattern" do
+  test "Element macro as match pattern" do
     e = eml do
       span(%{id: id}, _) = %M{tag: :span, attrs: %{id: "test"}, content: []}
       id
@@ -47,13 +47,13 @@ defmodule EmlTest do
     assert "test" == unpack(e)
   end
 
-  test "Enumerate markup" do
+  test "Enumerate content" do
     assert true == Enum.member?(unpack(doc()), "Some notes...")
 
     e = eml do
       h1 [class: "title"], ["Eml is Html for developers"]
     end
-    assert e == Enum.filter(unpack(doc()), &Markup.has?(&1, tag: :h1))
+    assert e == Enum.filter(unpack(doc()), &Element.has?(&1, tag: :h1))
 
     e = eml do
       [
@@ -71,7 +71,7 @@ defmodule EmlTest do
         span([class: "test"], "Some notes...")
       ]
     end
-    assert e == Enum.filter(unpack(doc()), &Markup.has?(&1, class: "test"))
+    assert e == Enum.filter(unpack(doc()), &Element.has?(&1, class: "test"))
   end
 
   test "Render => Parse => Compare" do
@@ -84,8 +84,8 @@ defmodule EmlTest do
     assert :content   == Eml.type eml do: ""
     assert :content   == Eml.type eml do: []
     assert :content   == Eml.type eml do: nil
-    assert :markup    == Eml.type Eml.Markup.new()
-    assert :markup    == Eml.type unpack(eml do: div([], 42))
+    assert :element    == Eml.type Eml.Element.new()
+    assert :element    == Eml.type unpack(eml do: div([], 42))
     assert :binary    == Eml.type "strings are binaries"
     assert :binary    == Eml.type Eml.unpackr(eml do: div([], 42))
     assert :binary    == Eml.type unpack(eml do: [1,2,"z"])
@@ -117,7 +117,7 @@ defmodule EmlTest do
     assert "42" == unpack unpack e
     assert "42" == unpack ["42"]
     assert "42" == unpack "42"
-    assert "42" == unpack Eml.Markup.new(:div, [], 42)
+    assert "42" == unpack Eml.Element.new(:div, [], 42)
 
     e = eml do: [div([], 1), div([], 2)]
     assert e == unpack e
@@ -158,7 +158,7 @@ defmodule EmlTest do
     assert ["1", "2", "3"] == Eml.funpackr(multi)
   end
 
-  test "Add markup" do
+  test "Add content" do
     input = eml do: body(id: "test")
     to_add = eml do: div([], "Hello world!")
     expected = eml do: body([id: "test"], to_add)
@@ -176,9 +176,9 @@ defmodule EmlTest do
     result = Eml.select(doc(), class: "title")
 
     # The order of the returned content is unspecified,
-    # so we need to compare the elements.
+    # so we need to compare the nodes.
 
-    assert Enum.all?(result, fn element -> element in expected end)
+    assert Enum.all?(result, fn node -> node in expected end)
   end
 
   test "Select by class 2" do
@@ -198,7 +198,7 @@ defmodule EmlTest do
     end
     result = Eml.select(doc(), class: "test")
 
-    assert Enum.all?(result, fn element -> element in expected end)
+    assert Enum.all?(result, fn node -> node in expected end)
   end
 
   test "Select by id" do
@@ -222,7 +222,7 @@ defmodule EmlTest do
     result = Eml.select(doc(), id: "main-side-bar", class: "content")
 
     # If both an id and a class are specified,
-    # only return the markup that satisfies both.
+    # only return the element that satisfies both.
 
     assert expected == result
   end

@@ -32,7 +32,7 @@ defimpl Eml.Parsable, for: Atom do
   def parse(param, _lang), do: %Eml.Parameter{id: param}
 end
 
-defimpl Eml.Parsable, for: [Eml.Markup, Eml.Parameter, Eml.Template] do
+defimpl Eml.Parsable, for: [Eml.Element, Eml.Parameter, Eml.Template] do
   def parse(data, _lang), do: data
 end
 

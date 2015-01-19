@@ -1,9 +1,9 @@
-defmodule Eml.Markup do
+defmodule Eml.Element do
   @moduledoc """
-  `Eml.Markup` defines a struct that represents an element in Eml.
+  `Eml.Element` defines a struct that represents an element in Eml.
 
   In practice, you will mostly use the element macro's instead of directly
-  creating `Eml.Markup` structs, but the functions in this module can be
+  creating `Eml.Element` structs, but the functions in this module can be
   valuable when querying, manipulating or transforming `eml`.
   """
   alias __MODULE__, as: M
@@ -23,15 +23,15 @@ defmodule Eml.Markup do
 
   @default_lang Eml.Language.Native
 
-  @doc "Creates a new `Eml.Markup` structure with default values."
+  @doc "Creates a new `Eml.Element` structure with default values."
   @spec new() :: t
   def new(), do: %M{}
 
   @doc """
-  Creates a new `Eml.Markup` structure.
+  Creates a new `Eml.Element` structure.
 
   ### Example
-      iex> e = Eml.Markup.new(:div, [id: 42], "hallo!")
+      iex> e = Eml.Element.new(:div, [id: 42], "hallo!")
       #div<%{id: "42"} ["hallo!"]>
       iex> Eml.render(e)
       {:ok, "<div id='42'>hallo!</div>"}
@@ -50,8 +50,8 @@ defmodule Eml.Markup do
 
   @doc "Sets the tag of an element."
   @spec tag(t, atom) :: t
-  def tag(%M{} = markup, tag)
-  when is_atom(tag), do: %{markup| "__tag__": tag}
+  def tag(%M{} = el, tag)
+  when is_atom(tag), do: %{el| "__tag__": tag}
 
   @doc """
   Gets the id of an element.
@@ -62,8 +62,8 @@ defmodule Eml.Markup do
 
   @doc "Sets the id of an element."
   @spec id(t, attr_value) :: t
-  def id(%M{attrs: attrs} = markup, id),
-  do: %M{markup| attrs: Map.put(attrs, :id, to_attr_value(id))}
+  def id(%M{attrs: attrs} = el, id),
+  do: %M{el| attrs: Map.put(attrs, :id, to_attr_value(id))}
 
   @doc """
   Gets the class or classes of an element.
@@ -80,14 +80,14 @@ defmodule Eml.Markup do
   Multiple classes can be assigned by providing a list of strings.
   """
   @spec class(t, attr_value) :: t
-  def class(%M{attrs: attrs} = markup, class),
-  do: %M{markup| attrs: Map.put(attrs, :class, to_attr_value(class))}
+  def class(%M{attrs: attrs} = el, class),
+  do: %M{el| attrs: Map.put(attrs, :class, to_attr_value(class))}
 
   @doc """
   Gets the content of an element.
 
-  Note that content in Eml always is a list, so when an element
-  has no content, it returns an empty list.
+  Note that content in Eml always is a list, so when an element's
+  content is empty, it returns an empty list.
   """
   @spec content(t) :: content
   def content(%M{content: content}), do: content
@@ -100,15 +100,15 @@ defmodule Eml.Markup do
 
   ### Example
 
-      iex> div = Eml.Markup.new(:div, [], [])
+      iex> div = Eml.Element.new(:div, [], [])
       #div<>
-      iex> Eml.Markup.content(div, ["Hallo ", 2, 0, [1, 5]])
+      iex> Eml.Element.content(div, ["Hallo ", 2, 0, [1, 5]])
       #div<["Hallo 2015"]>
 
   """
   @spec content(t, data, Eml.lang) :: t
-  def content(%M{} = markup, data, lang \\ @default_lang) do
-    %M{markup| content: Eml.parse!(data, lang)}
+  def content(%M{} = el, data, lang \\ @default_lang) do
+    %M{el| content: Eml.parse!(data, lang)}
   end
 
   @doc """
@@ -119,20 +119,20 @@ defmodule Eml.Markup do
 
   ### Example
 
-      iex> div = Eml.Markup.new(:div, [], [])
+      iex> div = Eml.Element.new(:div, [], [])
       #div<>
-      iex> div = Eml.Markup.content(div, ["Hallo ", 2, 0, [1, 5]])
+      iex> div = Eml.Element.content(div, ["Hallo ", 2, 0, [1, 5]])
       #div<["Hallo 2015"]>
-      iex> Eml.Markup.add(div, " !!!")
+      iex> Eml.Element.add(div, " !!!")
       #div<["Hallo 2015 !!!"]>
 
   """
   @spec add(t, data, Keyword.t) :: t
-  def add(%M{content: current} = markup, data, opts \\ []) do
+  def add(%M{content: current} = el, data, opts \\ []) do
     at      = opts[:at] || :end
     lang  = opts[:lang] || @default_lang
     content = Eml.parse!(data, current, at, lang)
-    %M{markup| content: content}
+    %M{el| content: content}
   end
 
   @doc """
@@ -143,18 +143,18 @@ defmodule Eml.Markup do
 
   ### Example
 
-      iex> div = Eml.Markup.new(:div, [], "hallo")
+      iex> div = Eml.Element.new(:div, [], "hallo")
       #div<["hallo"]>
-      iex> Eml.Markup.update(div, fn content -> String.upcase(content) end)
+      iex> Eml.Element.update(div, fn content -> String.upcase(content) end)
       #div<["HALLO"]>
 
   """
-  @spec update(t, (Eml.element -> data), Eml.lang) :: t
-  def update(%M{content: content} = markup, fun, lang \\ @default_lang) do
-    content = for element <- content, data = fun.(element) do
+  @spec update(t, (Eml.eml_node -> data), Eml.lang) :: t
+  def update(%M{content: content} = el, fun, lang \\ @default_lang) do
+    content = for node <- content, data = fun.(node) do
       Eml.Parsable.parse(data, lang)
     end
-    %M{markup| content: content}
+    %M{el| content: content}
   end
 
   @doc """
@@ -163,23 +163,23 @@ defmodule Eml.Markup do
 
   ### Example
 
-      iex> div1 = Eml.Markup.new(:div, [], "hallo")
+      iex> div1 = Eml.Element.new(:div, [], "hallo")
       #div<["hallo"]>
-      iex> div2 = Eml.Markup.new(:div, [], "world")
+      iex> div2 = Eml.Element.new(:div, [], "world")
       #div<["world"]>
-      iex> div3 = Eml.Markup.new(:div, [], [div1, div2])
+      iex> div3 = Eml.Element.new(:div, [], [div1, div2])
       #div<[#div<["hallo"]>, #div<["world"]>]>
-      iex> Eml.Markup.remove(div3, [div1, div2])
+      iex> Eml.Element.remove(div3, [div1, div2])
       #div<>
 
   """
-  @spec remove(t, Eml.element | content) :: t
-  def remove(%M{content: content} = markup, to_remove) do
+  @spec remove(t, Eml.eml_node | content) :: t
+  def remove(%M{content: content} = el, to_remove) do
     to_remove = if is_list(to_remove), do: to_remove, else: [to_remove]
-    content = for element <- content, not element in to_remove do
-      element
+    content = for node <- content, not node in to_remove do
+      node
     end
-    %M{markup| content: content}
+    %M{el| content: content}
   end
 
   @doc "Gets the attributes map of an element."
@@ -188,8 +188,8 @@ defmodule Eml.Markup do
 
   @doc "Merges the passed attributes with the current attributes."
   @spec attrs(t, attrs) :: t
-  def attrs(%M{attrs: current} = markup, attrs) when is_map(attrs) or is_list(attrs) do
-    %M{markup| attrs: Map.merge(current, to_attrs(attrs))}
+  def attrs(%M{attrs: current} = el, attrs) when is_map(attrs) or is_list(attrs) do
+    %M{el| attrs: Map.merge(current, to_attrs(attrs))}
   end
 
   @doc """
@@ -208,14 +208,14 @@ defmodule Eml.Markup do
   If the attribute already exists, the old value gets overwritten.
   """
   @spec attr(t, atom, attr_value) :: t
-  def attr(%M{attrs: attrs} = markup, field, value) when is_atom(field) do
-    %M{markup| attrs: Map.put(attrs, field, to_attr_value(value))}
+  def attr(%M{attrs: attrs} = el, field, value) when is_atom(field) do
+    %M{el| attrs: Map.put(attrs, field, to_attr_value(value))}
   end
 
   @doc false
   @spec insert_attr_value(t, atom, attr_value) :: t
-  def insert_attr_value(%M{attrs: attrs} = markup, field, value) when is_atom(field) do
-    %M{markup| attrs: Map.update(attrs, field, to_attr_value(value), &insert_attr_value(&1, value))}
+  def insert_attr_value(%M{attrs: attrs} = el, field, value) when is_atom(field) do
+    %M{el| attrs: Map.update(attrs, field, to_attr_value(value), &insert_attr_value(&1, value))}
   end
 
   defp insert_attr_value(old, new) do
@@ -228,8 +228,8 @@ defmodule Eml.Markup do
 
   @doc "Removes an attribute from an element."
   @spec remove_attr(t, atom) :: t
-  def remove_attr(%M{attrs: attrs} = markup, field) do
-    %M{markup| attrs: Map.delete(attrs, field)}
+  def remove_attr(%M{attrs: attrs} = el, field) do
+    %M{el| attrs: Map.delete(attrs, field)}
   end
 
   @doc """
@@ -237,17 +237,17 @@ defmodule Eml.Markup do
 
   ### Example
 
-      iex> e = Eml.Markup.new(:img, id: "duck-photo", src: "http://i.imgur.com/4xPWp.jpg")
+      iex> e = Eml.Element.new(:img, id: "duck-photo", src: "http://i.imgur.com/4xPWp.jpg")
       #img<%{id: "duck-photo", src: "http://i.imgur.com/4xPWp.jpg"}>
-      iex> Eml.Markup.has?(e, id: "duck-photo")
+      iex> Eml.Element.has?(e, id: "duck-photo")
       true
-      iex> Eml.Markup.has?(e, src: "http://i.imgur.com/4xPWp.jpg")
+      iex> Eml.Element.has?(e, src: "http://i.imgur.com/4xPWp.jpg")
       true
-      iex> Eml.Markup.has?(e, src: "http://i.imgur.com/4xPWp.jpg", id: "wrong")
+      iex> Eml.Element.has?(e, src: "http://i.imgur.com/4xPWp.jpg", id: "wrong")
       false
   """
   @spec has?(t, Keyword.t) :: boolean
-  def has?(%M{} = markup, opts) when is_list(opts) do
+  def has?(%M{} = el, opts) when is_list(opts) do
     { tag, opts }      = Keyword.pop(opts, :tag, :any)
     { id, opts }       = Keyword.pop(opts, :id, :any)
     { class, opts }    = Keyword.pop(opts, :class, :any)
@@ -255,13 +255,13 @@ defmodule Eml.Markup do
     content            = Eml.parse!(content, @default_lang)
     content            = if content == [], do: :any, else: content
 
-    has_tag?(markup, tag)         and
-    has_id?(markup, id)           and
-    has_class?(markup, class)     and
-    has_content?(markup, content) and
-    has_attrs?(markup, attrs)
+    has_tag?(el, tag)         and
+    has_id?(el, id)           and
+    has_class?(el, class)     and
+    has_content?(el, content) and
+    has_attrs?(el, attrs)
   end
-  def has?(_non_markup, _opts), do: false
+  def has?(_non_el, _opts), do: false
 
   defp has_tag?(_, :any), do: true
   defp has_tag?(%M{tag: etag}, tag), do: tag === etag
@@ -283,8 +283,8 @@ defmodule Eml.Markup do
   end
 
   defp has_attrs?(_, []), do: true
-  defp has_attrs?(markup, attrs) do
-    eattrs = attrs(markup)
+  defp has_attrs?(el, attrs) do
+    eattrs = attrs(el)
     Enum.all?(attrs, fn attr ->
       attr?(attr, eattrs)
     end)
@@ -372,13 +372,13 @@ end
 
 # Enumerable protocol implementation
 
-defimpl Enumerable, for: Eml.Markup do
+defimpl Enumerable, for: Eml.Element do
 
-  def count(_markup),           do: { :error, __MODULE__ }
-  def member?(_markup, _),      do: { :error, __MODULE__ }
+  def count(_el),           do: { :error, __MODULE__ }
+  def member?(_el, _),      do: { :error, __MODULE__ }
 
-  def reduce(markup, acc, fun) do
-    case reduce_content([markup], acc, fun) do
+  def reduce(el, acc, fun) do
+    case reduce_content([el], acc, fun) do
       { :cont, acc }    -> { :done, acc }
       { :suspend, acc } -> { :suspended, acc }
       { :halt, acc }    -> { :halted, acc }
@@ -391,11 +391,11 @@ defimpl Enumerable, for: Eml.Markup do
   defp reduce_content(content, { :suspend, acc }, fun) do
     { :suspend, acc, &reduce_content(content, &1, fun) }
   end
-  defp reduce_content([%Eml.Markup{content: content} = markup | rest], { :cont, acc }, fun) do
-    reduce_content(rest, reduce_content(content, fun.(markup, acc), fun), fun)
+  defp reduce_content([%Eml.Element{content: content} = el | rest], { :cont, acc }, fun) do
+    reduce_content(rest, reduce_content(content, fun.(el, acc), fun), fun)
   end
-  defp reduce_content([element | rest], { :cont, acc }, fun) do
-    reduce_content(rest, fun.(element, acc), fun)
+  defp reduce_content([node | rest], { :cont, acc }, fun) do
+    reduce_content(rest, fun.(node, acc), fun)
   end
   defp reduce_content([], acc, _fun) do
     acc
@@ -404,10 +404,10 @@ end
 
 # Inspect protocol implementation
 
-defimpl Inspect, for: Eml.Markup do
+defimpl Inspect, for: Eml.Element do
   import Inspect.Algebra
 
-  def inspect(%Eml.Markup{tag: tag, attrs: attrs, content: content}, opts) do
+  def inspect(%Eml.Element{tag: tag, attrs: attrs, content: content}, opts) do
     opts = if is_list(opts), do: Keyword.put(opts, :hide_content_type, true), else: opts
     tag   = Atom.to_string(tag)
     attrs = if attrs == %{}, do: "", else: to_doc(attrs, opts)

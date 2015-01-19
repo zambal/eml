@@ -1,7 +1,7 @@
 defmodule Eml.Language.Html.Renderer do
   @moduledoc false
 
-  alias Eml.Markup
+  alias Eml.Element
   alias Eml.Template
   alias Eml.Parameter
 
@@ -31,10 +31,10 @@ defmodule Eml.Language.Html.Renderer do
 
   # Eml parsing
 
-  defp parse_eml(%Markup{tag: tag, attrs: attrs, content: content},
+  defp parse_eml(%Element{tag: tag, attrs: attrs, content: content},
                  opts, %{type: type, chunks: chunks} = s) do
 
-    type  = chunk_type(:markup, type)
+    type  = chunk_type(:element, type)
 
     chunks = chunks
              |> maybe_doctype(tag)
@@ -183,7 +183,7 @@ defmodule Eml.Language.Html.Renderer do
     parse_attr_value(param, opts, s)
   end
 
-  # Markup generators
+  # Element generators
 
   defp start_tag_open(chunks, tag), do: ["<#{tag}" | chunks]
   defp start_tag_close(chunks),     do: [">" | chunks]
@@ -195,7 +195,7 @@ defmodule Eml.Language.Html.Renderer do
   defp maybe_doctype(chunks, _),     do: chunks
 
 
-  # Markup helpers
+  # Element helpers
 
   defp parse_param(param) do
     "#param{#{param.id}}"
@@ -223,7 +223,7 @@ defmodule Eml.Language.Html.Renderer do
     tag in [:area, :base, :br, :col, :embed, :hr, :img, :input, :keygen, :link, :meta, :param, :source, :track, :wbr]
   end
 
-  # Attribute markup helpers
+  # Attribute element helpers
 
   defp qchar(:single), do: "'"
   defp qchar(:double), do: "\""

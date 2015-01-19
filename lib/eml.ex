@@ -38,15 +38,15 @@ defmodule Eml do
   of the Eml library.
   """
 
-  alias Eml.Markup
+  alias Eml.Element
   alias Eml.Template
   alias Eml.Parsable
 
   @default_lang Eml.Language.Html
 
-  @type element  :: binary | Eml.Markup.t | Eml.Parameter.t | Eml.Template.t
-  @type content  :: [element]
-  @type t        :: element | content
+  @type eml_node  :: binary | Eml.Element.t | Eml.Parameter.t | Eml.Template.t
+  @type content  :: [eml_node]
+  @type t        :: eml_node | content
   @type data     :: Eml.Parsable.t
   @type error    :: { :error, term }
   @type lang     :: atom
@@ -65,14 +65,14 @@ defmodule Eml do
 
   It does this by doing two things:
 
-  * Provide a lexical scope where all markup macro's are imported to
+  * Provide a lexical scope where all element macro's are imported to
   * Parse the last expression of the block in order to guarantee valid eml content
 
   To illustrate, the expressions below all produce the same output:
 
   * `eml do: div([], 42)`
-  * `Eml.Markup.new(:div, %{}, 42) |> Eml.parse!(Eml.Language.Native)`
-  * `Eml.Markup.Html.div([], 42) |> Eml.parse!(Eml.Language.Native)`
+  * `Eml.Element.new(:div, %{}, 42) |> Eml.parse!(Eml.Language.Native)`
+  * `Eml.Element.Html.div([], 42) |> Eml.parse!(Eml.Language.Native)`
 
   Note that since the Elixir `Kernel` module by default imports the `div/2`
   function in to the global namespace, this function is inside an eml block
@@ -234,6 +234,7 @@ defmodule Eml do
       "<body><p>Strawberry</p></body>"
 
   """
+
   defmacro precompile(name \\ nil, opts) do
     ast = opts
     |> Keyword.put(:type, :template)
@@ -257,22 +258,22 @@ defmodule Eml do
   @doc """
   Selects content from arbritary eml.
 
-  It will traverse the complete eml tree, so all elements are
+  It will traverse the complete eml tree, so all nodes are
   evaluated. There is however currently no way to select templates
   or parameters.
 
-  Content is matched depending on the provided options.
+  Nodes are matched depending on the provided options.
 
   Those options can be:
 
-  * `:tag` - match markup content by tag (`atom`)
-  * `:id` - match markup content by id (`binary`)
-  * `:class` - match markup content by class (`binary`)
+  * `:tag` - match element by tag (`atom`)
+  * `:id` - match element by id (`binary`)
+  * `:class` - match element by class (`binary`)
   * `:pat` - match binary content by regular expression (`RegEx.t`)
-  * `:parent` - when set to true, selects the parent element
-    of the matched content (`boolean`)
+  * `:parent` - when set to true, selects the parent node
+    of the matched node (`boolean`)
 
-  When `:tag`, `:id`, or `:class` are combined, only markup is
+  When `:tag`, `:id`, or `:class` are combined, only element is
   selected that satisfies all conditions.
 
   When the `:pat` options is used, `:tag`, `:id` and `:class` will
@@ -311,7 +312,7 @@ defmodule Eml do
 
   def select(%Template{}, _opts), do: []
 
-  def select(element, opts) do
+  def select(node, opts) do
     tag            = opts[:tag] || :any
     id             = opts[:id] || :any
     class          = opts[:class] || :any
@@ -319,46 +320,46 @@ defmodule Eml do
     select_parent? = opts[:parent] || false
     if select_parent? do
       if pat do
-        pat_fun = fn element ->
-          markup?(element) and
-          Enum.any?(element.content, fn el -> is_binary(el) and Regex.match?(pat, el) end)
+        pat_fun = fn node ->
+          element?(node) and
+          Enum.any?(node.content, fn el -> is_binary(el) and Regex.match?(pat, el) end)
         end
-        Enum.filter(element, pat_fun)
+        Enum.filter(node, pat_fun)
       else
-        idclass_fun = fn element ->
-          markup?(element) and
-          Enum.any?(element.content, fn el -> Markup.match?(el, tag, id, class) end)
+        idclass_fun = fn node ->
+          element?(node) and
+          Enum.any?(node.content, fn el -> Element.match?(el, tag, id, class) end)
         end
-        Enum.filter(element, idclass_fun)
+        Enum.filter(node, idclass_fun)
       end
     else
       if pat do
         pat_fun = fn
-          element when is_binary(element) -> Regex.match?(pat, element)
+          node when is_binary(node) -> Regex.match?(pat, node)
           _                         -> false
         end
-        Enum.filter(element, pat_fun)
+        Enum.filter(node, pat_fun)
       else
-        Enum.filter(element, &Markup.match?(&1, tag, id, class))
+        Enum.filter(node, &Element.match?(&1, tag, id, class))
       end
     end
   end
 
   @doc """
-  Adds content to matched markup.
+  Adds content to matched elements.
 
   It traverses and returns the complete eml tree.
-  Markup is matched depending on the provided options.
+  Nodes are matched depending on the provided options.
 
   Those options can be:
 
-  * `:tag` - match content by tag (`atom`)
-  * `:id` - match content by id (`binary`)
-  * `:class` - match content by class (`binary`)
+  * `:tag` - match element by tag (`atom`)
+  * `:id` - match element by id (`binary`)
+  * `:class` - match element by class (`binary`)
   * `:at` -  add new content at begin or end of existing
     content, default is `:end` (`:begin | :end`)
 
-  When `:tag`, `:id`, or `:class` are combined, only markup is
+  When `:tag`, `:id`, or `:class` are combined, only element is
   selected that satisfies all conditions.
 
 
@@ -387,36 +388,36 @@ defmodule Eml do
     tag     = opts[:tag] || :any
     id      = opts[:id] || :any
     class   = opts[:class] || :any
-    add_fun = fn element ->
-      if markup?(element) and Markup.match?(element, tag, id, class),
-        do:   Markup.add(element, data, opts),
-        else: element
+    add_fun = fn node ->
+      if element?(node) and Element.match?(node, tag, id, class),
+        do:   Element.add(node, data, opts),
+        else: node
     end
     transform(eml, add_fun)
   end
 
   @doc """
-  Updates matched content.
+  Updates matched nodes.
 
-  When content is matched, the provided function will be evaluated
-  with the matched content as argument.
+  When nodes are matched, the provided function will be evaluated
+  with the matched node as argument.
 
-  When the provided function returns `nil`, the the content will
+  When the provided function returns `nil`, the node will
   be removed from the eml tree. Any other returned value will be
   evaluated by `Eml.parse!/2` in order to guarantee valid eml.
 
-  Content is matched depending on the provided options.
+  Nodes are matched depending on the provided options.
 
   Those options can be:
 
-  * `:tag` - match markup content by tag (`atom`)
-  * `:id` - match markup content by id (`binary`)
-  * `:class` - match markup content by class (`binary`)
+  * `:tag` - match element by tag (`atom`)
+  * `:id` - match element by id (`binary`)
+  * `:class` - match element by class (`binary`)
   * `:pat` - match binary content by regular expression (`RegEx.t`)
-  * `:parent` - when set to true, selects the parent element
-    of the matched content (`boolean`)
+  * `:parent` - when set to true, selects the parent node
+    of the matched node (`boolean`)
 
-  When `:tag`, `:id`, or `:class` are combined, only markup is
+  When `:tag`, `:id`, or `:class` are combined, only element is
   selected that satisfies all conditions.
 
   When the `:pat` options is used, `:tag`, `:id` and `:class` will
@@ -433,11 +434,11 @@ defmodule Eml do
       ...> end
       [#div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
         #span<%{id: "inner2", class: "inner"} ["world"]>]>]
-      iex> Eml.update(e, fn m -> Markup.id(m, "outer") end, tag: :div)
+      iex> Eml.update(e, fn m -> Element.id(m, "outer") end, tag: :div)
       [#div<%{id: "outer"}
        [#span<%{id: "inner1", class: "inner"} ["hello "]>,
         #span<%{id: "inner2", class: "inner"} ["world"]>]>]
-      iex> Eml.update(e, fn m -> Markup.id(m, "outer") end, id: "inner2", parent: true)
+      iex> Eml.update(e, fn m -> Element.id(m, "outer") end, id: "inner2", parent: true)
       [#div<%{id: "outer"}
        [#span<%{id: "inner1", class: "inner"} ["hello "]>,
         #span<%{id: "inner2", class: "inner"} ["world"]>]>]
@@ -445,7 +446,7 @@ defmodule Eml do
       "<div><span id='inner1' class='inner'>HELLO </span><span id='inner2' class='inner'>WORLD</span></div>"
 
   """
-  @spec update(t, (element -> data), Keyword.t) :: t
+  @spec update(t, (eml_node -> data), Keyword.t) :: t
   def update(eml, fun, opts \\ []) do
     tag            = opts[:tag] || :any
     id             = opts[:id] || :any
@@ -455,32 +456,32 @@ defmodule Eml do
     update_fun     =
      if update_parent? do
        if pat do
-          fn element ->
-            if markup?(element) and
-            Enum.any?(element.content, fn el -> is_binary(el) and Regex.match?(pat, el) end),
-              do: fun.(element),
-            else: element
+          fn node ->
+            if element?(node) and
+            Enum.any?(node.content, fn el -> is_binary(el) and Regex.match?(pat, el) end),
+              do: fun.(node),
+            else: node
           end
         else
-          fn element ->
-            if markup?(element) and
-            Enum.any?(element.content, fn el -> Markup.match?(el, tag, id, class) end),
-              do: fun.(element),
-            else: element
+          fn node ->
+            if element?(node) and
+            Enum.any?(node.content, fn el -> Element.match?(el, tag, id, class) end),
+              do: fun.(node),
+            else: node
           end
         end
       else
         if pat do
-          fn element ->
-            if is_binary(element) and Regex.match?(pat, element),
-             do: fun.(element),
-           else: element
+          fn node ->
+            if is_binary(node) and Regex.match?(pat, node),
+             do: fun.(node),
+           else: node
           end
         else
-          fn element ->
-            if Markup.match?(element, tag, id, class),
-              do: fun.(element),
-            else: element
+          fn node ->
+            if Element.match?(node, tag, id, class),
+              do: fun.(node),
+            else: node
           end
         end
      end
@@ -488,7 +489,7 @@ defmodule Eml do
   end
 
   @doc """
-  Removes matched content from the eml tree.
+  Removes matched nodes from the eml tree.
 
   See `update/3` for a description of the provided options.
 
@@ -521,32 +522,32 @@ defmodule Eml do
     remove_fun     =
       if remove_parent? do
         if pat do
-          fn element ->
-            if markup?(element) and
-            Enum.any?(element.content, fn el -> is_binary(el) and Regex.match?(pat, el) end),
+          fn node ->
+            if element?(node) and
+            Enum.any?(node.content, fn el -> is_binary(el) and Regex.match?(pat, el) end),
               do: nil,
-            else: element
+            else: node
           end
         else
-          fn element ->
-            if markup?(element) and
-            Enum.any?(element.content, fn el -> Markup.match?(el, tag, id, class) end),
+          fn node ->
+            if element?(node) and
+            Enum.any?(node.content, fn el -> Element.match?(el, tag, id, class) end),
               do: nil,
-            else: element
+            else: node
           end
         end
       else
         if pat do
-          fn element ->
-            if is_binary(element) and Regex.match?(pat, element),
+          fn node ->
+            if is_binary(node) and Regex.match?(pat, node),
              do: nil,
-           else: element
+           else: node
           end
         else
-          fn element ->
-            if Markup.match?(element, tag, id, class),
+          fn node ->
+            if Element.match?(node, tag, id, class),
               do: nil,
-            else: element
+            else: node
           end
         end
     end
@@ -554,7 +555,7 @@ defmodule Eml do
   end
 
   @doc """
-  Returns true if there's at least one match with
+  Returns true if there's at least one node matches
   the provided options, returns false otherwise.
 
   In other words, returns true when the same select query
@@ -589,22 +590,22 @@ defmodule Eml do
   end
 
   @doc """
-  Recursively transforms content.
+  Recursively transforms `eml` content.
 
   This is the most low level operation provided by Eml for manipulating
-  eml content. For example, `update/3` and `remove/2` are implemented by
+  eml nodes. For example, `update/3` and `remove/2` are implemented by
   using this function.
 
-  It accepts any eml and traverses all elements of the provided eml tree.
-  The provided transform function will be evaluated for every element `transform/3`
-  encounters. Parent elements will be transformed before their children. Child elements
+  It accepts any eml and traverses all nodes of the provided eml tree.
+  The provided transform function will be evaluated for every node `transform/3`
+  encounters. Parent nodes will be transformed before their children. Child nodes
   of a parent will be evaluated before moving to the next sibling.
 
-  When the provided function returns `nil`, the the content will
+  When the provided function returns `nil`, the node will
   be removed from the eml tree. Any other returned value will be
   evaluated by `Eml.parse!/2` in order to guarantee valid eml.
 
-  Note that because parent elements are evaluated before their children,
+  Note that because parent nodes are evaluated before their children,
   no children will be evaluated if the parent is removed.
 
   Accepts a lang as optional 3rd argument, in order to specify how transformed data
@@ -620,7 +621,7 @@ defmodule Eml do
       ...> end
       [#div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
         #span<%{id: "inner2", class: "inner"} ["world"]>]>]
-      iex> Eml.transform(e, fn x -> if Markup.has?(x, tag: :span), do: "matched", else: x end)
+      iex> Eml.transform(e, fn x -> if Element.has?(x, tag: :span), do: "matched", else: x end)
       [#div<["matched", "matched"]>]
       iex> Eml.transform(e, fn x ->
       ...> IO.puts(inspect x)
@@ -634,20 +635,20 @@ defmodule Eml do
         #span<%{id: "inner2", class: "inner"} ["world"]>]>]
 
   """
-  @spec transform(t, (element -> data), lang) :: t | nil
+  @spec transform(t, (eml_node -> data), lang) :: t | nil
   def transform(eml, fun, lang \\ Eml.Language.Native)
 
   def transform(eml, fun, lang) when is_list(eml) do
-    for element <- eml, t = transform(element, fun, lang), do: t
+    for node <- eml, t = transform(node, fun, lang), do: t
   end
 
-  def transform(element, fun, lang) do
-    case element |> fun.() |> Parsable.parse(lang) do
+  def transform(node, fun, lang) do
+    case node |> fun.() |> Parsable.parse(lang) do
       { :error, _ } -> nil
-      element ->
-        if markup?(element),
-          do: %Markup{element| content: transform(element.content, fun, lang)},
-        else: element
+      node ->
+        if element?(node),
+          do: %Element{node| content: transform(node.content, fun, lang)},
+        else: node
     end
   end
 
@@ -658,7 +659,7 @@ defmodule Eml do
   The default value is `Eml.Language.Html', which means that
   strings are parsed as html. The other language that is supported
   by default is `Eml.Language.Native`, which is for example used when
-  setting content in an `Eml.Markup` element. Appart from the provided
+  setting content in an `Eml.Element` node. Appart from the provided
   language, this function performs some conversions on its own. Mainly
   flattening of lists and concatenating binaries in a list.
 
@@ -711,47 +712,47 @@ defmodule Eml do
   def parse(data, content, mode, lang) do
     case Parsable.parse(data, lang) do
       { :error, e } -> { :error, e }
-      element       -> add_element(element, content, mode)
+      node       -> add_node(node, content, mode)
     end
   end
 
   # Optimize for most comon cases
 
-  defp add_element(element, [], _) when is_list(element),
-  do: element
+  defp add_node(node, [], _) when is_list(node),
+  do: node
 
-  defp add_element(element, [], _),
-  do: [element]
+  defp add_node(node, [], _),
+  do: [node]
 
-  defp add_element(element, [current], :end) do
-    if is_binary(element) and is_binary(current) do
-      [current <> element]
+  defp add_node(node, [current], :end) do
+    if is_binary(node) and is_binary(current) do
+      [current <> node]
     else
-      [current, element]
+      [current, node]
     end
   end
 
-  defp add_element(element, [current], :begin) do
-    if is_binary(element) and is_binary(current) do
-      [element <> current]
+  defp add_node(node, [current], :begin) do
+    if is_binary(node) and is_binary(current) do
+      [node <> current]
     else
-      [element, current]
+      [node, current]
     end
   end
 
-  defp add_element(element, [h | t], :end) do
-    if is_binary(element) and is_binary(h) do
-      [h <> element | t]
+  defp add_node(node, [h | t], :end) do
+    if is_binary(node) and is_binary(h) do
+      [h <> node | t]
     else
-      [element, h | t]
+      [node, h | t]
     end
   end
 
-  defp add_element(element, [h | t], :begin) do
-    if is_binary(element) and is_binary(h) do
-      [element <> h | t]
+  defp add_node(node, [h | t], :begin) do
+    if is_binary(node) and is_binary(h) do
+      [node <> h | t]
     else
-      [element, h | t]
+      [node, h | t]
     end
   end
 
@@ -851,7 +852,7 @@ defmodule Eml do
   end
 
   @doc """
-  Extracts a value from content (which is always a list) or markup
+  Extracts a value from content (which is always a list) or an element
 
   ### Examples
 
@@ -869,13 +870,13 @@ defmodule Eml do
 
   """
   @spec unpack(t) :: t
-  def unpack(%Markup{content: [element]}), do: element
-  def unpack(%Markup{content: content}),   do: content
-  def unpack([element]),                   do: element
+  def unpack(%Element{content: [node]}), do: node
+  def unpack(%Element{content: content}),   do: content
+  def unpack([node]),                   do: node
   def unpack(eml),                         do: eml
 
   @doc """
-  Extracts a value recursively from content or markup
+  Extracts a value recursively from content or an element
 
   ### Examples
 
@@ -887,40 +888,40 @@ defmodule Eml do
 
   """
   @spec unpackr(t) :: unpackr_result
-  def unpackr(%Markup{content: [element]}),   do: unpackr(element)
-  def unpackr(%Markup{content: content}),     do: unpack_content(content)
-  def unpackr([element]),                     do: unpackr(element)
+  def unpackr(%Element{content: [node]}),   do: unpackr(node)
+  def unpackr(%Element{content: content}),     do: unpack_content(content)
+  def unpackr([node]),                     do: unpackr(node)
   def unpackr(content) when is_list(content), do: unpack_content(content)
-  def unpackr(element),                       do: element
+  def unpackr(node),                       do: node
 
   defp unpack_content(content) do
-    for element <- content, do: unpackr(element)
+    for node <- content, do: unpackr(node)
   end
 
   @doc """
-  Extracts a value recursively from content or markup and flatten the results.
+  Extracts a value recursively from content or an element and flatten the results.
   """
   @spec funpackr(t) :: funpackr_result
   def funpackr(eml), do: unpackr(eml) |> :lists.flatten
 
-  @doc "Checks if a term is a `Eml.Markup` struct."
-  @spec markup?(term) :: boolean
-  def markup?(%Markup{}), do: true
-  def markup?(_),   do: false
+  @doc "Checks if a term is a `Eml.Element` struct."
+  @spec element?(term) :: boolean
+  def element?(%Element{}), do: true
+  def element?(_),   do: false
 
   @doc "Checks if a value is regarded as empty by Eml."
   @spec empty?(term) :: boolean
   def empty?(nil), do: true
   def empty?([]), do: true
-  def empty?(%Markup{content: []}), do: true
+  def empty?(%Element{content: []}), do: true
   def empty?(_), do: false
 
   @doc """
   Returns the type of content.
 
-  The types are `:content`, `:binary`, `:markup`, `:template`, `:parameter`, or `:undefined`.
+  The types are `:content`, `:binary`, `:element`, `:template`, `:parameter`, or `:undefined`.
   """
-  @spec type(content) :: :content | :binary | :markup | :template | :parameter | :undefined
+  @spec type(content) :: :content | :binary | :element | :template | :parameter | :undefined
   def type(content)
   when is_list(content) do
     if Enum.any?(content, fn el -> type(el) === :undefined end) do
@@ -933,7 +934,7 @@ defmodule Eml do
   def type(bin)
   when is_binary(bin), do: :binary
 
-  def type(%Markup{}), do: :markup
+  def type(%Element{}), do: :element
 
   def type(%Template{}), do: :template
 
@@ -955,12 +956,12 @@ defmodule Eml do
     aliases =
       if opts[:aliases] != false do
         quote do
-          alias Eml.Markup
+          alias Eml.Element
           alias Eml.Template
         end
       end
     quote do
-      require Eml.Markup
+      require Eml.Element
       unquote(imports)
       unquote(aliases)
     end

@@ -1,10 +1,10 @@
-defmodule Eml.Language.Html.Markup do
+defmodule Eml.Language.Html.Elements do
   @moduledoc """
   This is the container module of all the generated HTML element macro's.
   All macro's in this module are imported inside an `eml` block.
   """
 
-  use Eml.Markup.Generator, tags: [:html, :head, :title, :base, :link, :meta, :style,
+  use Eml.Element.Generator, tags: [:html, :head, :title, :base, :link, :meta, :style,
                                    :script, :noscript, :body, :div, :span, :article,
                                    :section, :nav, :aside, :h1, :h2, :h3, :h4, :h5, :h6,
                                    :header, :footer, :address, :p, :hr, :pre, :blockquote,
@@ -24,7 +24,7 @@ defmodule Eml.Language.Html do
 
   @behaviour Eml.Language
 
-  def markup?(), do: true
+  def element?(), do: true
 
   def parse(data, type) do
     Eml.Language.Html.Parser.parse(data, type)
@@ -37,7 +37,7 @@ defmodule Eml.Language.Html do
   defmacro __using__(_opts) do
     quote do
       import Kernel, except: [div: 2]
-      import unquote(__MODULE__).Markup
+      import unquote(__MODULE__).Elements
     end
   end
 end

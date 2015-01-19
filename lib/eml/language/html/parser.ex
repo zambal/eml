@@ -3,7 +3,7 @@ defmodule Eml.Language.Html.Parser do
 
   # API
 
-  @spec parse(binary, atom) :: Eml.element | Eml.error
+  @spec parse(binary, atom) :: Eml.eml_node | Eml.error
   def parse(html, BitString) do
     res = case tokenize(html, { :blank, [] }, [], :blank) do
             { :error, state } ->
@@ -14,10 +14,10 @@ defmodule Eml.Language.Html.Parser do
     case res do
       { :error, state } ->
         { :error, state }
-      { markup, [] } ->
-        markup
-      { markup, rest }->
-        { :error, [compiled: markup, rest: rest] }
+      { content, [] } ->
+        content
+      { content, rest }->
+        { :error, [compiled: content, rest: rest] }
     end
   end
 
@@ -175,7 +175,7 @@ defmodule Eml.Language.Html.Parser do
   defp tokenize(<<">", rest::binary>>, buf, acc, state) do
     case state do
       s when s in [:attr_close, :start_tag] ->
-        # The html tokenizer doesn't support arbitrary markup without proper closing.
+        # The html tokenizer doesn't support elements without proper closing.
         # However, it does makes exceptions for tags specified in is_void_element?/1
         # and assume they never have children.
         tag = get_last_tag(acc, buf)
@@ -356,8 +356,8 @@ defmodule Eml.Language.Html.Parser do
       :skip ->
         parse_content(ts, acc)
       { :tag, tag } ->
-        { markup, tokens } = parse_markup(ts, [tag: tag, attrs: [], content: []])
-        parse_content(tokens, [markup | acc])
+        { element, tokens } = parse_element(ts, [tag: tag, attrs: [], content: []])
+        parse_content(tokens, [element | acc])
       { :content, content } ->
         parse_content(ts, [content | acc])
       { :cdata, content } ->
@@ -371,38 +371,38 @@ defmodule Eml.Language.Html.Parser do
     { :lists.reverse(acc), [] }
   end
 
-  defp parse_markup([{ type, token } | ts], acc) do
+  defp parse_element([{ type, token } | ts], acc) do
     case preparse(type, token) do
       :skip ->
-        parse_markup(ts, acc)
+        parse_element(ts, acc)
       { :attr_field, field } ->
         attrs = [{ field, "" } | acc[:attrs]]
-        parse_markup(ts, Keyword.put(acc, :attrs, attrs))
+        parse_element(ts, Keyword.put(acc, :attrs, attrs))
       { :attr_value, value } ->
         [{ field, current } | rest] = acc[:attrs]
         attrs = if is_binary(current) && is_binary(value) do
                   [{ field, current <> value } | rest]
                 else
-                  [{ field, Eml.Markup.ensure_list(current) ++ [value] } | rest]
+                  [{ field, Eml.Element.ensure_list(current) ++ [value] } | rest]
                 end
-        parse_markup(ts, Keyword.put(acc, :attrs, attrs))
+        parse_element(ts, Keyword.put(acc, :attrs, attrs))
       :start_content ->
         { content, tokens } = parse_content(ts, [])
-        { make_markup(Keyword.put(acc, :content, content)), tokens }
+        { make_element(Keyword.put(acc, :content, content)), tokens }
       :end_el ->
-        { make_markup(acc), ts }
+        { make_element(acc), ts }
     end
   end
-  defp parse_markup([], acc) do
-    { make_markup(acc), [] }
+  defp parse_element([], acc) do
+    { make_element(acc), [] }
   end
 
-  defp make_markup(acc) do
+  defp make_element(acc) do
     attrs = acc[:attrs]
     if attrs[:class] do
       attrs = Keyword.update!(attrs, :class, &class_value/1)
     end
-    Eml.Markup.new(acc[:tag], attrs, maybe_trim_whitespace(acc[:content], acc[:tag]))
+    Eml.Element.new(acc[:tag], attrs, maybe_trim_whitespace(acc[:content], acc[:tag]))
   end
 
   defp preparse(:blank, _),            do: :skip

@@ -21,7 +21,7 @@ Eml.render! eml do
   div class: "person" do
     div do
       span [], "name: "
-      span[], name
+      span [], name
     end
     div do
       span [], "age: "

@@ -108,7 +108,7 @@ defmodule Eml do
               quote do
                 use unquote(lang)
                 import Eml.Template, only: [bind: 2]
-                Eml.compile unquote(quoted)
+                Eml.compile! unquote(quoted)
               end
             :html ->
               quote do
@@ -223,13 +223,13 @@ defmodule Eml do
       ...>     end
       ...>   end
       ...> end
+      iex> File.rm! "test.eml.exs"
       iex> MyTemplates.test1
-      #Template<[fruit: 1]>
+      #Template<[:fruit]>
       iex> MyTemplates.test fruit: "lemon"
       "<div><span class='prefix'>fruit</span><span class='content'>lemon</span></div>"
       iex> MyTemplates.from_file name: "Vincent"
       "<div id='name'>Vincent</div>"
-      iex> File.rm! "test.eml.exs"
       iex> MyTemplated.test2
       "<body><p>Strawberry</p></body>"
 
@@ -249,7 +249,7 @@ defmodule Eml do
       { name, _, nil } = name
       quote do
         def unquote(name)(bindings \\ []) do
-          Eml.compile(unquote(ast), bindings)
+          Eml.compile!(unquote(ast), bindings)
         end
       end
     end
@@ -833,21 +833,32 @@ defmodule Eml do
   ### Examples:
 
       iex> t = Eml.compile (eml do: body([], h1([id: "main-title"], :the_title)))
-      #Template<[the_title: 1]>
+      { :ok, #Template<[:the_title]> }
       iex> Eml.render(t, bindings: [the_title: "The Title"])
       {:ok, "<body><h1 id='main-title'>The Title</h1></body>"}
 
   """
-  @spec compile(t, Keyword.t) :: Eml.Template.t | error
+  @spec compile(t, Keyword.t) :: { :ok, Eml.Template.t } | error
   def compile(eml, bindings \\ [], opts \\ []) do
     # for consistence, when compiling eml we always want to return a template, even if
     # there are no parameters at all, or all of them are bound.
     { lang, opts } = Keyword.pop(opts, :lang, @default_lang)
     opts = Keyword.put(opts, :bindings, bindings)
     opts = Keyword.put(opts, :mode, :compile)
-    case lang.render(eml, opts) do
-      { :ok, t } -> t
-      error -> error
+    lang.render(eml, opts)
+  end
+
+  @doc """
+  Same as `Eml.render/2`, except that it raises an exception, instead of returning an
+  error tuple in case of an error.
+  """
+  @spec compile!(t, Keyword.t) :: Eml.Template.t
+  def compile!(eml, bindings \\ [], opts \\ []) do
+     case compile(eml, bindings, opts) do
+       { :ok, str } ->
+        str
+      { :error, e } ->
+        raise ArgumentError, message: inspect(e, pretty: true)
     end
   end
 

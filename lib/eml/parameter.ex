@@ -17,7 +17,7 @@ defmodule Eml.Parameter do
 
       iex> e = eml do: p([id: :some_id], :content)
       [#p<%{id: #param:some_id} [#param:content]>]
-      iex> t = Eml.compile(e, some_id: 42)
+      iex> t = Eml.compile!(e, some_id: 42)
       #Template<[:content]>
       iex> t = Template.bind(t, content: "some content")
       #Template<BOUND>

@@ -78,8 +78,8 @@ defmodule Eml.Template do
 
   ### Example
       iex> use Eml
-      iex> t = Eml.compile(eml do: div([id: :id], :content))
-      #Template<[id: 1, content: 1]>
+      iex> t = Eml.compile!(eml do: div([id: :id], :content))
+      #Template<[:id, :content]>
       iex> Template.unbound(t)
       [:id, :content]
       iex> t = Template.bind(t, :id, "some_id")
@@ -100,8 +100,8 @@ defmodule Eml.Template do
 
   ### Example
       iex> use Eml
-      iex> t = Eml.compile(eml do: div([id: :id], :content))
-      #Template<[id: 1, content: 1]>
+      iex> t = Eml.compile!(eml do: div([id: :id], :content))
+      #Template<[:id, :content]>
       iex> Template.bound?(t)
       false
       iex> t = Template.bind(t, id: "some_id", content: "some content")

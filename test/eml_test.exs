@@ -91,10 +91,10 @@ defmodule EmlTest do
     assert :binary    == Eml.type unpack(eml do: [1,2,"z"])
     assert :binary    == Eml.type Eml.render!((eml do: :name), [], render_params: true)
     assert :binary    == Eml.type (eml do: :name)
-                                  |> Eml.compile()
+                                  |> Eml.compile!()
                                   |> Eml.render!(name: "Vincent")
-    assert :template  == Eml.type Eml.compile(eml do: :name)
-    assert :template  == Eml.type Eml.compile(eml do: [div([], 1), div([], 2), div([], :param), "..."])
+    assert :template  == Eml.type Eml.compile!(eml do: :name)
+    assert :template  == Eml.type Eml.compile!(eml do: [div([], 1), div([], 2), div([], :param), "..."])
     assert :parameter == Eml.type %Eml.Parameter{}
     assert :parameter == Eml.type unpack(eml do: :param)
   end
@@ -307,7 +307,7 @@ defmodule EmlTest do
         div [], :fruit2
       end
     end
-    t = Eml.compile(e)
+    { :ok, t } = Eml.compile(e)
 
     assert :template == Eml.type t
     assert false == Template.bound?(t)
@@ -326,7 +326,7 @@ defmodule EmlTest do
         div [], :fruit
       end
     end
-    t = Eml.compile(e)
+    { :ok, t } = Eml.compile(e)
 
     assert :template == Eml.type t
     assert false == Template.bound?(t)
@@ -341,9 +341,9 @@ defmodule EmlTest do
 
   test "Templates in eml" do
     fruit  = eml do: section([], :fruit)
-    tfruit = Eml.compile(fruit)
+    tfruit = Eml.compile!(fruit)
     aside  = eml do: aside([], tfruit)
-    taside = Eml.compile(aside)
+    taside = Eml.compile!(aside)
 
     assert :template == Eml.type taside
 
@@ -382,7 +382,7 @@ defmodule EmlTest do
                                        class3: "class3",
                                        custom: 1)
 
-    t = Eml.compile(e, [class3: "class3", custom: 1])
+    { :ok, t } = Eml.compile(e, [class3: "class3", custom: 1])
     assert :template == Eml.type t
     assert Enum.sort([:id_param, :class1]) == Enum.sort(Template.unbound(t))
     assert expected2 == Eml.render!(t, id_param: "parameterized", class1: "class1")

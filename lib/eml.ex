@@ -14,8 +14,14 @@ defmodule Eml do
     age  = 36
 
     div class: "person" do
-      div [], [ span([], "name: "), span([], name) ]
-      div [], [ span([], "age: "), span([], age) ]
+      div do
+        span [], "name: "
+        span [], name
+      end
+      div do
+        span [], "age: "
+        span [], age
+      end
     end
   end
   ```

@@ -3,7 +3,7 @@ defmodule Eml.Mixfile do
 
   def project do
     [ app: :eml,
-      version: "0.5.0",
+      version: "0.6.0-dev",
       name: "Eml",
       source_url: "https://github.com/zambal/eml",
       homepage_url: "https://github.com/zambal/eml",
@@ -36,5 +36,4 @@ defmodule Eml.Mixfile do
       licenses: ["Apache 2.0"],
       links: %{"GitHub" => "https://github.com/zambal/eml"} ]
   end
-
 end

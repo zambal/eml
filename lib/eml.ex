@@ -186,7 +186,7 @@ defmodule Eml do
   is effectively the same as:
 
   ```elixir
-  def mydiv(content), do: eml do div(%{}, content) end |> Eml.render()
+  def mydiv(content), do: eml do div(%{}, content) end |> Eml.render!()
   ```
 
   """
@@ -292,8 +292,8 @@ defmodule Eml do
   * `:parent` - when set to true, selects the parent node
     of the matched node (`boolean`)
 
-  When `:tag`, `:id`, or `:class` are combined, only element is
-  selected that satisfies all conditions.
+  When `:tag`, `:id`, or `:class` are combined, only elements are
+  selected that satisfy all conditions.
 
   When the `:pat` options is used, `:tag`, `:id` and `:class` will
   be ignored.
@@ -378,8 +378,8 @@ defmodule Eml do
   * `:at` -  add new content at begin or end of existing
     content, default is `:end` (`:begin | :end`)
 
-  When `:tag`, `:id`, or `:class` are combined, only element is
-  selected that satisfies all conditions.
+  When `:tag`, `:id`, or `:class` are combined, only elements are
+  selected that satisfy all conditions.
 
 
   ### Examples:
@@ -436,8 +436,8 @@ defmodule Eml do
   * `:parent` - when set to true, selects the parent node
     of the matched node (`boolean`)
 
-  When `:tag`, `:id`, or `:class` are combined, only element is
-  selected that satisfies all conditions.
+  When `:tag`, `:id`, or `:class` are combined, only elements are
+  selected that satisfy all conditions.
 
   When the `:pat` options is used, `:tag`, `:id` and `:class` will
   be ignored.

@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.6.0-dev
+
+ * Enhancements
+
+ * Bug fixes
+  * Some documentation corrections.
+  * Removed duplicate code in `Eml.defhtml/2`
+
+ * Backwards incompatible changes
+
 ## v0.5.0
 
  * Enhancements

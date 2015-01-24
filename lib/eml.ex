@@ -121,7 +121,7 @@ defmodule Eml do
                 import Eml.Template, only: [bind: 2]
                 Eml.compile! unquote(quoted)
               end
-            :html ->
+            :markup ->
               quote do
                 use unquote(lang)
                 import Eml.Template, only: [bind: 2]
@@ -192,10 +192,10 @@ defmodule Eml do
   """
   defmacro defhtml(call, do_block) do
     block = do_block[:do]
-    ast   = do_eml(block, type: :eml)
+    ast   = do_eml(block, type: :markup, use: Eml.Language.Html)
     quote do
       def unquote(call) do
-        Eml.render! unquote(ast)
+        unquote(ast)
       end
     end
   end

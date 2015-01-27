@@ -6,26 +6,25 @@ defmodule Eml.Element do
   creating `Eml.Element` structs, but the functions in this module can be
   valuable when querying, manipulating or transforming `eml`.
   """
-  alias __MODULE__, as: M
+  alias __MODULE__, as: El
 
   defstruct tag: :div, content: [], attrs: %{}
 
-  @type data       :: Eml.data
-  @type content    :: Eml.content
+  @type content       :: [Eml.t]
+  @type attr_name     :: atom
+  @type attr_value    :: String.t | Eml.Parameter.t | [String.t | Eml.Parameter]
+  @type attrs         :: %{ attr_name => attr_value }
+  @type attr_value_in :: String.t | atom | number | Eml.Parameter.t | [String.t | atom | number | Eml.Parameter.t]
+  @type attrs_in      :: [{ attr_name, attr_value_in }]
+                       | %{ attr_name => attr_value_in }
 
-  @type attr_field :: atom
-  @type attr_value :: binary | list(binary) | nil
-  @type attrs      :: list({ attr_field, attr_value })
-                    | %{ attr_field => attr_value }
-  @type fields :: map | [{ atom, any }]
-
-  @type t :: %M{tag: atom, content: content, attrs: map}
+  @type t :: %El{tag: atom, content: content, attrs: attrs}
 
   @default_lang Eml.Language.Native
 
   @doc "Creates a new `Eml.Element` structure with default values."
   @spec new() :: t
-  def new(), do: %M{}
+  def new(), do: %El{}
 
   @doc """
   Creates a new `Eml.Element` structure.
@@ -37,20 +36,20 @@ defmodule Eml.Element do
       {:ok, "<div id='42'>hallo!</div>"}
 
   """
-  @spec new(atom, fields, data, Eml.lang) :: t
+  @spec new(atom, attrs_in, Eml.Parsable.t, Eml.lang) :: t
   def new(tag, attrs \\ %{}, content \\ [], lang \\ @default_lang) when is_atom(tag) and (is_map(attrs) or is_list(attrs)) do
     attrs   = to_attrs(attrs)
-    content = Eml.parse!(content, lang)
-    %M{tag: tag, attrs: attrs, content: content}
+    content = Eml.parse!(content, lang) |> ensure_list()
+    %El{tag: tag, attrs: attrs, content: content}
   end
 
   @doc "Gets the tag of an element."
   @spec tag(t) :: atom
-  def tag(%M{tag: tag}), do: tag
+  def tag(%El{tag: tag}), do: tag
 
   @doc "Sets the tag of an element."
   @spec tag(t, atom) :: t
-  def tag(%M{} = el, tag)
+  def tag(%El{} = el, tag)
   when is_atom(tag), do: %{el| "__tag__": tag}
 
   @doc """
@@ -58,12 +57,12 @@ defmodule Eml.Element do
   Returns `nil` if the `id` attribute is not set for the element.
   """
   @spec id(t) :: attr_value
-  def id(%M{attrs: attrs}), do: attrs[:id]
+  def id(%El{attrs: attrs}), do: attrs[:id]
 
   @doc "Sets the id of an element."
-  @spec id(t, attr_value) :: t
-  def id(%M{attrs: attrs} = el, id),
-  do: %M{el| attrs: Map.put(attrs, :id, to_attr_value(id))}
+  @spec id(t, attr_value_in) :: t
+  def id(%El{attrs: attrs} = el, id),
+  do: %El{el| attrs: Map.put(attrs, :id, to_attr_value(id))}
 
   @doc """
   Gets the class or classes of an element.
@@ -71,7 +70,7 @@ defmodule Eml.Element do
   Multiple classes are stored in the form `["class1", "class2"]`.
   """
   @spec class(t) :: attr_value
-  def class(%M{attrs: attrs}), do: attrs[:class]
+  def class(%El{attrs: attrs}), do: attrs[:class]
 
 
   @doc """
@@ -79,9 +78,9 @@ defmodule Eml.Element do
 
   Multiple classes can be assigned by providing a list of strings.
   """
-  @spec class(t, attr_value) :: t
-  def class(%M{attrs: attrs} = el, class),
-  do: %M{el| attrs: Map.put(attrs, :class, to_attr_value(class))}
+  @spec class(t, attr_value_in) :: t
+  def class(%El{attrs: attrs} = el, class),
+  do: %El{el| attrs: Map.put(attrs, :class, to_attr_value(class))}
 
   @doc """
   Gets the content of an element.
@@ -90,7 +89,7 @@ defmodule Eml.Element do
   content is empty, it returns an empty list.
   """
   @spec content(t) :: content
-  def content(%M{content: content}), do: content
+  def content(%El{content: content}), do: content
 
   @doc """
   Sets the content of an element.
@@ -106,9 +105,9 @@ defmodule Eml.Element do
       #div<["Hallo 2015"]>
 
   """
-  @spec content(t, data, Eml.lang) :: t
-  def content(%M{} = el, data, lang \\ @default_lang) do
-    %M{el| content: Eml.parse!(data, lang)}
+  @spec content(t, Eml.Parsable.t, Eml.lang) :: t
+  def content(%El{} = el, data, lang \\ @default_lang) do
+    %El{el| content: Eml.parse!(data, lang) |> ensure_list()}
   end
 
   @doc """
@@ -127,12 +126,12 @@ defmodule Eml.Element do
       #div<["Hallo 2015 !!!"]>
 
   """
-  @spec add(t, data, Keyword.t) :: t
-  def add(%M{content: current} = el, data, opts \\ []) do
+  @spec add(t, Eml.Parsable.t, Keyword.t) :: t
+  def add(%El{content: current} = el, data, opts \\ []) do
     at      = opts[:at] || :end
     lang  = opts[:lang] || @default_lang
-    content = Eml.parse!(data, current, at, lang)
-    %M{el| content: content}
+    content = Eml.parse!(data, current, at, lang) |> ensure_list()
+    %El{el| content: content}
   end
 
   @doc """
@@ -149,12 +148,12 @@ defmodule Eml.Element do
       #div<["HALLO"]>
 
   """
-  @spec update(t, (Eml.eml_node -> data), Eml.lang) :: t
-  def update(%M{content: content} = el, fun, lang \\ @default_lang) do
+  @spec update(t, (Eml.t -> Eml.Parsable.t), Eml.lang) :: t
+  def update(%El{content: content} = el, fun, lang \\ @default_lang) do
     content = for node <- content, data = fun.(node) do
       Eml.Parsable.parse(data, lang)
     end
-    %M{el| content: content}
+    %El{el| content: content}
   end
 
   @doc """
@@ -173,23 +172,23 @@ defmodule Eml.Element do
       #div<>
 
   """
-  @spec remove(t, Eml.eml_node | content) :: t
-  def remove(%M{content: content} = el, to_remove) do
+  @spec remove(t, Eml.t | content) :: t
+  def remove(%El{content: content} = el, to_remove) do
     to_remove = if is_list(to_remove), do: to_remove, else: [to_remove]
     content = for node <- content, not node in to_remove do
       node
     end
-    %M{el| content: content}
+    %El{el| content: content}
   end
 
   @doc "Gets the attributes map of an element."
   @spec attrs(t) :: attrs
-  def attrs(%M{attrs: attrs}), do: attrs
+  def attrs(%El{attrs: attrs}), do: attrs
 
   @doc "Merges the passed attributes with the current attributes."
-  @spec attrs(t, attrs) :: t
-  def attrs(%M{attrs: current} = el, attrs) when is_map(attrs) or is_list(attrs) do
-    %M{el| attrs: Map.merge(current, to_attrs(attrs))}
+  @spec attrs(t, attrs_in) :: t
+  def attrs(%El{attrs: current} = el, attrs) when is_map(attrs) or is_list(attrs) do
+    %El{el| attrs: Map.merge(current, to_attrs(attrs))}
   end
 
   @doc """
@@ -198,7 +197,7 @@ defmodule Eml.Element do
   If the attribute does not exist, nil is returned.
   """
   @spec attr(t, atom) :: attr_value
-  def attr(%M{attrs: attrs}, field) when is_atom(field) do
+  def attr(%El{attrs: attrs}, field) when is_atom(field) do
     attrs[field]
   end
 
@@ -207,15 +206,15 @@ defmodule Eml.Element do
 
   If the attribute already exists, the old value gets overwritten.
   """
-  @spec attr(t, atom, attr_value) :: t
-  def attr(%M{attrs: attrs} = el, field, value) when is_atom(field) do
-    %M{el| attrs: Map.put(attrs, field, to_attr_value(value))}
+  @spec attr(t, atom, attr_value_in) :: t
+  def attr(%El{attrs: attrs} = el, field, value) when is_atom(field) do
+    %El{el| attrs: Map.put(attrs, field, to_attr_value(value))}
   end
 
   @doc false
-  @spec insert_attr_value(t, atom, attr_value) :: t
-  def insert_attr_value(%M{attrs: attrs} = el, field, value) when is_atom(field) do
-    %M{el| attrs: Map.update(attrs, field, to_attr_value(value), &insert_attr_value(&1, value))}
+  @spec insert_attr_value(t, atom, attr_value_in) :: t
+  def insert_attr_value(%El{attrs: attrs} = el, field, value) when is_atom(field) do
+    %El{el| attrs: Map.update(attrs, field, to_attr_value(value), &insert_attr_value(&1, value))}
   end
 
   defp insert_attr_value(old, new) do
@@ -228,8 +227,8 @@ defmodule Eml.Element do
 
   @doc "Removes an attribute from an element."
   @spec remove_attr(t, atom) :: t
-  def remove_attr(%M{attrs: attrs} = el, field) do
-    %M{el| attrs: Map.delete(attrs, field)}
+  def remove_attr(%El{attrs: attrs} = el, field) do
+    %El{el| attrs: Map.delete(attrs, field)}
   end
 
   @doc """
@@ -247,12 +246,12 @@ defmodule Eml.Element do
       false
   """
   @spec has?(t, Keyword.t) :: boolean
-  def has?(%M{} = el, opts) when is_list(opts) do
+  def has?(%El{} = el, opts) when is_list(opts) do
     { tag, opts }      = Keyword.pop(opts, :tag, :any)
     { id, opts }       = Keyword.pop(opts, :id, :any)
     { class, opts }    = Keyword.pop(opts, :class, :any)
     { content, attrs } = Keyword.pop(opts, :content)
-    content            = Eml.parse!(content, @default_lang)
+    content            = Eml.parse!(content, @default_lang) |> ensure_list()
     content            = if content == [], do: :any, else: content
 
     has_tag?(el, tag)         and
@@ -264,21 +263,21 @@ defmodule Eml.Element do
   def has?(_non_el, _opts), do: false
 
   defp has_tag?(_, :any), do: true
-  defp has_tag?(%M{tag: etag}, tag), do: tag === etag
+  defp has_tag?(%El{tag: etag}, tag), do: tag === etag
 
   defp has_id?(_, :any), do: true
-  defp has_id?(%M{attrs: %{id: eid}}, id), do: id === eid
+  defp has_id?(%El{attrs: %{id: eid}}, id), do: id === eid
   defp has_id?(_, _), do: false
 
   defp has_class?(_, :any), do: true
-  defp has_class?(%M{attrs: %{class: eclass}}, classes) when is_list(classes) do
+  defp has_class?(%El{attrs: %{class: eclass}}, classes) when is_list(classes) do
     Enum.all?(classes, &class?(&1, eclass))
   end
-  defp has_class?(%M{attrs: %{class: eclass}}, class), do: class?(class, eclass)
+  defp has_class?(%El{attrs: %{class: eclass}}, class), do: class?(class, eclass)
   defp has_class?(_, _), do: false
 
   defp has_content?(_, :any), do: true
-  defp has_content?(%M{content: econtent}, content) do
+  defp has_content?(%El{content: econtent}, content) do
     Enum.all?(content, &Kernel.in(&1, econtent))
   end
 
@@ -302,25 +301,25 @@ defmodule Eml.Element do
   def match?(_, :any, :any, :any),
   do: true
 
-  def match?(%M{tag: etag}, tag, :any, :any),
+  def match?(%El{tag: etag}, tag, :any, :any),
   do: tag === etag
 
-  def match?(%M{attrs: %{id: eid}}, :any, id, :any),
+  def match?(%El{attrs: %{id: eid}}, :any, id, :any),
   do: id === eid
 
-  def match?(%M{attrs: %{class: eclass}}, :any, :any, class),
+  def match?(%El{attrs: %{class: eclass}}, :any, :any, class),
   do: class?(class, eclass)
 
-  def match?(%M{tag: etag, attrs: %{id: eid}}, tag, id, :any),
+  def match?(%El{tag: etag, attrs: %{id: eid}}, tag, id, :any),
   do: tag === etag and id === eid
 
-  def match?(%M{tag: etag, attrs: %{class: eclass}}, tag, :any, class),
+  def match?(%El{tag: etag, attrs: %{class: eclass}}, tag, :any, class),
   do: tag === etag and class?(class, eclass)
 
-  def match?(%M{ attrs: %{id: eid, class: eclass}}, :any, id, class),
+  def match?(%El{ attrs: %{id: eid, class: eclass}}, :any, id, class),
   do: id === eid and class?(class, eclass)
 
-  def match?(%M{tag: etag, attrs: %{id: eid, class: eclass}}, tag, id, class),
+  def match?(%El{tag: etag, attrs: %{id: eid, class: eclass}}, tag, id, class),
   do: tag === etag and id === eid and class?(class, eclass)
 
   def match?(_, _, _, _),

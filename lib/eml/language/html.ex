@@ -35,6 +35,7 @@ defmodule Eml.Language.Html do
   end
 
   defmacro __using__(_opts) do
+    Eml.default_alias_and_imports
     quote do
       import Kernel, except: [div: 2]
       import unquote(__MODULE__).Elements

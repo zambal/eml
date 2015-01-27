@@ -202,9 +202,6 @@ defmodule Eml.Language.Html.Renderer do
   end
 
   defp maybe_escape(data, tag \\ nil, opts)
-  defp maybe_escape({ :escaped, data }, _, _) do
-    data
-  end
   defp maybe_escape(data, tag, %{escape: true})
   when not tag in [:script, :style] do
     escape(data)
@@ -261,7 +258,7 @@ defmodule Eml.Language.Html.Renderer do
   defp parse_bindings(bindings) do
     Enum.map(bindings, fn { k, v } ->
       v = (if is_list(v), do: v, else: [v])
-          |> Enum.map(fn v -> Eml.parse(v, Eml.Language.Native) end)
+          |> Enum.map(fn v -> Eml.parse!(v, Eml.Language.Native) end)
       { k, v }
     end)
   end

@@ -3,12 +3,22 @@
 ## v0.6.0-dev
 
  * Enhancements
+   * Introduced `use Eml.Language.Html` as prefered way of defininf markup
+   * Restructured README.md and added new content about precompiling
+   * It's now possible to pass content as the first argument of an element macro, ie. `div "Hello world!"` 
 
  * Bug fixes
-  * Some documentation corrections.
+  * Documentation corrections.
   * Removed duplicate code in `Eml.defhtml/2`
+  * Type specification fixes
+  * `Eml.parse/2` in some cases returned weird results when the input is a list
 
  * Backwards incompatible changes
+  * Removed `Eml.eml/2` in favor of `use Eml.Language.Html`
+  * `Eml.parse/2` now returns results in the form of `{ :ok, res }`, in order to be consistent with render and compile functions
+  * Unless the input of `Eml.parse/2` is a list, if the result is a single element, `Eml.parse/2` now just returns the single element
+    instead of always wrapping the result in a list
+
 
 ## v0.5.0
 

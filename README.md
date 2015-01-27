@@ -14,21 +14,21 @@ To start off:
 
 This piece of code
 ```elixir
-Eml.render! eml do
-  name = "Vincent"
-  age  = 36
+use Eml.Language.Html
 
-  div class: "person" do
-    div do
-      span [], "name: "
-      span [], name
-    end
-    div do
-      span [], "age: "
-      span [], age
-    end
+name = "Vincent"
+age  = 36
+
+div class: "person" do
+  div do
+    span "name: "
+    span name
   end
-end
+  div do
+    span "age: "
+    span age
+  end
+end |> Eml.render!
 ```
 
 produces
@@ -62,54 +62,59 @@ with markup.
 
 ### Walk-through
 
+- [Intro](#intro)
+- [Unpacking](#unpacking)
+- [Rendering](#rendering)
+- [Parsing](#parsing)
+- [Parameters and templates](#parameters-and-templates)
+- [Precompiling](#precompiling)
+- [Querying eml](#querying-eml)
+- [Transforming eml](#transforming-eml)
+- [Languages and parser behaviour](#languages-and-parser-behaviour)
+
+
 #### Intro
 
 ```elixir
-iex(1)> use Eml
+iex> use Eml.Language.Html
 nil
 ```
-Invoking `use Eml` translates to:
+Invoking `use Eml.Language.Html` translates to:
 ```elixir
-import Eml, only: [eml: 1, eml: 2, defeml: 2, defhtml: 2, precompile: 1, precompile: 2, unpack: 1]
 alias Eml.Element
 alias Eml.Template
+import Eml.Template, only: [bind: 2]
+import Kernel, except: [div: 2]
+import Eml.Language.Html.Elements
 ```
 
-The `eml` macro by default imports all generated html element macros
-from `Eml.Language.Html.Elements` in to its local scope. These macro's just translate
-to a call to `Eml.Element.new`, except when used as a pattern in a match operation.
-When used inside a match, the macro will be translated to the for %Eml.Element{...}.
-`eml` returns data of the type `Eml.content`, which is a list of `Eml.eml_node`
-nodes. Nodes can be of the type `binary`, `Eml.Element.t`, `Eml.Parameter.t`,
-or `Eml.Template.t`. We'll focus on binaries and elements for now.
+By invoking `use Eml.Language.Html` all generated html element macros from
+`Eml.Language.Html.Elements` are imported in to the current scope. Note that
+`use Eml.Language.Html` also unimports Kernel.div/2, as it would otherwise clash
+with the div element macro, so if you want to use `Kernel.div/2` in the same scope,
+you'll have to call it with the module name. The element macro's just translate to a
+call to `Eml.Element.new`, except when used as a pattern in a match operation.
+When used inside a match, the macro will be translated to %Eml.Element{...}. The nodes
+of an element can be `String.t`, `Eml.Element.t`, `Eml.Parameter.t`, or `Eml.Template.t`.
+We'll focus on strings and elements for now.
 ```elixir
-iex(2)> eml do: div([], 42)
-[#div<["42"]>]
+iex> div 42
+#div<["42"]>
 ```
 Here we created a `div` element with `"42"` as it contents. Since Eml content's
-only primitive data type is binaries, the integer automatically gets converted.
-Eml also provides the `defeml` macro. It works like defining a regular Elixir
-function, but anything you write in the function definition gets evaluated as if
-it were in an `eml` do block.
+only primitive data type are strings, the integer automatically gets converted.
 
 
 #### Unpacking
 
-To access the `div` element from the returned contents, you can use `unpack`
+To access the contents of the div element, you can use `Eml.unpack/1`
 ```elixir
-iex(3)> unpack eml do: div([], 42)
-#div<["42"]>
-```
-If you want to get the contents of the div element, you can use unpack again
-```elixir
-iex(4)> unpack unpack eml do: div([], 42)
+iex> Eml.unpack div 42
 "42"
 ```
-Since unpacking recursive data this way gets tiring pretty fast, Eml also provides
-a recursive version called `unpackr`. Note that this function, as most others,
-is not automatically imported in to local scope.
+Eml also provides a recursive version called `unpackr`.
 ```elixir
-iex(5)> Eml.unpackr eml do: div([], 42)
+iex> Eml.unpackr div span(42)
 "42"
 ```
 
@@ -120,72 +125,147 @@ Contents can be rendered to a string by calling `Eml.render`.
 Notice that Eml automatically inserts a doctype declaration when
 the html element is the root.
 ```elixir
-iex(6)> Eml.render(eml(do: html(body(div([], 42)))))
+iex> html(body(div(42))) |> Eml.render
 {:ok,
  "<!doctype html>\n<html><body><div>42</div></body>\n</html>"}
 ```
 Eml also provides a version of render that either succeeds, or raises an exception.
 ```elixir
-iex(7)> Eml.render!(eml(do: html(body(div([], 42)))))
-"<!doctype html>\n<html><body><div>42</div></body></html>"
+iex> "text & more" |> div |> body |> html |> Eml.render!
+"<!doctype html>\n<html><body><div>text &amp; more</div></body></html>"
 ```
-In practice, you rarely encounter situations that need as much brackets as in this
-example. Using do blocks, as can be seen in the introductory example,
-is more convenient most of the time.
+As you can see, you can also use Elixir's pipe operator for creating markup.
+However, using do blocks, as can be seen in the introductory example,
+is more convenient most of the time. By default, Eml also converts `&`,
+`<` and `>` characters in content or attribute values to entities, but this
+behaviour can also be switched off.
 
-#### Languages
-Let's turn back to Eml's data types. Mostly you'll be using binaries and elements. In
-order to provide translations from custom data types, Eml provides the `Eml.Parsable`
-protocol. Primitive types are handles by languages.
-
-A language implements the Eml.Language behaviour, providing a `parse`, `render` and
-`element?` function. The `parse` function converts types like strings, integers and
-floats in to eml. The `render` function converts eml in to whatever representation the
-language has. In practice this will be mostly binary. The `element?` function tells
-if the language provides element macros. By default Eml provides two languages:
-`Eml.Language.Native` and `Eml.Language.Html`. `Eml.Language.Native` is a bit of a
-special case, as it has no elements and is used internally in Eml. It is responsible
-for all conversions inside an `eml` block, like the conversion from a integer we saw
-in previous examples. `Eml.Language.Html` however is a language that the Eml core has
-no knowledge of, other than that it is specified as the default language when defining
-markup and is used by default in all parse and render functions. Other languages can be
-implemented as long as it implements the Eml.Language behaviour.
 
 #### Parsing
 
-The `Eml.Language.Html` parser provides a translation from binaries in to Eml content.
+Eml's parser by default converts a string with html content in to Eml content.
 ```elixir
-iex(8)> Eml.parse "<!doctype html>\n<html><body><div>42</div></body></html>"
-[#html<[#body<[#div<["42"]>]>]>]
+iex> Eml.parse "<!doctype html>\n<html><head><meta charset='UTF-8'></head><body><div>42</div></body></html>"
+{:ok, #html<[#head<[#meta<%{charset: "UTF-8"}>]>, #body<[#div<["42"]>]>]>}
+
+iex> Eml.parse "<div class=\"content article\"><h1 class='title'>Title<h1><p class=\"paragraph\">blah &amp; blah</p></div>"
+{:ok, #div<%{class: ["content", "article"]}
+ [#h1<%{class: "title"}
+  ["Title", #h1<[#p<%{class: "paragraph"} ["blah & blah"]>]>]>]>}
 ```
-`Eml.parse` also accepts `Eml.Language.Native` as a parser,
-because it follows the Eml.Language behaviour too.
+
+The html parser is primarily written to parse html rendered by Eml, but it's
+flexible enough to parse most html you throw at it. Most notable missing features
+of the parser are attribute values without quotes and elements that are not properly
+closed.
+
+
+#### Parameters and templates
+
+Parameters and templates can be used in situations where most content
+is static and performance is critical. Templates in Eml are quite
+simple and don't provide any language constructs like template languages.
+This is for good reason. If anything more complex is needed than a
+'fill in the blanks' template, you should use regular `eml`.
+
+Let's start with a simple example
 ```elixir
-iex(9)> Eml.parse("<div>42</div>", Eml.Language.Native)
-["<div>42</div>"]
+iex> e = Eml.parse!(h1 [:atoms, " ", :are, " ", :converted, " ", :to_parameters])
+#h1<[#param:atoms, " ", #param:are, " ", #param:converted, " ",
+ #param:to_parameters]>
+
+iex> Eml.render!(e, atoms: "Atoms", are: "are", converted: "converted", to_parameters: "to parameters.")
+"<h1>Atoms are converted to parameters.</h1>"
+
+iex> Eml.render!(e, [], render_params: true)
+"<h1>#param{atoms} #param{are} #param{converted} #param{to_parameters}</h1>"
+
+iex> { :ok, unbound } = Eml.compile(e)
+{ :ok, #Template<[:atoms, :are, :converted, :to_parameters]> }
+
+iex> t = Eml.Template.bind(unbound, atoms: "Atoms", are: "are")
+#Template<[:converted, :to_parameters]>
+
+iex> bound = Eml.Template.bind(t, converted: "converted", to_parameters: "to parameters.")
+#Template<BOUND>
+
+iex> Eml.render!(bound)
+"<h1>Atoms are converted to parameters.</h1>"
 ```
-No conversion of strings is performed by the native parser.
-Here are a few other examples of conversion the native parser
-performs.
+When creating eml, atoms are automatically converted to parameters.
+Whenever you render eml with the `render_params: true` option, parameters
+are converted in to a string representation. If Eml parses back html that
+contains these strings, it will automatically convert those in to parameters.
+To bind data to parameters in eml, you can either compile eml data to a template
+and use its various binding options, or you can directly bind data to parameters
+by providing bindings to `Eml.render`. If there are still unbound parameters left,
+`Eml.render` will return a error. The output of templates on Elixir's shell provide
+s some information about their state. The returned template in the 4th example
+tells that it has four unbound parameters. The returned template in the second last
+example tells that whatever parameters it has, they are all bound and the template
+is ready to render. Parameters with the same name can occur multiple times in a
+template.
+
+#### Precompiling
+
+Eml also provides a precompile macro. `eml` code inside a precompile block will be
+compiled to a template during compile time of your project. In other words, the code
+gets evaluated when for example you invoke `mix compile`. the precompile macro can be
+called in two ways: inside a function and inside a module. When called inside a
+function it will return the compiled template and when called inside a module it will
+define a function that returns the template when called. Lets start with an example
+that uses precompile in a function (or in this case, in the interpreter)
 ```elixir
-iex(10)> Eml.parse(nil, Eml.Language.Native)
-[]
-
-iex(11)> Eml.parse([1, 2, (eml do: h1([], "hello")), 4], Eml.Language.Native)
-["12", #h1<["hello"]>, "4"]
-
-iex(12)> Eml.parse([a: 1, b: 2], Eml.Language.Native)
-{:error, "Unparsable data: {:a, 1}"}
-
-iex(13)> Eml.parse(["Hello ", [2014, ["!"]]], Eml.Language.Native)
-["Hello 2014!"]
+# Calling `use Eml` imports its macro's
+iex> use Eml
+iex> t = precompile do
+...>   div do
+...>     span :a
+...>     span :b
+...>   end
+...> end
+#Template<[:a, :b]>
+iex> Eml.render! t, a: 1, b: 2
+"<div><span>1</span><span>2</span></div>"
 ```
-`nil` is a non-existing value in Eml. As will be later shown, it can be used to discard
-nodes when traversing an eml tree. The other examples show the parser also tries to
-concatenate all binary data. Furthermore, although Eml content is always a list, its
-nodes can not be lists. The native parser thus flattens all input data in order to
-guarantee Eml content always is a single list. Tuples aren't supported by default,
-as can be seen in the last example.
+
+Of course, calling `precompile` from iex doesn't make much sense, because the
+precompiling is done on the fly and doesn't give any performance benefits
+compared to `Eml.compile`.
+
+An example using precompile in a module
+```elixir
+iex> defmodule PrecompileTest do
+...>   use Eml
+...>   precompile my_template do
+...>     div do
+...>       span :a
+...>       span :b
+...>     end
+...>   end
+...> end
+{:module, PrecompileTest,
+ <<...>>,
+ {:my_template, 1}}
+iex> PrecompileTest.my_template(a: 42, b: 43) |> Eml.render!
+"<div><span>42</span><span>43</span></div>"
+```
+
+As you can see, using precompile in a module defines a function that (optionally) accepts a
+list of bindings.
+
+Instead of defining a block of `eml`, `precompile` also accepts a path to a file. See the
+documentation for more info about the options of `precompile`
+
+**WARNING**
+
+Since the code in a precompile block is evaluated during compile time, you can't call
+functions or macro's from the same module, since the module isn't compiled yet. Also
+you can't reliably call functions or macro's from other modules in the same project as
+they might still not be compiled. Calling functions or macro's from dependencies should
+work, as Elixir always compiles dependencies before the project itself.
+
+Generally, you want to keep your templates as pure as possible.
 
 
 #### Querying eml
@@ -193,34 +273,31 @@ as can be seen in the last example.
 `Eml.Element` implements the Elixir `Enumerable` protocol for traversing a tree of
 nodes. Let's start with creating something to query
 ```elixir
-iex(14)> e = eml do
-...(14)>   html do
-...(14)>     head class: "head" do
-...(14)>       meta charset: "UTF-8"
-...(14)>     end
-...(14)>     body do
-...(14)>       article id: "main-content" do
-...(14)>         section class: ["intro", "article"] do
-...(14)>           h3 [], "Hello world"
-...(14)>         end
-...(14)>         section class: ["conclusion", "article"] do
-...(14)>           "TODO"
-...(14)>         end
-...(14)>       end
-...(14)>     end
-...(14)>   end
-...(14)> end
-[#html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>,
-  #body<[#article<%{id: "main-content"}
-   [#section<%{class: ["intro", "article"]} [#h3<["Hello world"]>]>,
-    #section<%{class: ["conclusion", "article"]} ["TODO"]>]>]>]>]
+iex> e = html do
+...>   head class: "head" do
+...>     meta charset: "UTF-8"
+...>   end
+...>   body do
+...>     article id: "main-content" do
+...>       section class: ["intro", "article"] do
+...>         h3 "Hello world"
+...>       end
+...>       section class: ["conclusion", "article"] do
+...>         "TODO"
+...>       end
+...>     end
+...>   end
+...> end
+#html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>,
+ #body<[#article<%{id: "main-content"}
+  [#section<%{class: ["intro", "article"]} [#h3<["Hello world"]>]>,
+   #section<%{class: ["conclusion", "article"]} ["TODO"]>]>]>]>
 ```
-
 If we want to traverse the complete tree, we should unpack the result from `eml`,
 because otherwise we would pass a list with one argument to an `Enum` function. To
 get an idea how the tree is traversed, first just print all nodes
 ```elixir
-iex(15)> Enum.each(unpack(e), fn x -> IO.puts(inspect x) end)
+iex> Enum.each(e, fn x -> IO.puts(inspect x) end)
 #html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>, #body<[#article<%{id: "main-content"} [#section<%{class: ["intro", "article"]} [#h3<["Hello world"]>]>, #section<%{class: ["conclusion", "article"]} ["TODO"]>]>]>]>
 #head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>
 #meta<%{charset: "UTF-8"}>
@@ -237,18 +314,18 @@ iex(15)> Enum.each(unpack(e), fn x -> IO.puts(inspect x) end)
 As you can see every node of the tree is passed to `Enum`.
 Let's continue with some other examples
 ```elixir
-iex(16)> Enum.member?(unpack(e), "TODO")
+iex> Enum.member?(e, "TODO")
 true
 
 # `Eml.Element` is automatically aliased as `Element` when `use Eml` is invoked.
-iex(17)> Enum.filter(unpack(e), &Element.has?(&1, tag: :h3))
+iex> Enum.filter(e, &Eml.Element.has?(&1, tag: :h3))
 [#h3<["Hello world"]>]
 
-iex(18)> Enum.filter(unpack(e), &Element.has?(&1, class: "article"))
+iex> Enum.filter(e, &Eml.Element.has?(&1, class: "article"))
 [#section<%{class: ["intro", "article"]} [#h3<["Hello world"]>]>,
  #section<%{class: ["conclusion", "article"]} ["TODO"]>]
 
-iex(19)> Enum.filter(unpack(e), &Element.has?(&1, tag: :h3, class: "article"))
+iex> Enum.filter(e, &Eml.Element.has?(&1, tag: :h3, class: "article"))
 []
 ```
 
@@ -258,27 +335,27 @@ Note that you don't need to unpack, as `Eml.select` and all Eml transformation
 functions work recursively with lists. Check the docs for more info about
 the options `Eml.select` accepts.
 ```elixir
-iex(20)> Eml.select(e, class: "article")
+iex> Eml.select(e, class: "article")
 [#section<%{class: ["intro", "article"]} [#h3<["Hello world"]>]>,
  #section<%{class: ["conclusion", "article"]} ["TODO"]>]
 
 # using `parent: true` instructs `Eml.select` to select the parent
 # of the matched node(s)
-iex(21)> Eml.select(e, tag: :meta, parent: true)
+iex> Eml.select(e, tag: :meta, parent: true)
 [#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>]
 
 # when using the :pat option, a regular expression can be used to
 # match binary content
-iex(22)> Eml.select(e, pat: ~r/H.*d/)
+iex> Eml.select(e, pat: ~r/H.*d/)
 ["Hello world"]
 
-iex(23)> Eml.select(e, pat: ~r/TOD/, parent: true)
+iex> Eml.select(e, pat: ~r/TOD/, parent: true)
 [#section<%{class: ["conclusion", "article"]} ["TODO"]>]
 
-iex(24)> Eml.member?(e, class: "head")
+iex> Eml.member?(e, class: "head")
 true
 
-iex(25)> Eml.member?(e, tag: :article, class: "conclusion")
+iex> Eml.member?(e, tag: :article, class: "conclusion")
 false
 ```
 
@@ -286,41 +363,40 @@ false
 #### Transforming eml
 
 Eml provides three high-level constructs for transforming eml: `Eml.update`,
-`Eml.remove`, and `Eml.add`. The last doesn't have the `:pat` option, but
-has an `:at` option instead. Like `Eml.select` they traverse the complete
+`Eml.remove`, and `Eml.add`. Like `Eml.select` they traverse the complete
 eml tree. Check the docs for more info about these functions. The following
 examples work with the same eml snippet as in the previous section.
 
 ```elixir
-iex(26)> Eml.remove(e, class: "article")
-[#html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>,
-  #body<[#article<%{id: "main-content"}>]>]>]
+iex> Eml.remove(e, class: "article")
+#html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>,
+ #body<[#article<%{id: "main-content"}>]>]>
 
-iex(27)> Eml.remove(e, pat: ~r/orld/)
-[#html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>,
-  #body<[#article<%{id: "main-content"}
-   [#section<%{class: ["intro", "article"]} [#h3<>]>,
-    #section<%{class: ["conclusion", "article"]} ["TODO"]>]>]>]>]
+iex> Eml.remove(e, pat: ~r/orld/)
+#html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>,
+ #body<[#article<%{id: "main-content"}
+  [#section<%{class: ["intro", "article"]} [#h3<>]>,
+   #section<%{class: ["conclusion", "article"]} ["TODO"]>]>]>]>
 
-iex(28)> Eml.update(e, &String.downcase(&1), pat: ~r/.*/)
-[#html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>,
-  #body<[#article<%{id: "main-content"}
-   [#section<%{class: ["intro", "article"]} [#h3<["hello world"]>]>,
-    #section<%{class: ["conclusion", "article"]} ["todo"]>]>]>]>]
+iex> Eml.update(e, &String.downcase(&1), pat: ~r/.*/)
+#html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>,
+ #body<[#article<%{id: "main-content"}
+  [#section<%{class: ["intro", "article"]} [#h3<["hello world"]>]>,
+   #section<%{class: ["conclusion", "article"]} ["todo"]>]>]>]>
 
-iex(29)> Eml.add(e, eml(do: section([class: "pre-intro"}, "....")), id: "main-content", at: :begin)
-[#html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>,
-  #body<[#article<%{id: "main-content"}
-   [#section<%{class: "pre-intro"} ["...."]>,
-    #section<%{class: ["intro", "article"]} [#h3<["Hello world"]>]>,
-    #section<%{class: ["conclusion", "article"]} ["TODO"]>]>]>]>]
+iex> Eml.add(e, section([class: "pre-intro"], "...."), id: "main-content", at: :begin)
+#html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>,
+ #body<[#article<%{id: "main-content"}
+  [#section<%{class: "pre-intro"} ["...."]>,
+   #section<%{class: ["intro", "article"]} [#h3<["Hello world"]>]>,
+   #section<%{class: ["conclusion", "article"]} ["TODO"]>]>]>]>
 
-iex(30)> Eml.add(e, eml(do: section([class: "post-conclusion"}, "....")), id: "main-content", at: :end)
-[#html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>,
-  #body<[#article<%{id: "main-content"}
-   [#section<%{class: ["intro", "article"]} [#h3<["Hello world"]>]>,
-    #section<%{class: ["conclusion", "article"]} ["TODO"]>,
-    #section<%{class: "post-conclusion"} ["...."]>]>]>]>]
+iex> Eml.add(e, section([class: "post-conclusion"], "...."), id: "main-content", at: :end)
+#html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>,
+ #body<[#article<%{id: "main-content"}
+  [#section<%{class: ["intro", "article"]} [#h3<["Hello world"]>]>,
+   #section<%{class: ["conclusion", "article"]} ["TODO"]>,
+   #section<%{class: "post-conclusion"} ["...."]>]>]>]>
 ```
 
 Eml also provides `Eml.transform`. All functions from the previous section are
@@ -332,14 +408,14 @@ function. The transformation function can return any parsable data or `nil`,
 in which case the node is discarded, so it works a bit like a map and filter
 function in one pass.
 ```elixir
-iex(31)> Eml.transform(e, fn x -> if Element.has?(x, class: "article"), do: Element.content(x, "#"), else: x end)
-[#html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>,
-  #body<[#article<%{id: "main-content"}
-   [#section<%{class: ["intro", "article"]} ["#"]>,
-    #section<%{class: ["conclusion", "article"]} ["#"]>]>]>]>]
+iex> Eml.transform(e, fn x -> if Element.has?(x, class: "article"), do: Element.content(x, "#"), else: x end)
+#html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>,
+ #body<[#article<%{id: "main-content"}
+  [#section<%{class: ["intro", "article"]} ["#"]>,
+   #section<%{class: ["conclusion", "article"]} ["#"]>]>]>]>
 
-iex(32)> Eml.transform(e, fn x -> if Element.has?(x, class: "article"), do: Element.content(x, "#"), else: nil end)
-[]
+iex> Eml.transform(e, fn x -> if Element.has?(x, class: "article"), do: Element.content(x, "#"), else: nil end)
+nil
 ```
 The last result may seem unexpected, but the `section` elements aren't
 returned because `Eml.transform` first evaluates a parent node, before
@@ -347,62 +423,49 @@ continuing with its children. If the parent node gets removed,
 the children will be removed too and won't get evaluated.
 
 
-#### Parameters and templates
+#### Languages and parser behaviour
 
-Parameters and templates can be used in situations where most content
-is static and performance is critical. Templates in Eml are quite
-simple and don't provide any language constructs like template languages.
-This is for good reason. If anything more complex is needed than a
-'fill in the blanks' template, you should use regular eml.
+Let's turn back to Eml's data types. Mostly you'll be using strings and elements. In
+order to provide translations from custom data types, Eml provides the `Eml.Parsable`
+protocol. Primitive types are handles by languages.
 
-Let's start with a simple example
+A language implements the Eml.Language behaviour, providing a `parse`, `render` and
+`element?` function. The `parse` function converts types like strings, integers and
+floats in to eml. The `render` function converts eml in to whatever representation the
+language has. In practice this will be mostly binary. The `element?` function tells
+if the language provides element macros. By default Eml provides two languages:
+`Eml.Language.Native` and `Eml.Language.Html`. `Eml.Language.Native` is a bit of a
+special case, as it has no elements and is used internally in Eml. It is responsible
+for all conversions inside an `eml` block, like the conversion from a integer we saw
+in previous examples. `Eml.Language.Html` however is a language that the Eml core has
+no knowledge of, other than that it is specified as the default language when defining
+markup and is used by default in all parse and render functions. Other languages can be
+implemented as long as it implements the Eml.Language behaviour. The parser also tries to
+concatenate all binary data. Furthermore, although Eml content is always a list, its
+nodes can not be lists. The native parser thus flattens all input data in order to
+guarantee Eml content always is a single list.
+
+
+Some examples using `Eml.parse` using `Eml.Language.Native`:
 ```elixir
-iex(33)> e = eml do: [:atoms, " ", :are, " ", :converted, " ", :to_parameters]
-[#param:atoms, " ", #param:are, " ", #param:converted, " ",
- #param:to_parameters]
+iex> Eml.parse(nil, Eml.Language.Native)
+[]
 
-iex(34)> Eml.render!(e, atoms: "Atoms", are: "are", converted: "converted", to_parameters: "to parameters.")
-"Atoms are converted to parameters."
+iex> Eml.parse([1, 2, h1("hello"), 4], Eml.Language.Native)
+["12", #h1<["hello"]>, "4"]
 
-iex(34)> Eml.render!(e, [], render_params: true)
-"#param{atoms} #param{are} #param{converted} #param{to_parameters}"
+iex> Eml.parse([a: 1, b: 2], Eml.Language.Native)
+{:error, "Unparsable data: {:a, 1}"}
 
-iex(36)> unbound = Eml.compile(e)
-#Template<[:atoms, :are, :converted, :to_parameters]>
-
-# `Eml.Template` is automatically aliased as `Template` when `use Eml` is invoked.
-iex(37)> t = Template.bind(unbound, atoms: "Atoms", are: "are")
-#Template<[:converted, :to_parameters]>
-
-iex(38)> bound = Template.bind(t, converted: "converted", to_parameters: "to parameters.")
-#Template<BOUND>
-
-iex(39)> Eml.render!(bound)
-"Atoms are converted to parameters."
+iex> Eml.parse(["Hello ", ["world", ["!"]]], Eml.Language.Native)
+["Hello world!"]
 ```
-When creating eml, atoms are automatically converted to parameters.
-Whenever you render eml with the `render_params: true` option, parameters
-are converted in to a string representation. If Eml parses back html that
-contains these strings, it will automatically convert those in to parameters.
-To bind data to parameters in eml, you can either compile eml data to a template
-and use its various binding options, or you can directly bind data to parameters
-by providing bindings to `Eml.render`. If there are still unbound parameters left,
-`Eml.render` will return a error. The output of templates on Elixir's shell provide
-s some information about their state. The returned template at `iex(36)` tells that
-it has four unbound parameters. The returned template at `iex(38)` tells that
-whatever parameters it has, they are all bound and the template is ready to render.
-Parameters with the same name can occur multiple times in a template. 
 
 ### Notes
 
 The first thing to note is that this is still a work in progress.
 While it should already be pretty stable and has quite a rich API,
 expect some raw edges here and there.
-
-#### Escaping
-Hardly any work has gone into proper escaping of characters.
-Eml currently assumes utf8 content for strings and only escapes `<`,
- `>` and `&` characters.
 
 #### Security
 Obviously, as Eml has full access to the Elixir environment,
@@ -424,10 +487,10 @@ The main purpose of the html parser is to parse back generated html
 from Eml. It's a custom parser written in about 500 LOC,
 so don't expect it to successfully parse every html in the wild.
 
-Most notably, it doesn't understand arbitrary elements without proper
-closing, like `<div>`. An element should always be written as `<div/>`,
-or `<div></div>`. However, explicit exceptions are made for void elements
-that are expected to never have any child elements.
+Most notably, it doesn't understand attribute values without quotes and arbitrary
+elements without proper closing, like `<div>`. An element should always be written
+as `<div/>`, or `<div></div>`. However, explicit exceptions are made for void
+elements that are expected to never have any child elements.
 
 The bottom line is that whenever the parser fails to parse back generated
 html from Eml, it is a bug and please report it. Whenever it fails to

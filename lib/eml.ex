@@ -9,21 +9,21 @@ defmodule Eml do
 
   This piece of code
   ```elixir
-  Eml.render! eml do
-    name = "Vincent"
-    age  = 36
+  use Eml.Language.Html
 
-    div class: "person" do
-      div do
-        span [], "name: "
-        span [], name
-      end
-      div do
-        span [], "age: "
-        span [], age
-      end
+  name = "Vincent"
+  age  = 36
+
+  div class: "person" do
+    div do
+      span "name: "
+      span name
     end
-  end
+    div do
+      span "age: "
+      span age
+    end
+  end |> Eml.render!
   ```
 
   produces
@@ -50,56 +50,14 @@ defmodule Eml do
 
   @default_lang Eml.Language.Html
 
-  @type eml_node  :: binary | Eml.Element.t | Eml.Parameter.t | Eml.Template.t
-  @type content  :: [eml_node]
-  @type t        :: eml_node | content
-  @type data     :: Eml.Parsable.t
-  @type error    :: { :error, term }
-  @type lang     :: atom
-  @type path     :: binary
+  @type t             :: String.t | Eml.Element.t | Eml.Parameter.t | Eml.Template.t
+  @type enumerable    :: Eml.Element.t | [Eml.Element.t]
+  @type transformable :: t | [t]
+  @type error         :: { :error, term }
+  @type lang          :: module
 
   @type unpackr_result  :: funpackr_result | [unpackr_result]
-  @type funpackr_result :: binary | Eml.Parameter.t | Eml.Template.t | [binary | Eml.Parameter | Eml.Template.t]
-
-  @doc """
-  Define eml content.
-
-  Just like in other Elixir blocks, evaluates all expressions
-  and returns the last. Code inside an eml block is just
-  regular Elixir code. The purpose of the `eml/2` macro
-  is to make it more convenient to render eml.
-
-  It does this by doing two things:
-
-  * Provide a lexical scope where all element macro's are imported to
-  * Parse the last expression of the block in order to guarantee valid eml content
-
-  To illustrate, the expressions below all produce the same output:
-
-  * ```elixir
-    eml do: div([], 42)
-
-  * ```elixir
-    Eml.Element.new(:div, %{}, 42) |> Eml.parse!(Eml.Language.Native)
-
-  * ```elixir
-    Eml.Element.Html.div([], 42) |> Eml.parse!(Eml.Language.Native)
-
-  Note that since the Elixir `Kernel` module by default imports the `div/2`
-  function in to the global namespace, this function is inside an eml block
-  only available as `Kernel.div/2`.
-
-  Instead of defining a do block, you can also provide a path to a file
-  with eml content. See `Eml.precompile/2` for an example with
-  an external file.
-
-  """
-  defmacro eml(opts, block \\ []) do
-    block = block[:do] || opts[:do]
-    opts  = Keyword.put_new(opts, :type, :eml)
-    opts  = Keyword.put(opts, :precompile, false)
-    do_eml(block, opts)
-  end
+  @type funpackr_result :: String.t | Eml.Parameter.t | Eml.Template.t | [String.t | Eml.Parameter | Eml.Template.t]
 
   @doc false
   def do_eml(quoted \\ nil, opts) do
@@ -131,7 +89,7 @@ defmodule Eml do
               quote do
                 use unquote(lang)
                 import Eml.Template, only: [bind: 2]
-                Eml.parse! unquote(quoted), Eml.Language.Native
+                unquote(quoted)
               end
           end
     if opts[:precompile] do
@@ -151,13 +109,13 @@ defmodule Eml do
   This:
 
   ```elixir
-  defeml mydiv(content), do: div(%{}, content)
+  defeml mydiv(content), do: div(content)
   ```
 
   is effectively the same as:
 
   ```elixir
-  def mydiv(content), do: eml do div(%{}, content) end
+  def mydiv(content), do: eml do div(content) end
   ```
 
   """
@@ -322,7 +280,7 @@ defmodule Eml do
       [#span<%{id: "inner1", class: "inner"} ["hello "]>]
 
   """
-  @spec select(t) :: t
+  @spec select(enumerable) :: [t]
   def select(eml, opts \\ [])
 
   def select(content, opts) when is_list(content) do
@@ -402,7 +360,7 @@ defmodule Eml do
       "<div><span id='inner1' class='inner'>hello </span><span id='inner2' class='inner'>world</span><span>!</span></div>"
 
   """
-  @spec add(t, data, Keyword.t) :: t
+  @spec add(transformable, Eml.Parsable.t, Keyword.t) :: transformable
   def add(eml, data, opts \\ []) do
     tag     = opts[:tag] || :any
     id      = opts[:id] || :any
@@ -465,7 +423,7 @@ defmodule Eml do
       "<div><span id='inner1' class='inner'>HELLO </span><span id='inner2' class='inner'>WORLD</span></div>"
 
   """
-  @spec update(t, (eml_node -> data), Keyword.t) :: t
+  @spec update(transformable, (t -> Eml.Parsable.t), Keyword.t) :: transformable
   def update(eml, fun, opts \\ []) do
     tag            = opts[:tag] || :any
     id             = opts[:id] || :any
@@ -531,7 +489,7 @@ defmodule Eml do
         #span<%{id: "inner2", class: "inner"}>]>]
 
   """
-  @spec remove(t, Keyword.t) :: t
+  @spec remove(transformable, Keyword.t) :: transformable
   def remove(eml, opts \\ []) do
     tag            = opts[:tag] || :any
     id             = opts[:id] || :any
@@ -600,7 +558,7 @@ defmodule Eml do
       true
 
   """
-  @spec member?(t, Keyword.t) :: boolean
+  @spec member?(enumerable, Keyword.t) :: boolean
   def member?(eml, opts) do
     case select(eml, opts) do
       [] -> false
@@ -654,7 +612,7 @@ defmodule Eml do
         #span<%{id: "inner2", class: "inner"} ["world"]>]>]
 
   """
-  @spec transform(t, (eml_node -> data), lang) :: t | nil
+  @spec transform(transformable, (t -> Eml.Parsable.t), lang) :: transformable | nil
   def transform(eml, fun, lang \\ Eml.Language.Native)
 
   def transform(eml, fun, lang) when is_list(eml) do
@@ -691,47 +649,75 @@ defmodule Eml do
       ["123456 true false"]
 
   """
-  @spec parse(data, lang) :: t | error
+  @spec parse(Eml.Parsable.t, lang) :: { :ok, t | [t] } | error
   def parse(data, lang \\ @default_lang) do
-    parse(data, [], :begin, lang)
+    case parse(data, [], :begin, lang) do
+      { :error, e } ->
+        { :error, e }
+      [res] ->
+        if is_list(data) do
+          { :ok, [res] }
+        else
+          { :ok, res }
+        end
+      [] ->
+        if is_list(data) do
+          { :ok, [] }
+        else
+          { :ok, "" }
+        end
+      list when is_list(list) ->
+        { :ok, list }
+    end
   end
 
   @doc """
   Same as `Eml.parse/2`, except that it raises an exception, instead of returning an
   error tuple in case of an error.
   """
-  @spec parse!(data, lang) :: t
+  @spec parse!(Eml.Parsable.t, lang) :: t | [t]
   def parse!(data, lang \\ @default_lang) do
     case parse(data, lang) do
       { :error, e } ->
         raise ArgumentError, message: "Error #{inspect e}"
-      eml -> eml
+      { :ok, eml } ->
+        eml
     end
   end
 
   @doc false
-  @spec parse(data | error, content, atom, lang) :: t | error
-  def parse(data, content, at, lang \\ Eml.Languages.Native)
+  @spec parse(Eml.Parsable.t | error, [t], atom, lang) :: t | [t] | error
+  def parse(data, acc, at, lang \\ Eml.Languages.Native)
 
   # Error pass through
   def parse({ :error, e }, _, _, _), do: { :error, e }
 
   # No-ops
-  def parse(nondata, content, _, _)
-  when nondata in [nil, "", []], do: content
+  def parse(nondata, acc, _, _)
+  when nondata in [nil, "", []], do: acc
 
   # Handle lists
 
-  def parse(data, content, :end, lang)
-  when is_list(data), do: add_content(data, :lists.reverse(content), :end, lang) |> :lists.reverse()
+  def parse(data, acc, :end, lang)
+  when is_list(data), do: add_nodes(data, :lists.reverse(acc), :end, lang) |> :lists.reverse()
 
-  def parse(data, content, :begin, lang)
-  when is_list(data), do: add_content(:lists.reverse(data), content, :begin, lang)
+  def parse(data, acc, :begin, lang)
+  when is_list(data), do: add_nodes(:lists.reverse(data), acc, :begin, lang)
 
-  def parse(data, content, mode, lang) do
+  def parse(data, acc, mode, lang) do
     case Parsable.parse(data, lang) do
-      { :error, e } -> { :error, e }
-      node       -> add_node(node, content, mode)
+      { :error, e } ->
+        { :error, e }
+      [node] ->
+        add_node(node, acc, mode)
+      nodes when is_list(nodes) ->
+        if mode == :begin do
+          add_nodes(:lists.reverse(nodes), acc, mode, lang)
+        else
+          add_nodes(nodes, acc, mode, lang)
+        end
+      node ->
+        add_node(node, acc, mode)
     end
   end
 
@@ -775,23 +761,23 @@ defmodule Eml do
     end
   end
 
-  defp add_content([h | t], content, mode, lang) do
-    content = if is_list(h) and mode === :end,
-                do: add_content(h, content, mode, lang),
-              else: parse(h, content, mode, lang)
-    add_content(t, content, mode, lang)
+  defp add_nodes([h | t], acc, mode, lang) do
+    acc = if is_list(h) and mode === :end,
+                do: add_nodes(h, acc, mode, lang),
+              else: parse(h, acc, mode, lang)
+    add_nodes(t, acc, mode, lang)
   end
 
-  defp add_content([], content, _, _),
-  do: content
+  defp add_nodes([], acc, _, _),
+  do: acc
 
   @doc false
-  @spec parse!(data | error, content, atom, lang) :: t
-  def parse!(data, content, at, lang \\ @default_lang) do
-    case parse(data, content, at, lang) do
+  @spec parse!(Eml.Parsable.t | error, [t], atom, lang) :: t
+  def parse!(data, acc, at, lang \\ @default_lang) do
+    case parse(data, acc, at, lang) do
       { :error, e } ->
         raise ArgumentError, message: "Error #{e}"
-      content -> content
+      acc -> acc
     end
   end
 
@@ -860,8 +846,6 @@ defmodule Eml do
   """
   @spec compile(t, Eml.Template.bindings, Keyword.t) :: { :ok, Eml.Template.t } | error
   def compile(eml, bindings \\ [], opts \\ []) do
-    # for consistence, when compiling eml we always want to return a template, even if
-    # there are no parameters at all, or all of them are bound.
     { lang, opts } = Keyword.pop(opts, :lang, @default_lang)
     opts = Keyword.put(opts, :bindings, bindings)
     opts = Keyword.put(opts, :mode, :compile)
@@ -950,51 +934,29 @@ defmodule Eml do
   @doc """
   Returns the type of content.
 
-  The types are `:content`, `:binary`, `:element`, `:template`, `:parameter`, or `:undefined`.
+  The types are `:binary`, `:element`, `:template`, `:parameter`, or `:undefined`.
   """
-  @spec type(content) :: :content | :binary | :element | :template | :parameter | :undefined
-  def type(content)
-  when is_list(content) do
-    if Enum.any?(content, fn el -> type(el) === :undefined end) do
-      :undefined
-    else
-      :content
-    end
-  end
-
-  def type(bin)
-  when is_binary(bin), do: :binary
-
+  @spec type(t) :: :binary | :element | :template | :parameter | :undefined
+  def type(bin) when is_binary(bin), do: :binary
   def type(%Element{}), do: :element
-
   def type(%Template{}), do: :template
-
   def type(%Eml.Parameter{}), do: :parameter
-
   def type(_), do: :undefined
 
+  @doc false
+  def default_alias_and_imports do
+    quote do
+      alias Eml.Element
+      alias Eml.Template
+      import Eml.Template, only: [bind: 2]
+    end
+  end
+    
   # use Eml
 
-  defmacro __using__(opts) do
-    imports =
-      if opts[:imports] != false do
-        quote do
-          import Eml, only: [eml: 1, eml: 2, defeml: 2, defhtml: 2, precompile: 1, precompile: 2, unpack: 1]
-        end
-      else
-        quote do: require Eml
-      end
-    aliases =
-      if opts[:aliases] != false do
-        quote do
-          alias Eml.Element
-          alias Eml.Template
-        end
-      end
+  defmacro __using__(_) do
     quote do
-      require Eml.Element
-      unquote(imports)
-      unquote(aliases)
+      import Eml, only: [defeml: 2, defhtml: 2, precompile: 1, precompile: 2]
     end
   end
 end

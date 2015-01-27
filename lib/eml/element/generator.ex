@@ -48,6 +48,8 @@ defmodule Eml.Element.Generator do
       { [{ :do, content}], _ }                        -> { (quote do: %{}), content }
       { attrs, [{ :do, {:"__block__", _, content}}] } -> { attrs, content }
       { attrs, [{ :do, content}] }                    -> { attrs, content }
+      { [{ _, _ } | _] = attrs, [] }                  -> { attrs, [] }
+      { content, [] }                                 -> { (quote do: %{}), content }
       { attrs, content }                              -> { attrs, content }
     end
   end

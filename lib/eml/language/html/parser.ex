@@ -3,7 +3,7 @@ defmodule Eml.Language.Html.Parser do
 
   # API
 
-  @spec parse(binary, atom) :: Eml.eml_node | Eml.error
+  @spec parse(binary, atom) :: Eml.t | Eml.error
   def parse(html, BitString) do
     res = case tokenize(html, { :blank, [] }, [], :blank) do
             { :error, state } ->

@@ -16,7 +16,7 @@ defmodule Eml.Template do
       ...>       p [], :title
       ...>     end
       ...>   end
-      ...> end |> Eml.compile
+      ...> end |> Eml.compile!
       #Template<[:title, :url]>
       iex> t = Template.bind(t, url: "http://i.imgur.com/4xPWp.jpg")
       #Template<[:title]>
@@ -30,7 +30,7 @@ defmodule Eml.Template do
   defstruct chunks: [], bindings: []
 
   @type chunks   :: [binary | Eml.Parameter.t]
-  @type bindings :: [{ Eml.Parameter.id, Eml.data }]
+  @type bindings :: [{ Eml.Parameter.id, Eml.Parsable.t }]
   @type t        :: %M{ chunks: chunks, bindings: bindings }
 
   @lang Eml.Language.Native
@@ -48,7 +48,7 @@ defmodule Eml.Template do
   Binds a value to parameters by providing a parameter ids
   and value.
   """
-  @spec bind(t, Eml.Parameter.id, Eml.data) :: t
+  @spec bind(t, Eml.Parameter.id, Eml.Parsable.t) :: t
   def bind(t, param_id, data)
   when is_atom(param_id), do: bind(t, [{ param_id, data }])
 

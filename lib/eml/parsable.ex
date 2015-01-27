@@ -22,7 +22,7 @@ defimpl Eml.Parsable, for: Float do
 end
 
 defimpl Eml.Parsable, for: Tuple do
-  def parse(data, lang), do: lang.parse(data, Tuple)
+  def parse(data, _lang), do: { :error, "Unparsable data: #{inspect data}" }
 end
 
 defimpl Eml.Parsable, for: Atom do

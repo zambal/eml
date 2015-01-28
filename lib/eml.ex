@@ -867,6 +867,74 @@ defmodule Eml do
   end
 
   @doc """
+  Similar to `Eml.compile/3`, but returns a compiled EEx template, instead of an Eml template.
+  """
+  @spec compile_to_eex(t, Eml.Template.bindings, Keyword.t) :: { :ok, Macro.t } | error
+  def compile_to_eex(eml, bindings \\ [], opts \\ []) do
+    eex_opts = [engine: opts[:eex_engine] || EEx.SmartEngine]
+    opts = Keyword.put_new(opts, :escape, false)
+    case compile(eml, bindings, opts) do
+      { :ok, res } ->
+        { :ok, to_eex(res) |> EEx.compile_string(eex_opts) }
+      { :error, e } ->
+        { :error, e }
+    end
+  end
+
+  @doc """
+  Same as `Eml.compile_to_eex/3`, except that it raises an exception, instead of returning an
+  error tuple in case of an error.
+  """
+  @spec compile_to_eex!(t, Eml.Template.bindings, Keyword.t) :: Macro.t
+  def compile_to_eex!(eml, bindings \\ [], opts \\ []) do
+    case compile_to_eex(eml, bindings, opts) do
+      { :ok, res } ->
+        res
+      { :error, e } ->
+        raise ArgumentError, message: inspect(e, pretty: true)
+    end
+  end
+
+  @doc """
+  Similar to `Eml.compile/3`, but returns an EEx template, instead of an Eml template.
+  """
+  @spec render_to_eex(t, Eml.Template.bindings, Keyword.t) :: { :ok, String.t } | error
+  def render_to_eex(eml, bindings \\ [], opts \\ []) do
+    opts = Keyword.put_new(opts, :escape, false)
+    case compile(eml, bindings, opts) do
+      { :ok, res } ->
+        { :ok, to_eex(res) }
+      { :error, e } ->
+        { :error, e }
+    end
+  end
+
+  @doc """
+  Same as `Eml.render_to_eex/3`, except that it raises an exception, instead of returning an
+  error tuple in case of an error.
+  """
+  @spec render_to_eex!(t, Eml.Template.bindings, Keyword.t) :: String.t
+  def render_to_eex!(eml, bindings \\ [], opts \\ []) do
+    case render_to_eex(eml, bindings, opts) do
+      { :ok, res } ->
+        res
+      { :error, e } ->
+        raise ArgumentError, message: inspect(e, pretty: true)
+    end
+  end
+
+  defp to_eex(%Eml.Template{chunks: chunks}) do
+    for c <- chunks, into: "" do
+      case c do
+        %Eml.Parameter{id: id} ->
+          "<%= #{id} %>"
+        _ ->
+          c
+      end
+    end
+  end
+
+  @doc """
   Extracts a value from content (which is always a list) or an element
 
   ### Examples

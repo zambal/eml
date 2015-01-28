@@ -5,7 +5,8 @@
  * Enhancements
    * Introduced `use Eml.Language.Html` as prefered way of defininf markup
    * Restructured README.md and added new content about precompiling
-   * It's now possible to pass content as the first argument of an element macro, ie. `div "Hello world!"` 
+   * It's now possible to pass content as the first argument of an element macro, ie. `div "Hello world!"`
+   * Added `Eml.compile_to_eex/3` and `Eml.render_to_eex/3`
 
  * Bug fixes
   * Documentation corrections.

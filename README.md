@@ -46,15 +46,14 @@ produces
 ```
 
 ### Why?
-There's currently not much in the Elixir eco system that helps with
-writing markup. Elixir has Eex and there are some template language
-implementations in Erlang that can be used, but I'm actually not particularly
-fond of template languages. Templates itself are fine, Eml has them too,
-but I'm mostly not a fan of the *language* part. In my opinion they are either
-too simple, or too complex, making you almost learn a complete programming
-language before they can be used effectively. Eml tries to fill this
-gap by providing the developer all the power of Elixir itself when working
-with markup.
+Most templating libraries are build around the idea of interpreting strings
+that can contain embeded code. This code is mostly used for implementing view
+logic in the template. You could say that these libraries are making code a first
+class citizen in template strings. As long as the view logic is simple this works
+pretty well, but with more complex views this can become quite messy. Eml takes
+this idea inside out and makes the markup that you normally would write as a string
+the first class citizen of a programming language, allowing you to organize view
+logic with all the power of Elixir.
 
 Please read on for a walkthrough that tries to cover most of Eml's features.
 
@@ -77,14 +76,6 @@ Please read on for a walkthrough that tries to cover most of Eml's features.
 ```elixir
 iex> use Eml.Language.Html
 nil
-```
-Invoking `use Eml.Language.Html` translates to:
-```elixir
-alias Eml.Element
-alias Eml.Template
-import Eml.Template, only: [bind: 2]
-import Kernel, except: [div: 2]
-import Eml.Language.Html.Elements
 ```
 
 By invoking `use Eml.Language.Html` all generated html element macros from

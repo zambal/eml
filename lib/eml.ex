@@ -76,19 +76,16 @@ defmodule Eml do
             :template ->
               quote do
                 use unquote(lang)
-                import Eml.Template, only: [bind: 2]
                 Eml.compile! unquote(quoted)
               end
             :markup ->
               quote do
                 use unquote(lang)
-                import Eml.Template, only: [bind: 2]
                 Eml.render! unquote(quoted)
               end
             :eml ->
               quote do
                 use unquote(lang)
-                import Eml.Template, only: [bind: 2]
                 unquote(quoted)
               end
           end

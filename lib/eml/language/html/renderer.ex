@@ -172,6 +172,7 @@ defmodule Eml.Language.Html.Renderer do
       chunk, %{chunks: chunks} = st ->
         %{st| chunks: [chunk | chunks]}
     end
+    bindings = parse_bindings(bindings)
     Enum.reduce(chunks, %{s| type: type, bindings: bindings}, process_chunk)
   end
 

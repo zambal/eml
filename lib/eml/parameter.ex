@@ -9,14 +9,14 @@ defmodule Eml.Parameter do
 
   ### Examples
 
-      iex> use Eml
-      iex> e = eml do: :a_parameter
-      [#param:a_parameter]
+      iex> e = Eml.parse!(:a_parameter, Eml.Language.Native)
+      #param:a_parameter
       iex> Eml.render!(e, a_parameter: "a value")
       "a value"
 
-      iex> e = eml do: p([id: :some_id], :content)
-      [#p<%{id: #param:some_id} [#param:content]>]
+      iex> use Eml.Language.Html
+      iex> e = p [id: :some_id], :content
+      #p<%{id: #param:some_id} [#param:content]>
       iex> t = Eml.compile!(e, some_id: 42)
       #Template<[:content]>
       iex> t = Template.bind(t, content: "some content")

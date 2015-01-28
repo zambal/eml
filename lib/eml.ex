@@ -112,7 +112,10 @@ defmodule Eml do
   is effectively the same as:
 
   ```elixir
-  def mydiv(content), do: eml do div(content) end
+  def mydiv(content) do 
+    use Eml.Language.Html
+    div(content)
+  end
   ```
 
   """
@@ -135,13 +138,16 @@ defmodule Eml do
   This:
 
   ```elixir
-  defhtml mydiv(content), do: div(%{}, content)
+  defhtml mydiv(content), do: div(content)
   ```
 
   is effectively the same as:
 
   ```elixir
-  def mydiv(content), do: eml do div(%{}, content) end |> Eml.render!()
+  def mydiv(content) do
+    use Eml.Language.Html
+    div(content) |> Eml.render!()
+  end
   ```
 
   """
@@ -256,14 +262,12 @@ defmodule Eml do
 
   ### Examples:
 
-      iex> e = eml do
-      ...>   div do
-      ...>     span [id: "inner1", class: "inner"], "hello "
-      ...>     span [id: "inner2", class: "inner"], "world"
-      ...>   end
+      iex> e = div do
+      ...>   span [id: "inner1", class: "inner"], "hello "
+      ...>   span [id: "inner2", class: "inner"], "world"
       ...> end
-      [#div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
-        #span<%{id: "inner2", class: "inner"} ["world"]>]>]
+      #div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
+       #span<%{id: "inner2", class: "inner"} ["world"]>]>
       iex> Eml.select(e, id: "inner1")
       [#span<%{id: "inner1", class: "inner"} ["hello "]>]
       iex> Eml.select(e, class: "inner")
@@ -339,21 +343,19 @@ defmodule Eml do
 
   ### Examples:
 
-      iex> e = eml do
-      ...>   div do
-      ...>     span [id: "inner1", class: "inner"], "hello "
-      ...>     span [id: "inner2", class: "inner"], "world"
-      ...>   end
+      iex> e = div do
+      ...>   span [id: "inner1", class: "inner"], "hello "
+      ...>   span [id: "inner2", class: "inner"], "world"
       ...> end
-      [#div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
-        #span<%{id: "inner2", class: "inner"} ["world"]>]>]
+      #div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
+       #span<%{id: "inner2", class: "inner"} ["world"]>]>
       iex> Eml.add(e, "dear ", id: "inner1")
       [#div<[#span<%{id: "inner1", class: "inner"} ["hello dear "]>,
         #span<%{id: "inner2", class: "inner"} ["world"]>]>]
       iex> Eml.add(e, "__", class: "inner", at: :begin)
       [#div<[#span<%{id: "inner1", class: "inner"} ["__hello "]>,
         #span<%{id: "inner2", class: "inner"} ["__world"]>]>]
-      iex> Eml.add(e, (eml do: span "!"), tag: :div) |> Eml.render!()
+      iex> Eml.add(e, span("!"), tag: :div) |> Eml.render!()
       "<div><span id='inner1' class='inner'>hello </span><span id='inner2' class='inner'>world</span><span>!</span></div>"
 
   """
@@ -400,14 +402,12 @@ defmodule Eml do
 
   ### Examples:
 
-      iex> e = eml do
-      ...>   div do
-      ...>     span [id: "inner1", class: "inner"], "hello "
-      ...>     span [id: "inner2", class: "inner"], "world"
-      ...>   end
+      iex> e = div do
+      ...>   span [id: "inner1", class: "inner"], "hello "
+      ...>   span [id: "inner2", class: "inner"], "world"
       ...> end
-      [#div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
-        #span<%{id: "inner2", class: "inner"} ["world"]>]>]
+      #div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
+       #span<%{id: "inner2", class: "inner"} ["world"]>]>
       iex> Eml.update(e, fn m -> Element.id(m, "outer") end, tag: :div)
       [#div<%{id: "outer"}
        [#span<%{id: "inner1", class: "inner"} ["hello "]>,
@@ -469,14 +469,12 @@ defmodule Eml do
 
   ### Examples:
 
-      iex> e = eml do
-      ...>   div do
-      ...>     span [id: "inner1", class: "inner"], "hello "
-      ...>     span [id: "inner2", class: "inner"], "world"
-      ...>   end
+      iex> e = div do
+      ...>   span [id: "inner1", class: "inner"], "hello "
+      ...>   span [id: "inner2", class: "inner"], "world"
       ...> end
-      [#div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
-        #span<%{id: "inner2", class: "inner"} ["world"]>]>]
+      #div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
+       #span<%{id: "inner2", class: "inner"} ["world"]>]>
       iex> Eml.remove(e, tag: :div)
       []
       iex> Eml.remove(e, id: "inner1")
@@ -539,14 +537,12 @@ defmodule Eml do
 
   ### Examples:
 
-      iex> e = eml do
-      ...>   div do
-      ...>     span [id: "inner1", class: "inner"], "hello "
-      ...>     span [id: "inner2", class: "inner"], "world"
-      ...>   end
+      iex> e = div do
+      ...>   span [id: "inner1", class: "inner"], "hello "
+      ...>   span [id: "inner2", class: "inner"], "world"
       ...> end
-      [#div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
-        #span<%{id: "inner2", class: "inner"} ["world"]>]>]
+      #div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
+       #span<%{id: "inner2", class: "inner"} ["world"]>]>
       iex> Eml.member?(e, id: "inner1")
       true
       iex> Eml.member?(e, class: "inner", id: "test")
@@ -587,14 +583,12 @@ defmodule Eml do
 
   ### Examples:
 
-      iex> e = eml do
-      ...>   div do
-      ...>     span [id: "inner1", class: "inner"], "hello "
-      ...>     span [id: "inner2", class: "inner"], "world"
-      ...>   end
+      iex> e = div do
+      ...>   span [id: "inner1", class: "inner"], "hello "
+      ...>   span [id: "inner2", class: "inner"], "world"
       ...> end
-      [#div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
-        #span<%{id: "inner2", class: "inner"} ["world"]>]>]
+      #div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
+       #span<%{id: "inner2", class: "inner"} ["world"]>]>
       iex> Eml.transform(e, fn x -> if Element.has?(x, tag: :span), do: "matched", else: x end)
       [#div<["matched", "matched"]>]
       iex> Eml.transform(e, fn x ->
@@ -795,13 +789,13 @@ defmodule Eml do
 
   ### Examples:
 
-      iex> Eml.render (eml do: body([], h1([id: "main-title"], "A title")))
+      iex> Eml.render(body(h1([id: "main-title"], "A title")))
       {:ok, "<body><h1 id='main-title'>A title</h1></body>"}
 
-      iex> Eml.render (eml do: body([], h1([id: "main-title"], "A title"))), quote: :double
+      iex> Eml.render(body(h1([id: "main-title"], "A title")), quote: :double)
       {:ok, "<body><h1 id=\"main-title\">A title</h1></body>"}
 
-      iex> Eml.render (eml do: p([], "Tom & Jerry"))
+      iex> Eml.render(p "Tom & Jerry")
       {:ok, "<p>Tom &amp; Jerry</p>"}
 
   """
@@ -835,7 +829,7 @@ defmodule Eml do
 
   ### Examples:
 
-      iex> t = Eml.compile (eml do: body([], h1([id: "main-title"], :the_title)))
+      iex> t = Eml.compile(body(h1([id: "main-title"], :the_title)))
       { :ok, #Template<[:the_title]> }
       iex> Eml.render(t, bindings: [the_title: "The Title"])
       {:ok, "<body><h1 id='main-title'>The Title</h1></body>"}
@@ -936,16 +930,16 @@ defmodule Eml do
 
   ### Examples
 
-      iex> unpack ["42"]
+      iex> Eml.unpack ["42"]
       "42"
 
-      iex> unpack 42
+      iex> Eml.unpack 42
       42
 
-      iex> unpack (eml do: div([], "hallo"))
-      #div<["hallo"]>
+      iex> Eml.unpack(div "hallo")
+      "hallo"
 
-      iex> unpack unpack (eml do: div([], "hallo"))
+      iex> Eml.unpack Eml.unpack(div(span("hallo")))
       "hallo"
 
   """
@@ -960,10 +954,10 @@ defmodule Eml do
 
   ### Examples
 
-      iex> Eml.unpackr eml do: div([], 42)
+      iex> Eml.unpackr div(span(42))
       "42"
 
-      iex> Eml.unpackr eml do: div([], [span([], "Hallo"), span([], " world")])
+      iex> Eml.unpackr div([span("Hallo"), span(" world")])
       ["Hallo", " world"]
 
   """

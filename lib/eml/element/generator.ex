@@ -9,7 +9,7 @@ defmodule Eml.Element.Generator do
       ...>   use Eml.Element.Generator tags: [:custom1, :custom2]
       ...> end
       iex> import MyElements
-      iex> eml do: custom1 [id: 42], "content in a custom element"
+      iex> custom1 [id: 42], "content in a custom element"
       #custom1<%{id: "42"} ["content in a custom element"]>
   """
 

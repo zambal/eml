@@ -8,13 +8,11 @@ defmodule Eml.Template do
 
   ### Example:
 
-      iex> use Eml
-      iex> t = eml do
-      ...>   div class: "photo" do
-      ...>     div do
-      ...>       img [src: :url, alt: :title]
-      ...>       p [], :title
-      ...>     end
+      iex> use Eml.Language.Html
+      iex> t = div class: "photo" do
+      ...>   div do
+      ...>     img [src: :url, alt: :title]
+      ...>     p :title
       ...>   end
       ...> end |> Eml.compile!
       #Template<[:title, :url]>
@@ -78,7 +76,7 @@ defmodule Eml.Template do
 
   ### Example
       iex> use Eml
-      iex> t = Eml.compile!(eml do: div([id: :id], :content))
+      iex> t = Eml.compile!(div [id: :id], :content)
       #Template<[:id, :content]>
       iex> Template.unbound(t)
       [:id, :content]
@@ -99,8 +97,8 @@ defmodule Eml.Template do
   Checks if all parameters in the template are bound.
 
   ### Example
-      iex> use Eml
-      iex> t = Eml.compile!(eml do: div([id: :id], :content))
+      iex> use Eml.Language.Html
+      iex> t = Eml.compile!(div [id: :id], :content)
       #Template<[:id, :content]>
       iex> Template.bound?(t)
       false

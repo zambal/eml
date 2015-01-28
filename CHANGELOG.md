@@ -13,6 +13,7 @@
   * Removed duplicate code in `Eml.defhtml/2`
   * Type specification fixes
   * `Eml.parse/2` in some cases returned weird results when the input is a list
+  * Template bindings were not correctly parsed
 
  * Backwards incompatible changes
   * Removed `Eml.eml/2` in favor of `use Eml.Language.Html`

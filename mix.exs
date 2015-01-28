@@ -31,7 +31,7 @@ defmodule Eml.Mixfile do
   end
 
   defp package do
-    [ files: ["lib", "priv", "mix.exs", "README*", "readme*", "LICENSE*", "license*"],
+    [ files: ["lib", "priv", "mix.exs", "README*", "readme*", "LICENSE*", "license*", "CHANGELOG*"],
       contributors: ["Vincent Siliakus"],
       licenses: ["Apache 2.0"],
       links: %{

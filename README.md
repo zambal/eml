@@ -45,9 +45,6 @@ produces
 </div>
 ```
 
-Please read on for a walk-through that tries to cover most of Eml's features.
-
-
 ### Why?
 There's currently not much in the Elixir eco system that helps with
 writing markup. Elixir has Eex and there are some template language
@@ -59,15 +56,17 @@ language before they can be used effectively. Eml tries to fill this
 gap by providing the developer all the power of Elixir itself when working
 with markup.
 
+Please read on for a walkthrough that tries to cover most of Eml's features.
 
-### Walk-through
+
+### Walkthrough
 
 - [Intro](#intro)
-- [Unpacking](#unpacking)
 - [Rendering](#rendering)
 - [Parsing](#parsing)
 - [Parameters and templates](#parameters-and-templates)
 - [Precompiling](#precompiling)
+- [Unpacking](#unpacking)
 - [Querying eml](#querying-eml)
 - [Transforming eml](#transforming-eml)
 - [Languages and parser behaviour](#languages-and-parser-behaviour)
@@ -101,22 +100,34 @@ We'll focus on strings and elements for now.
 iex> div 42
 #div<["42"]>
 ```
-Here we created a `div` element with `"42"` as it contents. Since Eml content's
+Here we created a `div` element with `"42"` as it contents.Since Eml content's
 only primitive data type are strings, the integer automatically gets converted.
 
-
-#### Unpacking
-
-To access the contents of the div element, you can use `Eml.unpack/1`
+The element macro's in Eml try to be clever about the type of arguments that
+get passed. For example, if the first argument is a Keyword list, it will be
+interpreted as attributes, otherwise as content.
 ```elixir
-iex> Eml.unpack div 42
-"42"
+iex> div id: "some-id"
+#div<%{id: "some-id"}>
+
+iex> div "some content"
+#div<["some content"]>
+
+iex> div do
+...>   "some content"
+...> end
+#div<["some content"]>
+
+iex> div [id: "some-id"], "some content"
+#div<%{id: "some-id"} ["some content"]>
+
+iex> div id: "some-id" do
+...>   "some content"
+...> end
+#div<%{id: "some-id"} ["some content"]>
 ```
-Eml also provides a recursive version called `unpackr`.
-```elixir
-iex> Eml.unpackr div span(42)
-"42"
-```
+
+Note that attributes are stored internally as a map.
 
 
 #### Rendering
@@ -268,6 +279,21 @@ work, as Elixir always compiles dependencies before the project itself.
 Generally, you want to keep your templates as pure as possible.
 
 
+#### Unpacking
+
+Since the contents of elements are always wrapped in a list, Eml provides
+a utility function to easily access the contents.
+```elixir
+iex> Eml.unpack div 42
+"42"
+```
+Eml also provides a recursive version called `unpackr`.
+```elixir
+iex> Eml.unpackr div span(42)
+"42"
+```
+
+
 #### Querying eml
 
 `Eml.Element` implements the Elixir `Enumerable` protocol for traversing a tree of
@@ -293,9 +319,7 @@ iex> e = html do
   [#section<%{class: ["intro", "article"]} [#h3<["Hello world"]>]>,
    #section<%{class: ["conclusion", "article"]} ["TODO"]>]>]>]>
 ```
-If we want to traverse the complete tree, we should unpack the result from `eml`,
-because otherwise we would pass a list with one argument to an `Enum` function. To
-get an idea how the tree is traversed, first just print all nodes
+To get an idea how the tree is traversed, first just print all nodes
 ```elixir
 iex> Enum.each(e, fn x -> IO.puts(inspect x) end)
 #html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>, #body<[#article<%{id: "main-content"} [#section<%{class: ["intro", "article"]} [#h3<["Hello world"]>]>, #section<%{class: ["conclusion", "article"]} ["TODO"]>]>]>]>
@@ -331,9 +355,7 @@ iex> Enum.filter(e, &Eml.Element.has?(&1, tag: :h3, class: "article"))
 
 Eml also provides the `Eml.select` and `Eml.member?` functions, which
 can be used to select content and check for membership more easily.
-Note that you don't need to unpack, as `Eml.select` and all Eml transformation
-functions work recursively with lists. Check the docs for more info about
-the options `Eml.select` accepts.
+Check the docs for more info about the options `Eml.select` accepts.
 ```elixir
 iex> Eml.select(e, class: "article")
 [#section<%{class: ["intro", "article"]} [#h3<["Hello world"]>]>,

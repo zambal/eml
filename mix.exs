@@ -34,6 +34,10 @@ defmodule Eml.Mixfile do
     [ files: ["lib", "priv", "mix.exs", "README*", "readme*", "LICENSE*", "license*"],
       contributors: ["Vincent Siliakus"],
       licenses: ["Apache 2.0"],
-      links: %{"GitHub" => "https://github.com/zambal/eml", "Documentation" => "https://hexdocs.pm/eml/"} ]
+      links: %{
+        "GitHub" => "https://github.com/zambal/eml",
+        "Walkthrough" => "https://github.com/zambal/eml/blob/master/README.md",
+        "Documentation" => "https://hexdocs.pm/eml/"
+      } ]
   end
 end

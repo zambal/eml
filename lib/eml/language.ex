@@ -1,10 +1,5 @@
 defmodule Eml.Language do
-  @moduledoc """
-  Defines the Eml.Language behaviour.
-
-  Eml ships currentlu with two implementations:
-  `Eml.Language.Native` and `Eml.Language.Html`.
-  """
+  @moduledoc false
 
   use Behaviour
 

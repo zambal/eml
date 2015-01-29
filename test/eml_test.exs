@@ -1,15 +1,15 @@
 defmodule EmlTest do
   use ExUnit.Case
-  use Eml.Language.Html
+  use Eml.Language.HTML
   alias Eml.Element, as: M
 
   defp doc() do
     %M{tag: :html, content: [
      %M{tag: :head, attrs: %{class: "test"}, content: [
-       %M{tag: :title, attrs: %{class: "title"}, content: ["Eml is Html for developers"]}
+       %M{tag: :title, attrs: %{class: "title"}, content: ["Eml is HTML for developers"]}
      ]},
      %M{tag: :body, attrs: %{class: ["test", "main"]}, content: [
-       %M{tag: :h1, attrs: %{class: "title"}, content: ["Eml is Html for developers"]},
+       %M{tag: :h1, attrs: %{class: "title"}, content: ["Eml is HTML for developers"]},
        %M{tag: :article, attrs: %{class: "content", "data-custom": "some custom attribute"},
           content: ["Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."]},
        %M{tag: :div, attrs: %{id: "main-side-bar", class: ["content", "side-bar"]}, content: [
@@ -22,10 +22,10 @@ defmodule EmlTest do
   test "Element macro" do
     doc = html do
       head class: "test" do
-        title [class: "title"], "Eml is Html for developers"
+        title [class: "title"], "Eml is HTML for developers"
       end
       body class: ["test", "main"] do
-        h1 [class: "title"], "Eml is Html for developers"
+        h1 [class: "title"], "Eml is HTML for developers"
         article [class: "content", "data-custom": "some custom attribute"],
         "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."
         div id: "main-side-bar", class: ["content", "side-bar"] do
@@ -45,15 +45,15 @@ defmodule EmlTest do
   test "Enumerate content" do
     assert true == Enum.member?(doc(), "Some notes...")
 
-    e = [h1([class: "title"], "Eml is Html for developers")]
+    e = [h1([class: "title"], "Eml is HTML for developers")]
     assert e == Enum.filter(doc(), &Eml.Element.has?(&1, tag: :h1))
 
     e = [
       head class: "test" do
-        title [class: "title"], "Eml is Html for developers"
+        title [class: "title"], "Eml is HTML for developers"
       end,
       body class: ["test", "main"] do
-        h1 [class: "title"], "Eml is Html for developers"
+        h1 [class: "title"], "Eml is HTML for developers"
         article [class: "content", "data-custom": "some custom attribute"],
         "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."
         div id: "main-side-bar", class: ["content", "side-bar"] do
@@ -74,23 +74,23 @@ defmodule EmlTest do
     assert :element   == Eml.type Eml.Element.new()
     assert :binary    == Eml.type "strings are binaries"
     assert :binary    == Eml.type Eml.unpackr div(42)
-    assert :binary    == Eml.type Eml.unpack Eml.parse!([1,2,"z"], Eml.Language.Native)
-    assert :binary    == Eml.type Eml.render!(Eml.parse!(:a, Eml.Language.Native), [], render_params: true)
-    assert :binary    == Eml.type Eml.parse!(:name, Eml.Language.Native)
+    assert :binary    == Eml.type Eml.unpack Eml.to_content([1,2,"z"])
+    assert :binary    == Eml.type Eml.render!(Eml.to_content(:a), [], render_params: true)
+    assert :binary    == Eml.type Eml.to_content(:name)
                                   |> Eml.compile!()
                                   |> Eml.render!(name: "Vincent")
-    assert :template  == Eml.type Eml.compile!(Eml.parse!(:name, Eml.Language.Native))
+    assert :template  == Eml.type Eml.compile!(Eml.to_content(:name))
     assert :template  == Eml.type Eml.compile!([div([], 1), div([], 2), div([], :param), "..."])
     assert :parameter == Eml.type %Eml.Parameter{}
   end
 
-  test "Native parse" do
-    assert []                  == Eml.parse! [nil, "", []], Eml.Language.Native
-    assert ["truefalse"]       == Eml.parse! [true, false], Eml.Language.Native
-    assert ["12345678"]        == Eml.parse! Enum.to_list(1..8), Eml.Language.Native
-    assert ["Hello world"]     == Eml.parse! ["H", ["el", "lo", [" "]], ["wor", ["ld"]]], Eml.Language.Native
-    assert ["Happy new 2015!"] == Eml.parse! ["Happy new ", 2, 0, 1, 5, "!"], Eml.Language.Native
-    assert { :error, "Unparsable data: {}" } == Eml.parse({}, Eml.Language.Native)
+  test "Eml.Content protocol and to_content" do
+    assert []                  == Eml.to_content [nil, "", []]
+    assert ["truefalse"]       == Eml.to_content [true, false]
+    assert ["12345678"]        == Eml.to_content Enum.to_list(1..8)
+    assert ["Hello world"]     == Eml.to_content ["H", ["el", "lo", [" "]], ["wor", ["ld"]]]
+    assert ["Happy new 2015!"] == Eml.to_content ["Happy new ", 2, 0, 1, 5, "!"]
+    assert_raise Protocol.UndefinedError, fn -> Eml.to_content({}) end
   end
 
   test "Unpack" do
@@ -143,8 +143,8 @@ defmodule EmlTest do
 
   test "Select by class1" do
     expected = [
-      title([class: "title"], "Eml is Html for developers"),
-      h1([class: "title"], "Eml is Html for developers")
+      title([class: "title"], "Eml is HTML for developers"),
+      h1([class: "title"], "Eml is HTML for developers")
     ]
     result = Eml.select(doc(), class: "title")
 
@@ -156,9 +156,9 @@ defmodule EmlTest do
 
   test "Select by class 2" do
     expected = [
-      head([class: "test"], title([class: "title"], "Eml is Html for developers")),
+      head([class: "test"], title([class: "title"], "Eml is HTML for developers")),
       body class: ["test", "main"] do
-        h1 [class: "title"], "Eml is Html for developers"
+        h1 [class: "title"], "Eml is HTML for developers"
         article [class: "content", "data-custom": "some custom attribute"],
         "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."
         div id: "main-side-bar", class: ["content", "side-bar"] do
@@ -205,10 +205,10 @@ defmodule EmlTest do
   test "Remove by class 1" do
     expected = html do
       head [class: "test"] do
-        title [class: "title"], "Eml is Html for developers"
+        title [class: "title"], "Eml is HTML for developers"
       end
       body class: ["test", "main"] do
-        h1 [class: "title"], "Eml is Html for developers"
+        h1 [class: "title"], "Eml is HTML for developers"
       end
     end
     result = Eml.remove(doc(), class: "content")
@@ -225,9 +225,9 @@ defmodule EmlTest do
 
   test "Remove by id" do
     expected = html do
-      head [class: "test"], do: title([class: "title"], "Eml is Html for developers")
+      head [class: "test"], do: title([class: "title"], "Eml is HTML for developers")
       body class: ["test", "main"] do
-        h1 [class: "title"], "Eml is Html for developers"
+        h1 [class: "title"], "Eml is HTML for developers"
         article [class: "content", "data-custom": "some custom attribute"],
         "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."
       end
@@ -239,9 +239,9 @@ defmodule EmlTest do
 
   test "Remove by id and class" do
     expected = html do
-      head [class: "test"], do: title([class: "title"], "Eml is Html for developers")
+      head [class: "test"], do: title([class: "title"], "Eml is HTML for developers")
       body class: ["test", "main"] do
-        h1 [class: "title"], "Eml is Html for developers"
+        h1 [class: "title"], "Eml is HTML for developers"
         article [class: "content", "data-custom": "some custom attribute"],
         "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."
       end
@@ -257,8 +257,8 @@ defmodule EmlTest do
 
   test "Parameters" do
     param = %Eml.Parameter{id: :a_parameter}
-    assert param                 == Eml.parse!(:a_parameter, Eml.Language.Native)
-    assert [param, "and", param] == Eml.parse!([:a_parameter, "and", :a_parameter], Eml.Language.Native)
+    assert [param]               == Eml.to_content(:a_parameter)
+    assert [param, "and", param] == Eml.to_content([:a_parameter, "and", :a_parameter])
   end
 
   test "Templates 1" do

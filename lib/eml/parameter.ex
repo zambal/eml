@@ -9,12 +9,12 @@ defmodule Eml.Parameter do
 
   ### Examples
 
-      iex> e = Eml.parse!(:a_parameter, Eml.Language.Native)
+      iex> e = Eml.to_content(:a_parameter)
       #param:a_parameter
       iex> Eml.render!(e, a_parameter: "a value")
       "a value"
 
-      iex> use Eml.Language.Html
+      iex> use Eml.Language.HTML
       iex> e = p [id: :some_id], :content
       #p<%{id: #param:some_id} [#param:content]>
       iex> t = Eml.compile!(e, some_id: 42)

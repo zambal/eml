@@ -14,7 +14,7 @@ To start off:
 
 This piece of code
 ```elixir
-use Eml.Language.Html
+use Eml.Language.HTML
 
 name = "Vincent"
 age  = 36
@@ -74,13 +74,13 @@ Please read on for a walkthrough that tries to cover most of Eml's features.
 #### Intro
 
 ```elixir
-iex> use Eml.Language.Html
+iex> use Eml.Language.HTML
 nil
 ```
 
-By invoking `use Eml.Language.Html` all generated html element macros from
-`Eml.Language.Html.Elements` are imported in to the current scope. Note that
-`use Eml.Language.Html` also unimports Kernel.div/2, as it would otherwise clash
+By invoking `use Eml.Language.HTML` all generated html element macros from
+`Eml.Language.HTML.Elements` are imported in to the current scope. Note that
+`use Eml.Language.HTML` also unimports Kernel.div/2, as it would otherwise clash
 with the div element macro, so if you want to use `Kernel.div/2` in the same scope,
 you'll have to call it with the module name. The element macro's just translate to a
 call to `Eml.Element.new`, except when used as a pattern in a match operation.
@@ -438,40 +438,36 @@ the children will be removed too and won't get evaluated.
 
 #### Languages and parser behaviour
 
-Let's turn back to Eml's data types. Mostly you'll be using strings and elements. In
-order to provide translations from custom data types, Eml provides the `Eml.Parsable`
-protocol. Primitive types are handles by languages.
+Let's turn back to Eml's data types. A language implements the Eml.Language behaviour,
+providing a `parse`, `render` and `element?` function. The `parse` function converts strings
+in to eml. The `render` function converts eml in to whatever string representation the
+language has. The `element?` function tells if the language provides element macros.
+By default Eml provides `Eml.Language.HTML`. Other languages can be implemented as long as
+it implements the Eml.Language behaviour.
 
-A language implements the Eml.Language behaviour, providing a `parse`, `render` and
-`element?` function. The `parse` function converts types like strings, integers and
-floats in to eml. The `render` function converts eml in to whatever representation the
-language has. In practice this will be mostly binary. The `element?` function tells
-if the language provides element macros. By default Eml provides two languages:
-`Eml.Language.Native` and `Eml.Language.Html`. `Eml.Language.Native` is a bit of a
-special case, as it has no elements and is used internally in Eml. It is responsible
-for all conversions inside an `eml` block, like the conversion from a integer we saw
-in previous examples. `Eml.Language.Html` however is a language that the Eml core has
-no knowledge of, other than that it is specified as the default language when defining
-markup and is used by default in all parse and render functions. Other languages can be
-implemented as long as it implements the Eml.Language behaviour. The parser also tries to
-concatenate all binary data. Furthermore, although Eml content is always a list, its
-nodes can not be lists. The native parser thus flattens all input data in order to
+In order to provide translations from various data types, Eml provides the `Eml.Content`
+protocol. Eml provides a implementation for strings, numbers and atoms, but you can
+provide a protocol implementation for your own types by just implementing a `to_eml`
+function that converts your type to a valid Eml node. Most functions in Eml that need
+type conversions don't directly call `Eml.Content.to_eml/1`, but use `Eml.to_content/1`
+instead. This function adds nodes to existing content and tries to concatenate all
+binary data. Furthermore, although Eml content is always a list, its
+nodes can not be lists. `to_content` thus flattens all input data in order to
 guarantee Eml content always is a single list.
 
-
-Some examples using `Eml.parse` using `Eml.Language.Native`:
+Some examples using `Eml.to_content/1`
 ```elixir
-iex> Eml.parse(nil, Eml.Language.Native)
+iex> Eml.to_content(nil)
 []
 
-iex> Eml.parse([1, 2, h1("hello"), 4], Eml.Language.Native)
+iex> Eml.to_content([1, 2, h1("hello"), 4])
 ["12", #h1<["hello"]>, "4"]
 
-iex> Eml.parse([a: 1, b: 2], Eml.Language.Native)
-{:error, "Unparsable data: {:a, 1}"}
-
-iex> Eml.parse(["Hello ", ["world", ["!"]]], Eml.Language.Native)
+iex> Eml.to_content(["Hello ", ["world", ["!"]]])
 ["Hello world!"]
+
+iex> Eml.to_content([a: 1, b: 2])
+** (Protocol.UndefinedError) protocol Eml.Content not implemented for {:b, 2}
 ```
 
 ### Notes
@@ -495,7 +491,7 @@ will be valid html, render it to an html file and use this file with any
 existing html validator. In this sense Eml is the same as hand
 written html.
 
-#### Html Parser
+#### HTML Parser
 The main purpose of the html parser is to parse back generated html
 from Eml. It's a custom parser written in about 500 LOC,
 so don't expect it to successfully parse every html in the wild.

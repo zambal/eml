@@ -1,4 +1,4 @@
-defmodule Eml.Language.Html.Renderer do
+defmodule Eml.Language.HTML.Renderer do
   @moduledoc false
 
   alias Eml.Element
@@ -259,7 +259,7 @@ defmodule Eml.Language.Html.Renderer do
   defp parse_bindings(bindings) do
     Enum.map(bindings, fn { k, v } ->
       v = (if is_list(v), do: v, else: [v])
-          |> Enum.map(fn v -> Eml.parse!(v, Eml.Language.Native) end)
+          |> Enum.map(&Eml.to_content(&1))
       { k, v }
     end)
   end

@@ -1,15 +1,15 @@
-defmodule Eml.Language.Html.Parser do
+defmodule Eml.Language.HTML.Parser do
   @moduledoc false
 
   # API
 
-  @spec parse(binary, atom) :: Eml.t | Eml.error
-  def parse(html, BitString) do
+  @spec parse(binary) :: Eml.t | Eml.error
+  def parse(html) do
     res = case tokenize(html, { :blank, [] }, [], :blank) do
             { :error, state } ->
               { :error, state }
             tokens ->
-              parse(tokens)
+              parse_content(tokens)
           end
     case res do
       { :error, state } ->
@@ -347,7 +347,7 @@ defmodule Eml.Language.Html.Parser do
 
   # Parse the genrated tokens
 
-  defp parse(tokens) do
+  defp parse_content(tokens) do
     parse_content(tokens, [])
   end
 

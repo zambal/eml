@@ -3,7 +3,7 @@ defmodule Eml.Mixfile do
 
   def project do
     [ app: :eml,
-      version: "0.6.0",
+      version: "0.7.0-dev",
       name: "Eml",
       source_url: "https://github.com/zambal/eml",
       homepage_url: "https://github.com/zambal/eml",

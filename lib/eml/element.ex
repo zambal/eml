@@ -20,8 +20,6 @@ defmodule Eml.Element do
 
   @type t :: %El{tag: atom, content: content, attrs: attrs}
 
-  @default_lang Eml.Language.Native
-
   @doc "Creates a new `Eml.Element` structure with default values."
   @spec new() :: t
   def new(), do: %El{}
@@ -36,10 +34,10 @@ defmodule Eml.Element do
       {:ok, "<div id='42'>hallo!</div>"}
 
   """
-  @spec new(atom, attrs_in, Eml.Parsable.t, Eml.lang) :: t
-  def new(tag, attrs \\ %{}, content \\ [], lang \\ @default_lang) when is_atom(tag) and (is_map(attrs) or is_list(attrs)) do
+  @spec new(atom, attrs_in, Eml.Parsable.t) :: t
+  def new(tag, attrs \\ %{}, content \\ []) when is_atom(tag) and (is_map(attrs) or is_list(attrs)) do
     attrs   = to_attrs(attrs)
-    content = Eml.parse!(content, lang) |> ensure_list()
+    content = Eml.to_content(content)
     %El{tag: tag, attrs: attrs, content: content}
   end
 
@@ -105,9 +103,9 @@ defmodule Eml.Element do
       #div<["Hallo 2015"]>
 
   """
-  @spec content(t, Eml.Parsable.t, Eml.lang) :: t
-  def content(%El{} = el, data, lang \\ @default_lang) do
-    %El{el| content: Eml.parse!(data, lang) |> ensure_list()}
+  @spec content(t, Eml.Parsable.t) :: t
+  def content(%El{} = el, data) do
+    %El{el| content: Eml.to_content(data)}
   end
 
   @doc """
@@ -129,8 +127,7 @@ defmodule Eml.Element do
   @spec add(t, Eml.Parsable.t, Keyword.t) :: t
   def add(%El{content: current} = el, data, opts \\ []) do
     at      = opts[:at] || :end
-    lang  = opts[:lang] || @default_lang
-    content = Eml.parse!(data, current, at, lang) |> ensure_list()
+    content = Eml.to_content(data, current, at)
     %El{el| content: content}
   end
 
@@ -148,10 +145,10 @@ defmodule Eml.Element do
       #div<["HALLO"]>
 
   """
-  @spec update(t, (Eml.t -> Eml.Parsable.t), Eml.lang) :: t
-  def update(%El{content: content} = el, fun, lang \\ @default_lang) do
+  @spec update(t, (Eml.t -> Eml.Parsable.t)) :: t
+  def update(%El{content: content} = el, fun) do
     content = for node <- content, data = fun.(node) do
-      Eml.Parsable.parse(data, lang)
+      Eml.Content.to_eml(data)
     end
     %El{el| content: content}
   end
@@ -251,7 +248,7 @@ defmodule Eml.Element do
     { id, opts }       = Keyword.pop(opts, :id, :any)
     { class, opts }    = Keyword.pop(opts, :class, :any)
     { content, attrs } = Keyword.pop(opts, :content)
-    content            = Eml.parse!(content, @default_lang) |> ensure_list()
+    content            = Eml.to_content(content)
     content            = if content == [], do: :any, else: content
 
     has_tag?(el, tag)         and

@@ -9,7 +9,7 @@ defmodule Eml do
 
   This piece of code
   ```elixir
-  use Eml.Language.Html
+  use Eml.Language.HTML
 
   name = "Vincent"
   age  = 36
@@ -46,9 +46,9 @@ defmodule Eml do
 
   alias Eml.Element
   alias Eml.Template
-  alias Eml.Parsable
+  alias Eml.Content
 
-  @default_lang Eml.Language.Html
+  @default_lang Eml.Language.HTML
 
   @type t             :: String.t | Eml.Element.t | Eml.Parameter.t | Eml.Template.t
   @type enumerable    :: Eml.Element.t | [Eml.Element.t]
@@ -113,7 +113,7 @@ defmodule Eml do
 
   ```elixir
   def mydiv(content) do 
-    use Eml.Language.Html
+    use Eml.Language.HTML
     div(content)
   end
   ```
@@ -145,7 +145,7 @@ defmodule Eml do
 
   ```elixir
   def mydiv(content) do
-    use Eml.Language.Html
+    use Eml.Language.HTML
     div(content) |> Eml.render!()
   end
   ```
@@ -153,7 +153,7 @@ defmodule Eml do
   """
   defmacro defhtml(call, do_block) do
     block = do_block[:do]
-    ast   = do_eml(block, type: :markup, use: Eml.Language.Html)
+    ast   = do_eml(block, type: :markup, use: Eml.Language.HTML)
     quote do
       def unquote(call) do
         unquote(ast)
@@ -359,7 +359,7 @@ defmodule Eml do
       "<div><span id='inner1' class='inner'>hello </span><span id='inner2' class='inner'>world</span><span>!</span></div>"
 
   """
-  @spec add(transformable, Eml.Parsable.t, Keyword.t) :: transformable
+  @spec add(transformable, Eml.Content.t, Keyword.t) :: transformable
   def add(eml, data, opts \\ []) do
     tag     = opts[:tag] || :any
     id      = opts[:id] || :any
@@ -420,7 +420,7 @@ defmodule Eml do
       "<div><span id='inner1' class='inner'>HELLO </span><span id='inner2' class='inner'>WORLD</span></div>"
 
   """
-  @spec update(transformable, (t -> Eml.Parsable.t), Keyword.t) :: transformable
+  @spec update(transformable, (t -> Eml.Content.t), Keyword.t) :: transformable
   def update(eml, fun, opts \\ []) do
     tag            = opts[:tag] || :any
     id             = opts[:id] || :any
@@ -578,9 +578,6 @@ defmodule Eml do
   Note that because parent nodes are evaluated before their children,
   no children will be evaluated if the parent is removed.
 
-  Accepts a lang as optional 3rd argument, in order to specify how transformed data
-  should be interpreted, defaults to `Eml.Language.Native`
-
   ### Examples:
 
       iex> e = div do
@@ -603,19 +600,19 @@ defmodule Eml do
         #span<%{id: "inner2", class: "inner"} ["world"]>]>]
 
   """
-  @spec transform(transformable, (t -> Eml.Parsable.t), lang) :: transformable | nil
-  def transform(eml, fun, lang \\ Eml.Language.Native)
+  @spec transform(transformable, (t -> Eml.Content.t)) :: transformable | nil
+  def transform(eml, fun)
 
-  def transform(eml, fun, lang) when is_list(eml) do
-    for node <- eml, t = transform(node, fun, lang), do: t
+  def transform(eml, fun) when is_list(eml) do
+    for node <- eml, t = transform(node, fun), do: t
   end
 
-  def transform(node, fun, lang) do
-    case node |> fun.() |> Parsable.parse(lang) do
+  def transform(node, fun) do
+    case node |> fun.() |> Content.to_eml() do
       { :error, _ } -> nil
       node ->
         if element?(node),
-          do: %Element{node| content: transform(node.content, fun, lang)},
+          do: %Element{node| content: transform(node.content, fun)},
         else: node
     end
   end
@@ -624,25 +621,18 @@ defmodule Eml do
   Parses data and converts it to eml
 
   How the data is interpreted depends on the `lang` argument.
-  The default value is `Eml.Language.Html', which means that
-  strings are parsed as html. The other language that is supported
-  by default is `Eml.Language.Native`, which is for example used when
-  setting content in an `Eml.Element` node. Appart from the provided
-  language, this function performs some conversions on its own. Mainly
-  flattening of lists and concatenating binaries in a list.
+  The default value is `Eml.Language.HTML', which means that
+  strings are parsed as html.
 
   ### Examples:
 
       iex> Eml.parse("<body><h1 id='main-title'>The title</h1></body>")
       [#body<[#h1<%{id: "main-title"} ["The title"]>]>]
 
-      iex> Eml.parse([1, 2, 3,[4, 5, "6"], " ", true, " ", [false]], Eml.Language.Native)
-      ["123456 true false"]
-
   """
-  @spec parse(Eml.Parsable.t, lang) :: { :ok, t | [t] } | error
+  @spec parse(Eml.Content.t, lang) :: { :ok, t | [t] } | error
   def parse(data, lang \\ @default_lang) do
-    case parse(data, [], :begin, lang) do
+    case lang.parse(data) do
       { :error, e } ->
         { :error, e }
       [res] ->
@@ -666,7 +656,7 @@ defmodule Eml do
   Same as `Eml.parse/2`, except that it raises an exception, instead of returning an
   error tuple in case of an error.
   """
-  @spec parse!(Eml.Parsable.t, lang) :: t | [t]
+  @spec parse!(Eml.Content.t, lang) :: t | [t]
   def parse!(data, lang \\ @default_lang) do
     case parse(data, lang) do
       { :error, e } ->
@@ -677,35 +667,30 @@ defmodule Eml do
   end
 
   @doc false
-  @spec parse(Eml.Parsable.t | error, [t], atom, lang) :: t | [t] | error
-  def parse(data, acc, at, lang \\ Eml.Languages.Native)
-
-  # Error pass through
-  def parse({ :error, e }, _, _, _), do: { :error, e }
+  @spec to_content(Eml.Content.t | error, [t], atom) :: t | [t]
+  def to_content(data, acc \\ [], at \\ :begin)
 
   # No-ops
-  def parse(nondata, acc, _, _)
+  def to_content(nondata, acc, _)
   when nondata in [nil, "", []], do: acc
 
   # Handle lists
 
-  def parse(data, acc, :end, lang)
-  when is_list(data), do: add_nodes(data, :lists.reverse(acc), :end, lang) |> :lists.reverse()
+  def to_content(data, acc, :end)
+  when is_list(data), do: add_nodes(data, :lists.reverse(acc), :end) |> :lists.reverse()
 
-  def parse(data, acc, :begin, lang)
-  when is_list(data), do: add_nodes(:lists.reverse(data), acc, :begin, lang)
+  def to_content(data, acc, :begin)
+  when is_list(data), do: add_nodes(:lists.reverse(data), acc, :begin)
 
-  def parse(data, acc, mode, lang) do
-    case Parsable.parse(data, lang) do
-      { :error, e } ->
-        { :error, e }
+  def to_content(data, acc, mode) do
+    case Content.to_eml(data) do
       [node] ->
         add_node(node, acc, mode)
       nodes when is_list(nodes) ->
         if mode == :begin do
-          add_nodes(:lists.reverse(nodes), acc, mode, lang)
+          add_nodes(:lists.reverse(nodes), acc, mode)
         else
-          add_nodes(nodes, acc, mode, lang)
+          add_nodes(nodes, acc, mode)
         end
       node ->
         add_node(node, acc, mode)
@@ -752,25 +737,15 @@ defmodule Eml do
     end
   end
 
-  defp add_nodes([h | t], acc, mode, lang) do
+  defp add_nodes([h | t], acc, mode) do
     acc = if is_list(h) and mode === :end,
-                do: add_nodes(h, acc, mode, lang),
-              else: parse(h, acc, mode, lang)
-    add_nodes(t, acc, mode, lang)
+                do: add_nodes(h, acc, mode),
+              else: to_content(h, acc, mode)
+    add_nodes(t, acc, mode)
   end
 
-  defp add_nodes([], acc, _, _),
+  defp add_nodes([], acc, _),
   do: acc
-
-  @doc false
-  @spec parse!(Eml.Parsable.t | error, [t], atom, lang) :: t
-  def parse!(data, acc, at, lang \\ @default_lang) do
-    case parse(data, acc, at, lang) do
-      { :error, e } ->
-        raise ArgumentError, message: "Error #{e}"
-      acc -> acc
-    end
-  end
 
   @doc """
   Renders eml content to the specified language, which is
@@ -782,7 +757,7 @@ defmodule Eml do
 
   The accepted options are:
 
-  * `:lang` - The language to render to, by default `Eml.Language.Html`
+  * `:lang` - The language to render to, by default `Eml.Language.HTML`
   * `:quote` - The type of quotes used for attribute values. Accepted values are `:single` (default) and `:double`.
   * `:escape` - Escape `&`, `<` and `>` in attribute values and content to HTML entities.
      Accepted values are `true` (default) and `false`.

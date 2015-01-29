@@ -8,7 +8,7 @@ defmodule Eml.Template do
 
   ### Example:
 
-      iex> use Eml.Language.Html
+      iex> use Eml.Language.HTML
       iex> t = div class: "photo" do
       ...>   div do
       ...>     img [src: :url, alt: :title]
@@ -30,8 +30,6 @@ defmodule Eml.Template do
   @type chunks   :: [binary | Eml.Parameter.t]
   @type bindings :: [{ Eml.Parameter.id, Eml.Parsable.t }]
   @type t        :: %M{ chunks: chunks, bindings: bindings }
-
-  @lang Eml.Language.Native
 
   @doc """
   Binds values to parameters by providing a Keyword list where
@@ -97,7 +95,7 @@ defmodule Eml.Template do
   Checks if all parameters in the template are bound.
 
   ### Example
-      iex> use Eml.Language.Html
+      iex> use Eml.Language.HTML
       iex> t = Eml.compile!(div [id: :id], :content)
       #Template<[:id, :content]>
       iex> Template.bound?(t)

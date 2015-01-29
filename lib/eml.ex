@@ -667,8 +667,8 @@ defmodule Eml do
   end
 
   @doc false
-  @spec to_content(Eml.Data.t | error, [t], atom) :: t | [t]
-  def to_content(data, acc \\ [], at \\ :begin)
+  @spec to_content(Eml.Data.t, [t], atom) :: [t]
+  def to_content(data, acc \\ [], insert_at \\ :begin)
 
   # No-ops
   def to_content(nondata, acc, _)
@@ -681,8 +681,8 @@ defmodule Eml do
   when is_list(data), do: add_nodes(:lists.reverse(data), acc, :begin)
 
   # Convert data to eml node
-  def to_content(data, acc, mode) do
-    Data.to_eml(data) |> add_node(acc, mode)
+  def to_content(data, acc, insert_at) do
+    Data.to_eml(data) |> add_node(acc, insert_at)
   end
 
   defp add_node(node, [], _), do: [node]
@@ -701,13 +701,13 @@ defmodule Eml do
     end
   end
 
-  defp add_nodes([h | t], acc, mode) do
-    acc = if is_list(h) and mode === :end do
-            add_nodes(h, acc, mode)
+  defp add_nodes([h | t], acc, insert_at) do
+    acc = if is_list(h) and insert_at === :end do
+            add_nodes(h, acc, insert_at)
           else
-            to_content(h, acc, mode)
+            to_content(h, acc, insert_at)
           end
-    add_nodes(t, acc, mode)
+    add_nodes(t, acc, insert_at)
   end
   defp add_nodes([], acc, _), do: acc
 

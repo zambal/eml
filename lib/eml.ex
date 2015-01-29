@@ -61,41 +61,49 @@ defmodule Eml do
 
   @doc false
   def do_eml(quoted \\ nil, opts) do
-    type   = opts[:type] || :template
-    lang   = opts[:use] || @default_lang
-    file   = opts[:file]
-    env    = opts[:env] || __ENV__
-    quoted = if file do
-             file
-             |> File.read!()
-             |> Code.string_to_quoted!(file: file, line: 1)
-           else
-             quoted || opts[:do]
-           end
-    ast  = case type do
-            :template ->
-              quote do
-                use unquote(lang)
-                Eml.compile! unquote(quoted)
-              end
-            :markup ->
-              quote do
-                use unquote(lang)
-                Eml.render! unquote(quoted)
-              end
-            :eml ->
-              quote do
-                use unquote(lang)
-                unquote(quoted)
-              end
-          end
-    if opts[:precompile] do
-      { expr, _ } = Code.eval_quoted(ast, [] , env)
-      expr
-    else
-      ast
+    (quoted || opts[:do])
+    |> handle_file(opts[:file])
+    |> handle_type(opts[:use], opts[:type])
+    |> handle_precompile(opts[:env], opts[:precompile])
+    |> handle_assign(opts[:handle_assign])
+  end
+
+  defp handle_file(_, file) when is_binary(file) do
+    file
+    |> File.read!()
+    |> Code.string_to_quoted!(file: file, line: 1)
+  end
+  defp handle_file(ast, _), do: ast
+
+  defp handle_type(ast, lang, :template) do
+    quote do
+      use unquote(lang)
+      Eml.compile! unquote(ast)
     end
   end
+  defp handle_type(ast, lang, :markup) do
+    quote do
+      use unquote(lang)
+      Eml.render! unquote(ast)
+    end
+  end
+  defp handle_type(ast, lang, :eml) do
+    quote do
+      use unquote(lang)
+      unquote(ast)
+    end
+  end
+
+  defp handle_precompile(ast, env, true) do
+      { expr, _ } = Code.eval_quoted(ast, [] , env)
+      expr
+  end
+  defp handle_precompile(ast, _, _) do
+    ast
+  end
+
+  defp handle_assign(ast, true), do: Macro.prewalk(ast, &EEx.Engine.handle_assign/1)
+  defp handle_assign(ast, _), do: ast
 
   @doc """
   Define a function that produces eml.

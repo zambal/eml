@@ -675,52 +675,17 @@ defmodule Eml do
   when nondata in [nil, "", []], do: acc
 
   # Handle lists
-
   def to_content(data, acc, :end)
   when is_list(data), do: add_nodes(data, :lists.reverse(acc), :end) |> :lists.reverse()
-
   def to_content(data, acc, :begin)
   when is_list(data), do: add_nodes(:lists.reverse(data), acc, :begin)
 
+  # Convert data to eml node
   def to_content(data, acc, mode) do
-    case Data.to_eml(data) do
-      [node] ->
-        add_node(node, acc, mode)
-      nodes when is_list(nodes) ->
-        if mode == :begin do
-          add_nodes(:lists.reverse(nodes), acc, mode)
-        else
-          add_nodes(nodes, acc, mode)
-        end
-      node ->
-        add_node(node, acc, mode)
-    end
+    Data.to_eml(data) |> add_node(acc, mode)
   end
 
-  # Optimize for most comon cases
-
-  defp add_node(node, [], _) when is_list(node),
-  do: node
-
-  defp add_node(node, [], _),
-  do: [node]
-
-  defp add_node(node, [current], :end) do
-    if is_binary(node) and is_binary(current) do
-      [current <> node]
-    else
-      [current, node]
-    end
-  end
-
-  defp add_node(node, [current], :begin) do
-    if is_binary(node) and is_binary(current) do
-      [node <> current]
-    else
-      [node, current]
-    end
-  end
-
+  defp add_node(node, [], _), do: [node]
   defp add_node(node, [h | t], :end) do
     if is_binary(node) and is_binary(h) do
       [h <> node | t]
@@ -728,7 +693,6 @@ defmodule Eml do
       [node, h | t]
     end
   end
-
   defp add_node(node, [h | t], :begin) do
     if is_binary(node) and is_binary(h) do
       [node <> h | t]
@@ -738,14 +702,14 @@ defmodule Eml do
   end
 
   defp add_nodes([h | t], acc, mode) do
-    acc = if is_list(h) and mode === :end,
-                do: add_nodes(h, acc, mode),
-              else: to_content(h, acc, mode)
+    acc = if is_list(h) and mode === :end do
+            add_nodes(h, acc, mode)
+          else
+            to_content(h, acc, mode)
+          end
     add_nodes(t, acc, mode)
   end
-
-  defp add_nodes([], acc, _),
-  do: acc
+  defp add_nodes([], acc, _), do: acc
 
   @doc """
   Renders eml content to the specified language, which is

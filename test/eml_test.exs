@@ -66,7 +66,8 @@ defmodule EmlTest do
   end
 
   test "Render => Parse => Compare" do
-    assert doc() == doc() |> Eml.render!() |> Eml.parse!()
+    # Parsing always return results in a list
+    assert [doc()] == doc() |> Eml.render!() |> Eml.parse!()
   end
 
   test "Types" do

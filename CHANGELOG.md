@@ -6,12 +6,17 @@
   * Better separation of concerns by removing all data conversions from parsing
 
  * Bug fixes
+  * Some type fixes in the Eml.Language behaviour
 
  * Backwards incompatible changes
   * Renamed `Eml.Language.Html` to `Eml.Language.HTML` in order to be compliant with Elixir's naming conventions
   * The undocumented `Eml.parse/4` function is now replaced by `Eml.to_content/3`
   * The `Eml.Parsable` protocol is replaced by `Eml.Data`, which is now strictly used for converting various
     data types into valid Eml nodes.
+  * `Eml.parse/2` now always returns a list again, because the type
+    conversions are now done by `Eml.to_content/3` and consequently you can't force
+    `Eml.parse/2` to return a list anymore, which would make it dangerous to
+    use when parsing html partials where you don't know the nummer of nodes.
 
 ## v0.6.0
 

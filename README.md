@@ -148,12 +148,12 @@ behaviour can also be switched off.
 Eml's parser by default converts a string with html content in to Eml content.
 ```elixir
 iex> Eml.parse "<!doctype html>\n<html><head><meta charset='UTF-8'></head><body><div>42</div></body></html>"
-{:ok, #html<[#head<[#meta<%{charset: "UTF-8"}>]>, #body<[#div<["42"]>]>]>}
+{:ok, [#html<[#head<[#meta<%{charset: "UTF-8"}>]>, #body<[#div<["42"]>]>]>]}
 
 iex> Eml.parse "<div class=\"content article\"><h1 class='title'>Title<h1><p class=\"paragraph\">blah &amp; blah</p></div>"
 {:ok, #div<%{class: ["content", "article"]}
  [#h1<%{class: "title"}
-  ["Title", #h1<[#p<%{class: "paragraph"} ["blah & blah"]>]>]>]>}
+  ["Title", #h1<[#p<%{class: "paragraph"} ["blah & blah"]>]>]>]}
 ```
 
 The html parser is primarily written to parse html rendered by Eml, but it's
@@ -172,7 +172,7 @@ This is for good reason. If anything more complex is needed than a
 
 Let's start with a simple example
 ```elixir
-iex> e = Eml.parse!(h1 [:atoms, " ", :are, " ", :converted, " ", :to_parameters])
+iex> e = h1 [:atoms, " ", :are, " ", :converted, " ", :to_parameters]
 #h1<[#param:atoms, " ", #param:are, " ", #param:converted, " ",
  #param:to_parameters]>
 

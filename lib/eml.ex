@@ -380,7 +380,7 @@ defmodule Eml do
 
   When the provided function returns `nil`, the node will
   be removed from the eml tree. Any other returned value will be
-  evaluated by `Eml.parse!/2` in order to guarantee valid eml.
+  evaluated by `Eml.to_content/3` in order to guarantee valid eml.
 
   Nodes are matched depending on the provided options.
 
@@ -573,7 +573,7 @@ defmodule Eml do
 
   When the provided function returns `nil`, the node will
   be removed from the eml tree. Any other returned value will be
-  evaluated by `Eml.parse!/2` in order to guarantee valid eml.
+  evaluated by `Eml.to_content/3` in order to guarantee valid eml.
 
   Note that because parent nodes are evaluated before their children,
   no children will be evaluated if the parent is removed.
@@ -627,28 +627,15 @@ defmodule Eml do
   ### Examples:
 
       iex> Eml.parse("<body><h1 id='main-title'>The title</h1></body>")
-      [#body<[#h1<%{id: "main-title"} ["The title"]>]>]
-
+      {:ok, [#body<[#h1<%{id: "main-title"} ["The title"]>]>]}
   """
   @spec parse(Eml.Data.t, lang) :: { :ok, t | [t] } | error
   def parse(data, lang \\ @default_lang) do
     case lang.parse(data) do
       { :error, e } ->
         { :error, e }
-      [res] ->
-        if is_list(data) do
-          { :ok, [res] }
-        else
-          { :ok, res }
-        end
-      [] ->
-        if is_list(data) do
-          { :ok, [] }
-        else
-          { :ok, "" }
-        end
-      list when is_list(list) ->
-        { :ok, list }
+      res ->
+        { :ok, res }
     end
   end
 

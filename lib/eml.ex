@@ -64,7 +64,7 @@ defmodule Eml do
     (quoted || opts[:do])
     |> handle_file(opts[:file])
     |> handle_type(opts[:use], opts[:type])
-    |> handle_precompile(opts[:env], opts[:precompile])
+    |> handle_precompile(opts[:env] || __ENV__, opts[:precompile])
     |> handle_assign(opts[:handle_assign])
   end
 

@@ -28,7 +28,7 @@ defmodule Eml.Template do
   defstruct chunks: [], bindings: []
 
   @type chunks   :: [binary | Eml.Parameter.t]
-  @type bindings :: [{ Eml.Parameter.id, Eml.Parsable.t }]
+  @type bindings :: [{ Eml.Parameter.id, Eml.Data.t }]
   @type t        :: %M{ chunks: chunks, bindings: bindings }
 
   @doc """
@@ -44,7 +44,7 @@ defmodule Eml.Template do
   Binds a value to parameters by providing a parameter ids
   and value.
   """
-  @spec bind(t, Eml.Parameter.id, Eml.Parsable.t) :: t
+  @spec bind(t, Eml.Parameter.id, Eml.Data.t) :: t
   def bind(t, param_id, data)
   when is_atom(param_id), do: bind(t, [{ param_id, data }])
 

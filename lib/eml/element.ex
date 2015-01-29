@@ -34,7 +34,7 @@ defmodule Eml.Element do
       {:ok, "<div id='42'>hallo!</div>"}
 
   """
-  @spec new(atom, attrs_in, Eml.Parsable.t) :: t
+  @spec new(atom, attrs_in, Eml.Data.t) :: t
   def new(tag, attrs \\ %{}, content \\ []) when is_atom(tag) and (is_map(attrs) or is_list(attrs)) do
     attrs   = to_attrs(attrs)
     content = Eml.to_content(content)
@@ -103,7 +103,7 @@ defmodule Eml.Element do
       #div<["Hallo 2015"]>
 
   """
-  @spec content(t, Eml.Parsable.t) :: t
+  @spec content(t, Eml.Data.t) :: t
   def content(%El{} = el, data) do
     %El{el| content: Eml.to_content(data)}
   end
@@ -124,7 +124,7 @@ defmodule Eml.Element do
       #div<["Hallo 2015 !!!"]>
 
   """
-  @spec add(t, Eml.Parsable.t, Keyword.t) :: t
+  @spec add(t, Eml.Data.t, Keyword.t) :: t
   def add(%El{content: current} = el, data, opts \\ []) do
     at      = opts[:at] || :end
     content = Eml.to_content(data, current, at)
@@ -145,7 +145,7 @@ defmodule Eml.Element do
       #div<["HALLO"]>
 
   """
-  @spec update(t, (Eml.t -> Eml.Parsable.t)) :: t
+  @spec update(t, (Eml.t -> Eml.Data.t)) :: t
   def update(%El{content: content} = el, fun) do
     content = for node <- content, data = fun.(node) do
       Eml.Data.to_eml(data)

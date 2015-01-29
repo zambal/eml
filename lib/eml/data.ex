@@ -5,7 +5,7 @@ defprotocol Eml.Data do
   This protocol is used by `Eml.parse/2` function to
   convert different Elixir data types to Eml content.
   """
-
+  @spec to_eml(Eml.Data.t) :: Eml.t
   def to_eml(data)
 end
 

@@ -46,7 +46,7 @@ defmodule Eml do
 
   alias Eml.Element
   alias Eml.Template
-  alias Eml.Content
+  alias Eml.Data
 
   @default_lang Eml.Language.HTML
 
@@ -359,7 +359,7 @@ defmodule Eml do
       "<div><span id='inner1' class='inner'>hello </span><span id='inner2' class='inner'>world</span><span>!</span></div>"
 
   """
-  @spec add(transformable, Eml.Content.t, Keyword.t) :: transformable
+  @spec add(transformable, Eml.Data.t, Keyword.t) :: transformable
   def add(eml, data, opts \\ []) do
     tag     = opts[:tag] || :any
     id      = opts[:id] || :any
@@ -420,7 +420,7 @@ defmodule Eml do
       "<div><span id='inner1' class='inner'>HELLO </span><span id='inner2' class='inner'>WORLD</span></div>"
 
   """
-  @spec update(transformable, (t -> Eml.Content.t), Keyword.t) :: transformable
+  @spec update(transformable, (t -> Eml.Data.t), Keyword.t) :: transformable
   def update(eml, fun, opts \\ []) do
     tag            = opts[:tag] || :any
     id             = opts[:id] || :any
@@ -600,7 +600,7 @@ defmodule Eml do
         #span<%{id: "inner2", class: "inner"} ["world"]>]>]
 
   """
-  @spec transform(transformable, (t -> Eml.Content.t)) :: transformable | nil
+  @spec transform(transformable, (t -> Eml.Data.t)) :: transformable | nil
   def transform(eml, fun)
 
   def transform(eml, fun) when is_list(eml) do
@@ -608,7 +608,7 @@ defmodule Eml do
   end
 
   def transform(node, fun) do
-    case node |> fun.() |> Content.to_eml() do
+    case node |> fun.() |> Data.to_eml() do
       { :error, _ } -> nil
       node ->
         if element?(node),
@@ -630,7 +630,7 @@ defmodule Eml do
       [#body<[#h1<%{id: "main-title"} ["The title"]>]>]
 
   """
-  @spec parse(Eml.Content.t, lang) :: { :ok, t | [t] } | error
+  @spec parse(Eml.Data.t, lang) :: { :ok, t | [t] } | error
   def parse(data, lang \\ @default_lang) do
     case lang.parse(data) do
       { :error, e } ->
@@ -656,7 +656,7 @@ defmodule Eml do
   Same as `Eml.parse/2`, except that it raises an exception, instead of returning an
   error tuple in case of an error.
   """
-  @spec parse!(Eml.Content.t, lang) :: t | [t]
+  @spec parse!(Eml.Data.t, lang) :: t | [t]
   def parse!(data, lang \\ @default_lang) do
     case parse(data, lang) do
       { :error, e } ->
@@ -667,7 +667,7 @@ defmodule Eml do
   end
 
   @doc false
-  @spec to_content(Eml.Content.t | error, [t], atom) :: t | [t]
+  @spec to_content(Eml.Data.t | error, [t], atom) :: t | [t]
   def to_content(data, acc \\ [], at \\ :begin)
 
   # No-ops
@@ -683,7 +683,7 @@ defmodule Eml do
   when is_list(data), do: add_nodes(:lists.reverse(data), acc, :begin)
 
   def to_content(data, acc, mode) do
-    case Content.to_eml(data) do
+    case Data.to_eml(data) do
       [node] ->
         add_node(node, acc, mode)
       nodes when is_list(nodes) ->

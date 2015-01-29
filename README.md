@@ -445,17 +445,17 @@ language has. The `element?` function tells if the language provides element mac
 By default Eml provides `Eml.Language.HTML`. Other languages can be implemented as long as
 it implements the Eml.Language behaviour.
 
-In order to provide translations from various data types, Eml provides the `Eml.Content`
+In order to provide translations from various data types, Eml provides the `Eml.Data`
 protocol. Eml provides a implementation for strings, numbers and atoms, but you can
 provide a protocol implementation for your own types by just implementing a `to_eml`
 function that converts your type to a valid Eml node. Most functions in Eml that need
-type conversions don't directly call `Eml.Content.to_eml/1`, but use `Eml.to_content/1`
+type conversions don't directly call `Eml.Data.to_eml`, but use `Eml.to_content`
 instead. This function adds nodes to existing content and tries to concatenate all
 binary data. Furthermore, although Eml content is always a list, its
 nodes can not be lists. `to_content` thus flattens all input data in order to
 guarantee Eml content always is a single list.
 
-Some examples using `Eml.to_content/1`
+Some examples using `Eml.to_content`
 ```elixir
 iex> Eml.to_content(nil)
 []
@@ -467,7 +467,7 @@ iex> Eml.to_content(["Hello ", ["world", ["!"]]])
 ["Hello world!"]
 
 iex> Eml.to_content([a: 1, b: 2])
-** (Protocol.UndefinedError) protocol Eml.Content not implemented for {:b, 2}
+** (Protocol.UndefinedError) protocol Eml.Data not implemented for {:b, 2}
 ```
 
 ### Notes

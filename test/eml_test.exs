@@ -84,7 +84,7 @@ defmodule EmlTest do
     assert :parameter == Eml.type %Eml.Parameter{}
   end
 
-  test "Eml.Content protocol and to_content" do
+  test "Eml.Data protocol and to_content" do
     assert []                  == Eml.to_content [nil, "", []]
     assert ["truefalse"]       == Eml.to_content [true, false]
     assert ["12345678"]        == Eml.to_content Enum.to_list(1..8)

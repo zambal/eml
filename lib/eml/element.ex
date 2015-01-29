@@ -148,7 +148,7 @@ defmodule Eml.Element do
   @spec update(t, (Eml.t -> Eml.Parsable.t)) :: t
   def update(%El{content: content} = el, fun) do
     content = for node <- content, data = fun.(node) do
-      Eml.Content.to_eml(data)
+      Eml.Data.to_eml(data)
     end
     %El{el| content: content}
   end

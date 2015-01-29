@@ -2,7 +2,7 @@
 
 ## v0.7.0-dev
  * Enhancements
-  * It's now easy to provide conversions for custom data types by using the new `Eml.Content` protocol
+  * It's now easy to provide conversions for custom data types by using the new `Eml.Data` protocol
   * Better separation of concerns by removing all data conversions from parsing
 
  * Bug fixes
@@ -10,7 +10,7 @@
  * Backwards incompatible changes
   * Renamed `Eml.Language.Html` to `Eml.Language.HTML` in order to be compliant with Elixir's naming conventions
   * The undocumented `Eml.parse/4` function is now replaced by `Eml.to_content/3`
-  * The `Eml.Parsable` protocol is replaced by `Eml.Content`, which is now strictly used for converting various
+  * The `Eml.Parsable` protocol is replaced by `Eml.Data`, which is now strictly used for converting various
     data types into valid Eml nodes.
 
 ## v0.6.0

@@ -24,6 +24,13 @@ defimpl Eml.Data, for: Atom do
   def to_eml(param), do: %Eml.Parameter{id: param}
 end
 
+defimpl Eml.Data, for: Tuple do
+  def to_eml({ :safe, data }) when is_binary(data), do: { :safe, data }
+  def to_eml(unsupported_tuple) do
+    raise Protocol.UndefinedError, protocol: Eml.Data, value: unsupported_tuple
+  end
+end
+
 defimpl Eml.Data, for: [BitString, Eml.Element, Eml.Parameter, Eml.Template] do
   def to_eml(data), do: data
 end

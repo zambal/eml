@@ -99,6 +99,10 @@ defmodule Eml.Language.HTML.Renderer do
     %{s| chunks: tchunks ++ chunks}
   end
 
+  defp parse_eml({ :safe, data }, _opts, %{chunks: chunks} = s) do
+    %{s| chunks: [data | chunks]}
+  end
+
   defp parse_eml(data, opts, %{chunks: chunks, current_tag: tag} = s) do
     %{s| chunks: [maybe_escape(data, tag, opts) | chunks]}
   end

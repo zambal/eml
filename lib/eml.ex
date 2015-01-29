@@ -63,7 +63,7 @@ defmodule Eml do
   def do_eml(quoted \\ nil, opts) do
     (quoted || opts[:do])
     |> handle_file(opts[:file])
-    |> handle_type(opts[:use], opts[:type])
+    |> handle_type(opts[:use] || @default_lang, opts[:type])
     |> handle_precompile(opts[:env] || __ENV__, opts[:precompile])
     |> handle_assign(opts[:handle_assign])
   end

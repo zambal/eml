@@ -10,7 +10,6 @@ defmodule Eml.Element do
 
   defstruct tag: :div, content: [], attrs: %{}
 
-  @type content       :: [Eml.t]
   @type attr_name     :: atom
   @type attr_value    :: String.t | Eml.Parameter.t | [String.t | Eml.Parameter]
   @type attrs         :: %{ attr_name => attr_value }
@@ -18,7 +17,7 @@ defmodule Eml.Element do
   @type attrs_in      :: [{ attr_name, attr_value_in }]
                        | %{ attr_name => attr_value_in }
 
-  @type t :: %El{tag: atom, content: content, attrs: attrs}
+  @type t :: %El{tag: atom, content: Eml.content, attrs: attrs}
 
   @doc "Creates a new `Eml.Element` structure with default values."
   @spec new() :: t
@@ -86,7 +85,7 @@ defmodule Eml.Element do
   Note that content in Eml always is a list, so when an element's
   content is empty, it returns an empty list.
   """
-  @spec content(t) :: content
+  @spec content(t) :: Eml.content
   def content(%El{content: content}), do: content
 
   @doc """
@@ -169,7 +168,7 @@ defmodule Eml.Element do
       #div<>
 
   """
-  @spec remove(t, Eml.t | content) :: t
+  @spec remove(t, Eml.t | Eml.content) :: t
   def remove(%El{content: content} = el, to_remove) do
     to_remove = if is_list(to_remove), do: to_remove, else: [to_remove]
     content = for node <- content, not node in to_remove do

@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.7.0-dev
+## v0.7.0
  * Enhancements
   * It's now easy to provide conversions for custom data types by using the new `Eml.Data` protocol
   * Better separation of concerns by removing all data conversions from parsing

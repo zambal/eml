@@ -51,6 +51,7 @@ defmodule Eml do
   @default_lang Eml.Language.HTML
 
   @type t             :: String.t | Eml.Element.t | Eml.Parameter.t | Eml.Template.t | { :safe, String.t }
+  @type content       :: [t]
   @type enumerable    :: Eml.Element.t | [Eml.Element.t]
   @type transformable :: t | [t]
   @type lang          :: module
@@ -628,7 +629,7 @@ defmodule Eml do
   end
 
   @doc false
-  @spec to_content(Eml.Data.t, [t], atom) :: [t]
+  @spec to_content(Eml.Data.t, content, atom) :: content
   def to_content(data, acc \\ [], insert_at \\ :begin)
 
   # No-ops
@@ -686,7 +687,7 @@ defmodule Eml do
       iex> Eml.parse("<body><h1 id='main-title'>The title</h1></body>")
       [#body<[#h1<%{id: "main-title"} ["The title"]>]>]
   """
-  @spec parse(String.t, lang) :: t | [t]
+  @spec parse(String.t, lang) :: content
   def parse(data, lang \\ @default_lang)
 
   def parse(data, lang) when is_binary(data) do

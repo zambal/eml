@@ -14,11 +14,11 @@ defmodule Eml.Template do
       ...>     img [src: :url, alt: :title]
       ...>     p :title
       ...>   end
-      ...> end |> Eml.compile!
+      ...> end |> Eml.compile
       #Template<[:title, :url]>
       iex> t = Template.bind(t, url: "http://i.imgur.com/4xPWp.jpg")
       #Template<[:title]>
-      iex> Eml.render!(t, title: "Little duck")
+      iex> Eml.render(t, title: "Little duck")
       "<div class='photo'><div><img alt='Little duck' src='http://i.imgur.com/4xPWp.jpg'/><p>Little duck</p></div></div>"
 
   """
@@ -74,7 +74,7 @@ defmodule Eml.Template do
 
   ### Example
       iex> use Eml
-      iex> t = Eml.compile!(div [id: :id], :content)
+      iex> t = Eml.compile(div [id: :id], :content)
       #Template<[:id, :content]>
       iex> Template.unbound(t)
       [:id, :content]
@@ -96,7 +96,7 @@ defmodule Eml.Template do
 
   ### Example
       iex> use Eml.Language.HTML
-      iex> t = Eml.compile!(div [id: :id], :content)
+      iex> t = Eml.compile(div [id: :id], :content)
       #Template<[:id, :content]>
       iex> Template.bound?(t)
       false

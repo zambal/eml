@@ -3,21 +3,14 @@ defmodule Eml.Language.HTML.Parser do
 
   # API
 
-  @spec parse(binary) :: Eml.t | Eml.error
+  @spec parse(binary) :: [Eml.t]
   def parse(html) do
-    res = case tokenize(html, { :blank, [] }, [], :blank) do
-            { :error, state } ->
-              { :error, state }
-            tokens ->
-              parse_content(tokens)
-          end
+    res = tokenize(html, { :blank, [] }, [], :blank) |> parse_content()
     case res do
-      { :error, state } ->
-        { :error, state }
       { content, [] } ->
         content
       { content, rest }->
-        { :error, [compiled: content, rest: rest] }
+        raise Eml.ParseError, type: :unparsable_tokens, value: [compiled: content, rest: rest]
     end
   end
 
@@ -239,7 +232,7 @@ defmodule Eml.Language.HTML.Parser do
              buf: buf,
              last_token: List.first(acc),
              next_char: String.first(rest)]
-    { :error, state}
+    raise Eml.ParseError, type: :tokenize, value: state
   end
 
   # Consumes character and put it in the buffer

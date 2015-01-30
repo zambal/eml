@@ -67,7 +67,7 @@ defmodule EmlTest do
 
   test "Render => Parse => Compare" do
     # Parsing always return results in a list
-    assert [doc()] == doc() |> Eml.render!() |> Eml.parse!()
+    assert [doc()] == doc() |> Eml.render() |> Eml.parse()
   end
 
   test "Types" do
@@ -76,12 +76,12 @@ defmodule EmlTest do
     assert :binary    == Eml.type "strings are binaries"
     assert :binary    == Eml.type Eml.unpackr div(42)
     assert :binary    == Eml.type Eml.unpack Eml.to_content([1,2,"z"])
-    assert :binary    == Eml.type Eml.render!(Eml.to_content(:a), [], render_params: true)
+    assert :binary    == Eml.type Eml.render(Eml.to_content(:a), [], render_params: true)
     assert :binary    == Eml.type Eml.to_content(:name)
-                                  |> Eml.compile!()
-                                  |> Eml.render!(name: "Vincent")
-    assert :template  == Eml.type Eml.compile!(Eml.to_content(:name))
-    assert :template  == Eml.type Eml.compile!([div([], 1), div([], 2), div([], :param), "..."])
+                                  |> Eml.compile()
+                                  |> Eml.render(name: "Vincent")
+    assert :template  == Eml.type Eml.compile(Eml.to_content(:name))
+    assert :template  == Eml.type Eml.compile([div([], 1), div([], 2), div([], :param), "..."])
     assert :parameter == Eml.type %Eml.Parameter{}
   end
 
@@ -267,7 +267,7 @@ defmodule EmlTest do
       div :fruit1
       div :fruit2
     end
-    { :ok, t } = Eml.compile(e)
+    t = Eml.compile(e)
 
     assert :template == Eml.type t
     assert false == Eml.Template.bound?(t)
@@ -284,7 +284,7 @@ defmodule EmlTest do
     e = for _ <- 1..4 do
       div [], :fruit
     end
-    { :ok, t } = Eml.compile(e)
+    t = Eml.compile(e)
 
     assert :template == Eml.type t
     assert false == Eml.Template.bound?(t)
@@ -294,14 +294,14 @@ defmodule EmlTest do
     assert [] == Eml.Template.unbound(t)
 
     assert "<div>lemon</div><div>lemon</div><div>lemon</div><div>lemon</div>" ==
-      Eml.render!(t)
+      Eml.render(t)
   end
 
   test "Templates in eml" do
     fruit  = section :fruit
-    tfruit = Eml.compile!(fruit)
+    tfruit = Eml.compile(fruit)
     aside  = aside tfruit
-    taside = Eml.compile!(aside)
+    taside = Eml.compile(aside)
 
     assert :template == Eml.type taside
 
@@ -309,14 +309,14 @@ defmodule EmlTest do
       section "lemon"
     end
 
-    assert Eml.render!(expected) == Eml.render!(taside, fruit: "lemon")
+    assert Eml.render(expected) == Eml.render(taside, fruit: "lemon")
   end
 
   test "Parse parameters from html" do
     html       = "<div><span>#param{name}</span><span>#param{age}</span></div"
     name_param = %Eml.Parameter{id: :name}
     age_param  = %Eml.Parameter{id: :age}
-    eml        = Eml.parse!(html)
+    eml        = Eml.parse(html)
 
     assert [name_param, age_param] == Eml.unpackr eml
   end
@@ -328,17 +328,17 @@ defmodule EmlTest do
             _custom2: :custom
 
     expected1 = "<div data-custom1='#param{custom}' data-custom2='#param{custom}' class='#param{class1} class2 #param{class3}' id='#param{id_param}'></div>"
-    assert expected1 == Eml.render!(e, [], render_params: true)
+    assert expected1 == Eml.render(e, [], render_params: true)
 
     expected2 = "<div data-custom1='1' data-custom2='1' class='class1 class2 class3' id='parameterized'></div>"
-    assert expected2 == Eml.render!(e, id_param: "parameterized",
+    assert expected2 == Eml.render(e, id_param: "parameterized",
                                        class1: "class1",
                                        class3: "class3",
                                        custom: 1)
 
-    { :ok, t } = Eml.compile(e, class3: "class3", custom: 1)
+    t = Eml.compile(e, class3: "class3", custom: 1)
     assert :template == Eml.type t
     assert Enum.sort([:id_param, :class1]) == Enum.sort(Eml.Template.unbound(t))
-    assert expected2 == Eml.render!(t, id_param: "parameterized", class1: "class1")
+    assert expected2 == Eml.render(t, id_param: "parameterized", class1: "class1")
   end
 end

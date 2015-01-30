@@ -31,7 +31,7 @@ defmodule Eml.Element do
       iex> e = Eml.Element.new(:div, [id: 42], "hallo!")
       #div<%{id: "42"} ["hallo!"]>
       iex> Eml.render(e)
-      {:ok, "<div id='42'>hallo!</div>"}
+      "<div id='42'>hallo!</div>"
 
   """
   @spec new(atom, attrs_in, Eml.Data.t) :: t

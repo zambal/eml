@@ -103,8 +103,12 @@ defmodule Eml.Language.HTML.Renderer do
     %{s| chunks: [data | chunks]}
   end
 
-  defp parse_eml(data, opts, %{chunks: chunks, current_tag: tag} = s) do
+  defp parse_eml(data, opts, %{chunks: chunks, current_tag: tag} = s) when is_binary(data) do
     %{s| chunks: [maybe_escape(data, tag, opts) | chunks]}
+  end
+
+  defp parse_eml(data, _, _) do
+    raise Eml.CompileError, type: :unsupported_content_type, value: data
   end
 
   # Attributes parsing
@@ -285,17 +289,17 @@ defmodule Eml.Language.HTML.Renderer do
   defp to_result(%{type: :templ, chunks: chunks}, opts) do
     t = %Template{chunks: chunks |> consolidate_chunks()}
     if opts.mode == :compile do
-      { :ok, t }
+      t
     else
-      { :error, { :unbound_params, Template.unbound(t) } }
+      raise Eml.CompileError, type: :unbound_params, value: Template.unbound(t)
     end
   end
 
   defp to_result(%{chunks: chunks}, %{output: :string}) do
-    { :ok, chunks |> :lists.reverse() |> IO.iodata_to_binary() }
+    chunks |> :lists.reverse() |> IO.iodata_to_binary()
   end
 
   defp to_result(%{chunks: chunks}, %{output: :iolist}) do
-    { :ok, chunks |> :lists.reverse() }
+    chunks |> :lists.reverse()
   end
 end

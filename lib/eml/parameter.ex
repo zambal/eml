@@ -11,17 +11,17 @@ defmodule Eml.Parameter do
 
       iex> e = Eml.to_content(:a_parameter)
       #param:a_parameter
-      iex> Eml.render!(e, a_parameter: "a value")
+      iex> Eml.render(e, a_parameter: "a value")
       "a value"
 
       iex> use Eml.Language.HTML
       iex> e = p [id: :some_id], :content
       #p<%{id: #param:some_id} [#param:content]>
-      iex> t = Eml.compile!(e, some_id: 42)
+      iex> t = Eml.compile(e, some_id: 42)
       #Template<[:content]>
       iex> t = Template.bind(t, content: "some content")
       #Template<BOUND>
-      iex> Eml.render!(t)
+      iex> Eml.render(t)
       "<p id='42'>some content</p>"
 
   """

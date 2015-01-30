@@ -8,6 +8,6 @@ defmodule Eml.Language do
 
   defcallback element?() :: true | false
 
-  defcallback parse(String.t) :: [Eml.t] | Eml.error
-  defcallback render(Eml.t, opts) :: { :ok, String.t } | Eml.error
+  defcallback parse(String.t) :: [Eml.t]
+  defcallback render(Eml.t, opts) :: String.t
 end

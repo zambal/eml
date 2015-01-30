@@ -23,7 +23,7 @@ defmodule Eml do
       span "age: "
       span age
     end
-  end |> Eml.render!
+  end |> Eml.render
   ```
 
   produces
@@ -50,10 +50,9 @@ defmodule Eml do
 
   @default_lang Eml.Language.HTML
 
-  @type t             :: String.t | Eml.Element.t | Eml.Parameter.t | Eml.Template.t
+  @type t             :: String.t | Eml.Element.t | Eml.Parameter.t | Eml.Template.t | { :safe, String.t }
   @type enumerable    :: Eml.Element.t | [Eml.Element.t]
   @type transformable :: t | [t]
-  @type error         :: { :error, term }
   @type lang          :: module
 
   @type unpackr_result  :: funpackr_result | [unpackr_result]
@@ -78,13 +77,13 @@ defmodule Eml do
   defp handle_type(ast, lang, :template) do
     quote do
       use unquote(lang)
-      Eml.compile! unquote(ast)
+      Eml.compile unquote(ast)
     end
   end
   defp handle_type(ast, lang, :markup) do
     quote do
       use unquote(lang)
-      Eml.render! unquote(ast)
+      Eml.render unquote(ast)
     end
   end
   defp handle_type(ast, lang, :eml) do
@@ -154,7 +153,7 @@ defmodule Eml do
   ```elixir
   def mydiv(content) do
     use Eml.Language.HTML
-    div(content) |> Eml.render!()
+    div(content) |> Eml.render
   end
   ```
 
@@ -237,7 +236,7 @@ defmodule Eml do
       { name, _, nil } = name
       quote do
         def unquote(name)(bindings \\ []) do
-          Eml.compile!(unquote(ast), bindings)
+          Eml.compile(unquote(ast), bindings)
         end
       end
     end
@@ -363,7 +362,7 @@ defmodule Eml do
       iex> Eml.add(e, "__", class: "inner", at: :begin)
       [#div<[#span<%{id: "inner1", class: "inner"} ["__hello "]>,
         #span<%{id: "inner2", class: "inner"} ["__world"]>]>]
-      iex> Eml.add(e, span("!"), tag: :div) |> Eml.render!()
+      iex> Eml.add(e, span("!"), tag: :div) |> Eml.render()
       "<div><span id='inner1' class='inner'>hello </span><span id='inner2' class='inner'>world</span><span>!</span></div>"
 
   """
@@ -424,7 +423,7 @@ defmodule Eml do
       [#div<%{id: "outer"}
        [#span<%{id: "inner1", class: "inner"} ["hello "]>,
         #span<%{id: "inner2", class: "inner"} ["world"]>]>]
-      iex> Eml.update(e, fn s -> String.upcase(s) end, pat: ~r/.+/) |> Eml.render!()
+      iex> Eml.update(e, fn s -> String.upcase(s) end, pat: ~r/.+/) |> Eml.render()
       "<div><span id='inner1' class='inner'>HELLO </span><span id='inner2' class='inner'>WORLD</span></div>"
 
   """
@@ -616,48 +615,11 @@ defmodule Eml do
   end
 
   def transform(node, fun) do
-    case node |> fun.() |> Data.to_eml() do
-      { :error, _ } -> nil
-      node ->
-        if element?(node),
-          do: %Element{node| content: transform(node.content, fun)},
-        else: node
-    end
-  end
-
-  @doc """
-  Parses data and converts it to eml
-
-  How the data is interpreted depends on the `lang` argument.
-  The default value is `Eml.Language.HTML', which means that
-  strings are parsed as html.
-
-  ### Examples:
-
-      iex> Eml.parse("<body><h1 id='main-title'>The title</h1></body>")
-      {:ok, [#body<[#h1<%{id: "main-title"} ["The title"]>]>]}
-  """
-  @spec parse(Eml.Data.t, lang) :: { :ok, t | [t] } | error
-  def parse(data, lang \\ @default_lang) do
-    case lang.parse(data) do
-      { :error, e } ->
-        { :error, e }
-      res ->
-        { :ok, res }
-    end
-  end
-
-  @doc """
-  Same as `Eml.parse/2`, except that it raises an exception, instead of returning an
-  error tuple in case of an error.
-  """
-  @spec parse!(Eml.Data.t, lang) :: t | [t]
-  def parse!(data, lang \\ @default_lang) do
-    case parse(data, lang) do
-      { :error, e } ->
-        raise ArgumentError, message: "Error #{inspect e}"
-      { :ok, eml } ->
-        eml
+    node = fun.(node) |> Data.to_eml()
+    if element?(node) do
+      %Element{node| content: transform(node.content, fun)}
+    else
+      node
     end
   end
 
@@ -707,6 +669,30 @@ defmodule Eml do
   defp add_nodes([], acc, _), do: acc
 
   @doc """
+  Parses data and converts it to eml
+
+  How the data is interpreted depends on the `lang` argument.
+  The default value is `Eml.Language.HTML', which means that
+  strings are parsed as html.
+
+  In case of error, raises an Eml.ParseError exception.
+
+  ### Examples:
+
+      iex> Eml.parse("<body><h1 id='main-title'>The title</h1></body>")
+      [#body<[#h1<%{id: "main-title"} ["The title"]>]>]
+  """
+  @spec parse(String.t, lang) :: t | [t]
+  def parse(data, lang \\ @default_lang)
+
+  def parse(data, lang) when is_binary(data) do
+    lang.parse(data)
+  end
+  def parse(data, _) do
+    raise Eml.ParseError, type: :unsupported_input, value: data
+  end
+
+  @doc """
   Renders eml content to the specified language, which is
   html by default.
 
@@ -721,19 +707,21 @@ defmodule Eml do
   * `:escape` - Escape `&`, `<` and `>` in attribute values and content to HTML entities.
      Accepted values are `true` (default) and `false`.
 
+  In case of error, raises an Eml.CompileError exception.
+
   ### Examples:
 
       iex> Eml.render(body(h1([id: "main-title"], "A title")))
-      {:ok, "<body><h1 id='main-title'>A title</h1></body>"}
+      "<body><h1 id='main-title'>A title</h1></body>"
 
       iex> Eml.render(body(h1([id: "main-title"], "A title")), quote: :double)
-      {:ok, "<body><h1 id=\"main-title\">A title</h1></body>"}
+      "<body><h1 id=\"main-title\">A title</h1></body>"
 
       iex> Eml.render(p "Tom & Jerry")
-      {:ok, "<p>Tom &amp; Jerry</p>"}
+      "<p>Tom &amp; Jerry</p>"
 
   """
-  @spec render(t, Eml.Template.bindings, Keyword.t) :: { :ok, binary } | error
+  @spec render(t, Eml.Template.bindings, Keyword.t) :: String.t
   def render(eml, bindings \\ [], opts \\ []) do
     { lang, opts } = Keyword.pop(opts, :lang, @default_lang)
     opts = Keyword.put(opts, :bindings, bindings)
@@ -742,121 +730,27 @@ defmodule Eml do
   end
 
   @doc """
-  Same as `Eml.render/3`, except that it raises an exception, instead of returning an
-  error tuple in case of an error.
-  """
-  @spec render!(t, Eml.Template.bindings, Keyword.t) :: binary
-  def render!(eml, bindings \\ [], opts \\ []) do
-    case render(eml, bindings, opts) do
-      { :ok, str } ->
-        str
-      { :error, { :unbound_params, params } } ->
-        raise ArgumentError, message: "Unbound parameters in template: #{inspect params}"
-      { :error, e } ->
-        raise ArgumentError, message: inspect(e, pretty: true)
-    end
-  end
+  Same as `Eml.render/3` except that it returns a template
+  that might conatain unbound parameters.
 
-  @doc """
-  Same as `Eml.render/3` except that it doesn't return an error when
-  not all parameters are bound and always returns a template.
+  In case of error, raises an Eml.CompileError exception.
 
   ### Examples:
 
       iex> t = Eml.compile(body(h1([id: "main-title"], :the_title)))
-      { :ok, #Template<[:the_title]> }
-      iex> Eml.render(t, bindings: [the_title: "The Title"])
-      {:ok, "<body><h1 id='main-title'>The Title</h1></body>"}
+      #Template<[:the_title]>
+      iex> t.chunks
+      ["<body><h1 id='main-title'>", #param:the_title, "</h1></body>"]
+      iex> Eml.render(t, the_title: "The Title")
+      "<body><h1 id='main-title'>The Title</h1></body>"
 
   """
-  @spec compile(t, Eml.Template.bindings, Keyword.t) :: { :ok, Eml.Template.t } | error
+  @spec compile(t, Eml.Template.bindings, Keyword.t) :: Eml.Template.t
   def compile(eml, bindings \\ [], opts \\ []) do
     { lang, opts } = Keyword.pop(opts, :lang, @default_lang)
     opts = Keyword.put(opts, :bindings, bindings)
     opts = Keyword.put(opts, :mode, :compile)
     lang.render(eml, opts)
-  end
-
-  @doc """
-  Same as `Eml.compile/3`, except that it raises an exception, instead of returning an
-  error tuple in case of an error.
-  """
-  @spec compile!(t, Eml.Template.bindings, Keyword.t) :: Eml.Template.t
-  def compile!(eml, bindings \\ [], opts \\ []) do
-     case compile(eml, bindings, opts) do
-       { :ok, str } ->
-        str
-      { :error, e } ->
-        raise ArgumentError, message: inspect(e, pretty: true)
-    end
-  end
-
-  @doc """
-  Similar to `Eml.compile/3`, but returns a compiled EEx template, instead of an Eml template.
-  """
-  @spec compile_to_eex(t, Eml.Template.bindings, Keyword.t) :: { :ok, Macro.t } | error
-  def compile_to_eex(eml, bindings \\ [], opts \\ []) do
-    eex_opts = [engine: opts[:eex_engine] || EEx.SmartEngine]
-    opts = Keyword.put_new(opts, :escape, false)
-    case compile(eml, bindings, opts) do
-      { :ok, res } ->
-        { :ok, to_eex(res) |> EEx.compile_string(eex_opts) }
-      { :error, e } ->
-        { :error, e }
-    end
-  end
-
-  @doc """
-  Same as `Eml.compile_to_eex/3`, except that it raises an exception, instead of returning an
-  error tuple in case of an error.
-  """
-  @spec compile_to_eex!(t, Eml.Template.bindings, Keyword.t) :: Macro.t
-  def compile_to_eex!(eml, bindings \\ [], opts \\ []) do
-    case compile_to_eex(eml, bindings, opts) do
-      { :ok, res } ->
-        res
-      { :error, e } ->
-        raise ArgumentError, message: inspect(e, pretty: true)
-    end
-  end
-
-  @doc """
-  Similar to `Eml.compile/3`, but returns an EEx template, instead of an Eml template.
-  """
-  @spec render_to_eex(t, Eml.Template.bindings, Keyword.t) :: { :ok, String.t } | error
-  def render_to_eex(eml, bindings \\ [], opts \\ []) do
-    opts = Keyword.put_new(opts, :escape, false)
-    case compile(eml, bindings, opts) do
-      { :ok, res } ->
-        { :ok, to_eex(res) }
-      { :error, e } ->
-        { :error, e }
-    end
-  end
-
-  @doc """
-  Same as `Eml.render_to_eex/3`, except that it raises an exception, instead of returning an
-  error tuple in case of an error.
-  """
-  @spec render_to_eex!(t, Eml.Template.bindings, Keyword.t) :: String.t
-  def render_to_eex!(eml, bindings \\ [], opts \\ []) do
-    case render_to_eex(eml, bindings, opts) do
-      { :ok, res } ->
-        res
-      { :error, e } ->
-        raise ArgumentError, message: inspect(e, pretty: true)
-    end
-  end
-
-  defp to_eex(%Eml.Template{chunks: chunks}) do
-    for c <- chunks, into: "" do
-      case c do
-        %Eml.Parameter{id: id} ->
-          "<%= #{id} %>"
-        _ ->
-          c
-      end
-    end
   end
 
   @doc """

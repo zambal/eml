@@ -28,7 +28,7 @@ div class: "person" do
     span "age: "
     span age
   end
-end |> Eml.render!
+end |> Eml.render
 ```
 
 produces
@@ -124,16 +124,13 @@ Note that attributes are stored internally as a map.
 #### Rendering
 
 Contents can be rendered to a string by calling `Eml.render`.
-Notice that Eml automatically inserts a doctype declaration when
-the html element is the root.
+Eml automatically inserts a doctype declaration when the html
+element is the root.
 ```elixir
 iex> html(body(div(42))) |> Eml.render
-{:ok,
- "<!doctype html>\n<html><body><div>42</div></body>\n</html>"}
-```
-Eml also provides a version of render that either succeeds, or raises an exception.
-```elixir
-iex> "text & more" |> div |> body |> html |> Eml.render!
+"<!doctype html>\n<html><body><div>42</div></body>\n</html>"
+
+iex> "text & more" |> div |> body |> html |> Eml.render
 "<!doctype html>\n<html><body><div>text &amp; more</div></body></html>"
 ```
 As you can see, you can also use Elixir's pipe operator for creating markup.
@@ -148,12 +145,12 @@ behaviour can also be switched off.
 Eml's parser by default converts a string with html content in to Eml content.
 ```elixir
 iex> Eml.parse "<!doctype html>\n<html><head><meta charset='UTF-8'></head><body><div>42</div></body></html>"
-{:ok, [#html<[#head<[#meta<%{charset: "UTF-8"}>]>, #body<[#div<["42"]>]>]>]}
+[#html<[#head<[#meta<%{charset: "UTF-8"}>]>, #body<[#div<["42"]>]>]>]
 
 iex> Eml.parse "<div class=\"content article\"><h1 class='title'>Title<h1><p class=\"paragraph\">blah &amp; blah</p></div>"
-{:ok, #div<%{class: ["content", "article"]}
+#div<%{class: ["content", "article"]}
  [#h1<%{class: "title"}
-  ["Title", #h1<[#p<%{class: "paragraph"} ["blah & blah"]>]>]>]}
+  ["Title", #h1<[#p<%{class: "paragraph"} ["blah & blah"]>]>]>]>
 ```
 
 The html parser is primarily written to parse html rendered by Eml, but it's
@@ -176,14 +173,14 @@ iex> e = h1 [:atoms, " ", :are, " ", :converted, " ", :to_parameters]
 #h1<[#param:atoms, " ", #param:are, " ", #param:converted, " ",
  #param:to_parameters]>
 
-iex> Eml.render!(e, atoms: "Atoms", are: "are", converted: "converted", to_parameters: "to parameters.")
+iex> Eml.render(e, atoms: "Atoms", are: "are", converted: "converted", to_parameters: "to parameters.")
 "<h1>Atoms are converted to parameters.</h1>"
 
-iex> Eml.render!(e, [], render_params: true)
+iex> Eml.render(e, [], render_params: true)
 "<h1>#param{atoms} #param{are} #param{converted} #param{to_parameters}</h1>"
 
-iex> { :ok, unbound } = Eml.compile(e)
-{ :ok, #Template<[:atoms, :are, :converted, :to_parameters]> }
+iex> unbound = Eml.compile(e)
+#Template<[:atoms, :are, :converted, :to_parameters]>
 
 iex> t = Eml.Template.bind(unbound, atoms: "Atoms", are: "are")
 #Template<[:converted, :to_parameters]>
@@ -191,7 +188,7 @@ iex> t = Eml.Template.bind(unbound, atoms: "Atoms", are: "are")
 iex> bound = Eml.Template.bind(t, converted: "converted", to_parameters: "to parameters.")
 #Template<BOUND>
 
-iex> Eml.render!(bound)
+iex> Eml.render(bound)
 "<h1>Atoms are converted to parameters.</h1>"
 ```
 When creating eml, atoms are automatically converted to parameters.
@@ -227,7 +224,7 @@ iex> t = precompile do
 ...>   end
 ...> end
 #Template<[:a, :b]>
-iex> Eml.render! t, a: 1, b: 2
+iex> Eml.render t, a: 1, b: 2
 "<div><span>1</span><span>2</span></div>"
 ```
 
@@ -249,7 +246,7 @@ iex> defmodule PrecompileTest do
 {:module, PrecompileTest,
  <<...>>,
  {:my_template, 1}}
-iex> PrecompileTest.my_template(a: 42, b: 43) |> Eml.render!
+iex> PrecompileTest.my_template(a: 42, b: 43) |> Eml.render
 "<div><span>42</span><span>43</span></div>"
 ```
 

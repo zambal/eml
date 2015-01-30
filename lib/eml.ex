@@ -63,7 +63,7 @@ defmodule Eml do
     (quoted || opts[:do])
     |> handle_file(opts[:file])
     |> handle_type(opts[:use] || @default_lang, opts[:type])
-    |> handle_precompile(opts[:env] || __ENV__, opts[:precompile])
+    |> handle_precompile(opts[:env] || __ENV__, opts[:file], opts[:precompile])
     |> handle_assign(opts[:handle_assign])
   end
 
@@ -93,11 +93,14 @@ defmodule Eml do
     end
   end
 
-  defp handle_precompile(ast, env, true) do
-      { expr, _ } = Code.eval_quoted(ast, [] , env)
-      expr
+  defp handle_precompile(ast, env, file, true) do
+    if file do
+      env = [file: file, line: 1]
+    end
+    { expr, _ } = Code.eval_quoted(ast, [] , env)
+    expr
   end
-  defp handle_precompile(ast, _, _) do
+  defp handle_precompile(ast, _, _, _) do
     ast
   end
 
@@ -226,6 +229,7 @@ defmodule Eml do
     ast = opts
     |> Keyword.put(:type, :template)
     |> Keyword.put(:precompile, true)
+    |> Keyword.put_new(:env, __CALLER__)
     |> do_eml()
     |> Macro.escape()
     if is_nil(name) do
@@ -233,7 +237,7 @@ defmodule Eml do
         unquote(ast)
       end
     else
-      { name, _, nil } = name
+      { name, _, _ } = name
       quote do
         def unquote(name)(bindings \\ []) do
           Eml.compile(unquote(ast), bindings)

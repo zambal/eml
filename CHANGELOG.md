@@ -17,6 +17,11 @@
     conversions are now done by `Eml.to_content/3` and consequently you can't force
     `Eml.parse/2` to return a list anymore, which would make it dangerous to
     use when parsing html partials where you don't know the nummer of nodes.
+  * `Eml.parse/2`, `Eml.render/3` and `Eml.compile/3` now always raise an exception on error.
+     Removed `Eml.parse!/2`, `Eml.render!/3` and `Eml.compile!/3`. Reason is that it was hard
+     to guarantee that those functions never raised an error and it simplifies Eml's API
+  * Removed `Eml.render_to_eex/3`, `Eml.render_to_eex!/3`, `Eml.compile_to_eex/3` and `Eml.compile_to_eex!/3`,
+    as they didn't provide much usefulness
 
 ## v0.6.0
 

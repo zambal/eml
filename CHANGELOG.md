@@ -3,6 +3,7 @@
 ## v0.7.1
  * Enhancements
   * Added unit tests that test escaping and enity parsing
+  * Documentation additions and corrections
 
  * Bug fixes
   * Single and double quotes in attributes now should get properly escaped

@@ -73,11 +73,11 @@ defmodule EmlTest do
   test "Types" do
     assert :element   == Eml.type div(42)
     assert :element   == Eml.type Eml.Element.new()
-    assert :binary    == Eml.type "strings are binaries"
-    assert :binary    == Eml.type Eml.unpackr div(42)
-    assert :binary    == Eml.type Eml.unpack Eml.to_content([1,2,"z"])
-    assert :binary    == Eml.type Eml.render(Eml.to_content(:a), [], render_params: true)
-    assert :binary    == Eml.type Eml.to_content(:name)
+    assert :string    == Eml.type "strings are binaries"
+    assert :string    == Eml.type Eml.unpackr div(42)
+    assert :string    == Eml.type Eml.unpack Eml.to_content([1,2,"z"])
+    assert :string    == Eml.type Eml.render(Eml.to_content(:a), [], render_params: true)
+    assert :string    == Eml.type Eml.to_content(:name)
                                   |> Eml.compile()
                                   |> Eml.render(name: "Vincent")
     assert :template  == Eml.type Eml.compile(Eml.to_content(:name))

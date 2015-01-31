@@ -23,10 +23,10 @@ defmodule Eml.Mixfile do
 
   defp description do
     """
-    Eml stands for Elixir Markup Language. It provides a flexible and
-    modular toolkit for generating, parsing and manipulating markup,
-    written in the Elixir programming language. It's main focus is
-    html, but other markup languages could be implemented as well.
+    Eml makes markup a first class citizen in Elixir. It provides a
+    flexible and modular toolkit for generating, parsing and
+    manipulating markup. It's main focus is html, but other markup
+    languages could be implemented as well.
     """
   end
 

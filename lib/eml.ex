@@ -1,9 +1,9 @@
 defmodule Eml do
   @moduledoc """
-  Eml stands for Elixir Markup Language. It provides a flexible and
-  modular toolkit for generating, parsing and manipulating markup,
-  written in the Elixir programming language. It's main focus is
-  html, but other markup languages could be implemented as well.
+  Eml makes markup a first class citizen in Elixir. It provides a
+  flexible and modular toolkit for generating, parsing and
+  manipulating markup. It's main focus is html, but other markup
+  languages could be implemented as well.
 
   To start off:
 
@@ -40,8 +40,8 @@ defmodule Eml do
   </div>
   ```
 
-  The functions and macro's in the `Eml` module are the bread and butter
-  of the Eml library.
+  The functions and macro's in the `Eml` module cover most of
+  Eml's public API. 
   """
 
   alias Eml.Element
@@ -491,7 +491,7 @@ defmodule Eml do
       []
       iex> Eml.remove(e, id: "inner1")
       [#div<[#span<%{id: "inner2", class: "inner"} ["world"]>]>]
-      iex> Eml.remove(e, pat: ~r/.*/)
+      iex> Eml.remove(e, pat: ~r/.+/)
       [#div<[#span<%{id: "inner1", class: "inner"}>,
         #span<%{id: "inner2", class: "inner"}>]>]
 
@@ -628,8 +628,27 @@ defmodule Eml do
     end
   end
 
-  @doc false
-  @spec to_content(Eml.Data.t, content, atom) :: content
+  @doc """
+  Converts data to `eml` content by using the `Eml.Data` protocol.
+
+  It also concatenates binaries and flatten lists to ensure the result
+  is valid content.
+
+  ### Example
+
+      iex> Eml.to_content(["1", 2, [3], " ", ["miles"]])
+      ["123 miles"]
+
+  You can also use this function to add data to existing content:
+ 
+      iex> Eml.to_content(42, [" is the number"], :begin)
+      ["42 is the number"]
+
+      iex> Eml.to_content(42, ["the number is "], :end)
+      ["the number is 42"]
+
+  """
+  @spec to_content(Eml.Data.t | [Eml.Data.t], content, atom) :: content
   def to_content(data, acc \\ [], insert_at \\ :begin)
 
   # No-ops
@@ -826,10 +845,10 @@ defmodule Eml do
   @doc """
   Returns the type of content.
 
-  The types are `:binary`, `:element`, `:template`, `:parameter`, or `:undefined`.
+  The types are `:string`, `:element`, `:template`, `:parameter`, or `:undefined`.
   """
-  @spec type(t) :: :binary | :element | :template | :parameter | :undefined
-  def type(bin) when is_binary(bin), do: :binary
+  @spec type(t) :: :string | :element | :template | :parameter | :undefined
+  def type(node) when is_binary(node), do: :string
   def type(%Element{}), do: :element
   def type(%Template{}), do: :template
   def type(%Eml.Parameter{}), do: :parameter
@@ -845,7 +864,14 @@ defmodule Eml do
   end
     
   # use Eml
+  @doc """
+  Import `defeml`, `defhtml` and `precompile` macro's.
 
+  Invoking it translates to:
+  ```
+  import Eml, only: [defeml: 2, defhtml: 2, precompile: 1, precompile: 2]
+  ```
+  """
   defmacro __using__(_) do
     quote do
       import Eml, only: [defeml: 2, defhtml: 2, precompile: 1, precompile: 2]

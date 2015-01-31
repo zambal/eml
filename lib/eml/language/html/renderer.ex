@@ -167,7 +167,7 @@ defmodule Eml.Language.HTML.Renderer do
   end
 
   defp parse_attr_value(value, opts, %{chunks: chunks} = s) do
-    %{s| chunks: [maybe_escape(value, opts) | chunks]}
+    %{s| chunks: [maybe_escape(value, :attribute, opts) | chunks]}
   end
 
   # Template parsing
@@ -210,19 +210,28 @@ defmodule Eml.Language.HTML.Renderer do
     "#param{#{param.id}}"
   end
 
-  defp maybe_escape(data, tag \\ nil, opts)
+  defp maybe_escape(data, :attribute, %{escape: true, quote: q}) do
+    data |> escape_content() |> escape_attribute(q)
+  end
   defp maybe_escape(data, tag, %{escape: true})
   when not tag in [:script, :style] do
-    escape(data)
+    escape_content(data)
   end
   defp maybe_escape(data, _tag, _opts) do
     data
   end
 
-  defp escape(s) do
+  defp escape_content(s) do
     :binary.replace(s, "&", "&amp;", [:global])
     |> :binary.replace("<", "&lt;", [:global])
     |> :binary.replace(">", "&gt;", [:global])
+  end
+
+  defp escape_attribute(s, :single) do
+    :binary.replace(s, "'", "&#39;", [:global])
+  end
+  defp escape_attribute(s, :double) do
+    :binary.replace(s, "\"", "&quot;", [:global])
   end
 
   defp is_void_element?(tag) do

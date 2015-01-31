@@ -311,6 +311,7 @@ defmodule Eml.Language.HTML.Parser do
                 "lt"     => "<",
                 "gt"     => ">",
                 "quot"   => "\"",
+                "#39"    => "'",
                 "hellip" => "…"}
 
   defp get_entity(chars) do

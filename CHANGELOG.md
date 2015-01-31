@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.7.1
+ * Enhancements
+  * Added unit tests that test escaping and enity parsing
+
+ * Bug fixes
+  * Single and double quotes in attributes now should get properly escaped
+
+ * Backwards incompatible changes
+
 ## v0.7.0
  * Enhancements
   * It's now easy to provide conversions for custom data types by using the new `Eml.Data` protocol
@@ -26,7 +35,7 @@
 ## v0.6.0
 
  * Enhancements
-   * Introduced `use Eml.Language.Html` as prefered way of defininf markup
+   * Introduced `use Eml.Language.Html` as prefered way of defining markup
    * Restructured README.md and added new content about precompiling
    * It's now possible to pass content as the first argument of an element macro, ie. `div "Hello world!"`
    * Added `Eml.compile_to_eex/3` and `Eml.render_to_eex/3`

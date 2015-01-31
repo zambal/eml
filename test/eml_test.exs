@@ -341,4 +341,68 @@ defmodule EmlTest do
     assert Enum.sort([:id_param, :class1]) == Enum.sort(Eml.Template.unbound(t))
     assert expected2 == Eml.render(t, id_param: "parameterized", class1: "class1")
   end
+
+  test "Default content escaping" do
+    expected = "<div>Tom &amp; Jerry</div>"
+    assert expected == Eml.render div("Tom & Jerry")
+
+    expected = "<div>Tom &gt; Jerry</div>"
+    assert expected == Eml.render div("Tom > Jerry")
+
+    expected = "<div>Tom &lt; Jerry</div>"
+    assert expected == Eml.render div("Tom < Jerry")
+  end
+
+  test "Default attributes escaping" do
+    expected = "<div data-custom='Tom &amp; Jerry'></div>"
+    assert expected == Eml.render div(_custom: "Tom & Jerry")
+
+    expected = "<div data-custom='Tom &gt; Jerry'></div>"
+    assert expected == Eml.render div(_custom: "Tom > Jerry")
+
+    expected = "<div data-custom='Tom &lt; Jerry'></div>"
+    assert expected == Eml.render div(_custom: "Tom < Jerry")
+  end
+
+  test "Attribute quotes escaping" do
+    expected = "<div data-custom='hello \"world\"'></div>"
+    assert expected == Eml.render div(_custom: "hello \"world\"")
+
+    expected = "<div data-custom='hello &#39;world&#39;'></div>"
+    assert expected == Eml.render div(_custom: "hello 'world'")
+
+    expected = "<div data-custom=\"hello &quot;world&quot;\"></div>"
+    assert expected == Eml.render div(_custom: "hello \"world\""), [], quote: :double
+
+    expected = "<div data-custom=\"hello 'world'\"></div>"
+    assert expected == Eml.render div(_custom: "hello 'world'"), [], quote: :double
+  end
+
+  test "Content entity parsing" do
+    html = "<p>Tom &amp; Jerry</p>"
+    assert [p("Tom & Jerry")] == Eml.parse(html)
+
+    html = "<p>Tom &gt; Jerry</p>"
+    assert [p("Tom > Jerry")] == Eml.parse(html)
+
+    html = "<p>Tom &lt; Jerry</p>"
+    assert [p("Tom < Jerry")] == Eml.parse(html)
+  end
+
+  test "Attributes entity parsing" do
+    html = "<p data-custom='Tom &amp; Jerry'></p>"
+    assert [p("data-custom": "Tom & Jerry")] == Eml.parse(html)
+
+    html = "<p data-custom='Tom &gt; Jerry'></p>"
+    assert [p("data-custom": "Tom > Jerry")] == Eml.parse(html)
+
+    html = "<p data-custom='Tom &lt; Jerry'></p>"
+    assert [p("data-custom": "Tom < Jerry")] == Eml.parse(html)
+
+    html = "<p data-custom='Tom &#39; Jerry'></p>"
+    assert [p("data-custom": "Tom ' Jerry")] == Eml.parse(html)
+
+    html = "<p data-custom=\"Tom &quot; Jerry\"></p>"
+    assert [p("data-custom": "Tom \" Jerry")] == Eml.parse(html)
+  end
 end

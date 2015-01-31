@@ -57,7 +57,7 @@ defmodule Eml do
   @type lang          :: module
 
   @type unpackr_result  :: funpackr_result | [unpackr_result]
-  @type funpackr_result :: String.t | Eml.Parameter.t | Eml.Template.t | [String.t | Eml.Parameter | Eml.Template.t]
+  @type funpackr_result :: String.t | Eml.Parameter.t | Eml.Template.t | [String.t | Eml.Parameter.t | Eml.Template.t]
 
   @doc false
   def do_eml(quoted \\ nil, opts) do

@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.8.0-dev
+ * Enhancements
+  * Much richer templates by using quoted expressions as replacement for parameters
+  * Removed all generic functionality from the html parser and renderer,
+    which makes it easier to implement other parsers and renderers
+  * Added `{ :safe, String.t }` as a new content type which you can use when you need to add content to an element that should not get escaped
+
+ * Bug fixes
+  * Using element macro's in a match had different confusing behaviour
+
+ * Backwards incompatible changes
+  * Removed `Eml.Template` and `Eml.Parameter` in favor of quoted expressions
+  * Replaced `Eml.precompile` with `Eml.Template` and `Eml.template_fn`
+  * Changed names of render options: :lang => :renderer, :quote => :quotes and :escape => :safe
+  * `Eml.compile` and `Eml.render` return results by default as `{ :safe, result }` so that
+    they can be easily added to other elements, witout getting escaped
+  * Importing all HTML element macro's is now done via `use Eml.HTML.Elements` instead of `use Eml.Language.HTML`
+
+
 ## v0.7.1
  * Enhancements
   * Added unit tests that test escaping and enity parsing

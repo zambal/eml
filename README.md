@@ -14,7 +14,7 @@ To start off:
 
 This piece of code
 ```elixir
-use Eml.Language.HTML
+use Eml.HTML.Elements
 
 name = "Vincent"
 age  = 36
@@ -63,27 +63,30 @@ Please read on for a walkthrough that tries to cover most of Eml's features.
 - [Intro](#intro)
 - [Rendering](#rendering)
 - [Parsing](#parsing)
-- [Parameters and templates](#parameters-and-templates)
-- [Precompiling](#precompiling)
+- [Compiling and templates](#compiling-and-templates)
 - [Unpacking](#unpacking)
 - [Querying eml](#querying-eml)
 - [Transforming eml](#transforming-eml)
-- [Languages and parser behaviour](#languages-and-parser-behaviour)
+- [Encoding data in Eml](#encoding-data-in-eml)
 - [Notes](#notes)
 
 #### Intro
 
 ```elixir
-iex> use Eml.Language.HTML
+iex> use Eml
+nil
+iex> use Eml.HTML.Elements
 nil
 ```
 
-By invoking `use Eml.Language.HTML` all generated html element macros from
-`Eml.Language.HTML.Elements` are imported into the current scope. The element
-macro's just translate to a call to `Eml.Element.new`, except when used as a pattern
-in a match operation. When used inside a match, the macro will be translated to
-%Eml.Element{...}. The nodes of an element can be `String.t`, `Eml.Element.t`,
-`Eml.Parameter.t`, or `Eml.Template.t`. We'll focus on strings and elements for now.
+By invoking `use Eml`, some macro's are imported into the current scope
+and the `Eml.Element` module is aliased. `use Eml.HTML.Elements` imports all
+generated html element macros from `Eml.HTML.Elements` into the current scope.
+The element macro's just translate to a call to `Eml.Element.new`, except when
+used as a pattern in a match operation. When used inside a match, the macro
+will be translated to %Eml.Element{...}. The nodes of an element can be
+`String.t`, `Eml.Element.t`, `{ :quoted, Macro.t }` and `{ :safe, String.t }`.
+We'll focus on strings and elements for now.
 ```elixir
 iex> div 42
 #div<["42"]>
@@ -126,18 +129,21 @@ Eml automatically inserts a doctype declaration when the html
 element is the root.
 ```elixir
 iex> html(body(div(42))) |> Eml.render
-"<!doctype html>\n<html><body><div>42</div></body>\n</html>"
+{:safe, "<!doctype html>\n<html><body><div>42</div></body>\n</html>"}
 
 iex> "text & more" |> div |> body |> html |> Eml.render
-"<!doctype html>\n<html><body><div>text &amp; more</div></body></html>"
+{:safe, "<!doctype html>\n<html><body><div>text &amp; more</div></body></html>"}
 ```
 As you can see, you can also use Elixir's pipe operator for creating markup.
 However, using do blocks, as can be seen in the introductory example,
-is more convenient most of the time. By default, Eml also escapes `&`,
-`<` and `>` characters in content or attribute values. Single and double quotes
-get escaped too in attribute values when needed. However, it is possible
-to turn of auto escaping when rendering `eml`.
+is more convenient most of the time. By default, Eml also escapes `&`, `'`, `"`,
+`<` and `>` characters in content or attribute values. `Eml.render` returns its 
+results in a { :safe, ... } tuple indicating that the string is safe to insert as
+content in other elementsHowever, it is possible to turn of auto escaping when 
+rendering eml.
 
+iex> Eml.render(div("Tom & Jerry"), [], safe: false)
+"<div>Tom & Jerry</div>"
 
 #### Parsing
 
@@ -158,111 +164,87 @@ of the parser are attribute values without quotes and elements that are not prop
 closed.
 
 
-#### Parameters and templates
+#### Compiling and templates
 
-Parameters and templates can be used in situations where most content
-is static and performance is critical. Templates in Eml are quite
-simple and don't provide any language constructs like template languages.
-This is for good reason. If anything more complex is needed than a
-'fill in the blanks' template, you should use regular `eml`.
+Compiling and templates can be used in situations where most content
+is static and performance is critical. A template is just Eml content
+that contains quoted expressions. `Eml.compile` precompiles all non quoted expressions.
+All quoted expressions are evaluated at runtime and it's results are
+rendered to eml and concatenated with the precompiled eml. You can use `Eml.render`
+to render the compiled template to markup. It's not needed to work with `Eml.compile`
+directly as using `Eml.template` and `Eml.template_fn` is more convenient in most cases.
+`Eml.template` defines a function that has all non quoted expressions prerendered and
+when called, concatenates the results from the quoted  expressions with it.
+`Eml.template_fn` works the same, but returns an anonymous function instead.
+
+Eml uses the assigns extension from `EEx` for easy data access in
+a template. See the `EEx` docs for more info about them. Since all
+runtime behaviour is written in quoted expressions, assigns need to
+be quoted too. To prevent you from writing `quote do: @my_assign` all
+the time, atoms can be used as a shortcut. This means that for example
+`div(:a)` and `div(quote do: @a)` have the same result. This convertion
+is being performed by the `Eml.Data` protocol. The function that the
+template macro defines accepts optionally an Keyword list for binding
+values to assigns.
 ```elixir
-iex> e = h1 [:atoms, " ", :are, " ", :converted, " ", :to_parameters]
-#h1<[#param:atoms, " ", #param:are, " ", #param:converted, " ",
- #param:to_parameters]>
+iex> e = h1 [:atoms, " ", :are, " ", :converted, " ", :to_assigns]
+#h1<[{:quoted,
+  {:@, [context: Eml.Data.Atom, import: Kernel],
+   [{:atoms, [], Eml.Data.Atom}]}}, " ",
+ {:quoted,
+  {:@, [context: Eml.Data.Atom, import: Kernel], [{:are, [], Eml.Data.Atom}]}},
+ " ",
+ {:quoted,
+  {:@, [context: Eml.Data.Atom, import: Kernel],
+   [{:converted, [], Eml.Data.Atom}]}}, " ",
+ {:quoted,
+  {:@, [context: Eml.Data.Atom, import: Kernel],
+   [{:to_assigns, [], Eml.Data.Atom}]}}]>
+iex> t = Eml.compile(e)
+{:quoted,
+ {:safe,
+  {:<>, ...}
+iex> Eml.render(t, atoms: "Atoms", are: "are", converted: "converted", to_assigns: "to assigns.")
+{ :safe, "<h1>Atoms are converted to assigns.</h1>" }
 
-iex> Eml.render(e, atoms: "Atoms", are: "are", converted: "converted", to_parameters: "to parameters.")
-"<h1>Atoms are converted to parameters.</h1>"
+iex> e = ul(quote do
+...>   for n <- @names, do: li n
+...> end)
+#ul<[quoted: {:for, [],
+  [{:<-, [],
+    [{:n, [], Elixir},
+     {:@, [context: Elixir, import: Kernel], [{:names, [], Elixir}]}]},
+   [do: {:li, [context: Elixir, import: Eml.HTML.Elements],
+     [{:n, [], Elixir}]}]]}]>
+# You can also call `Eml.render` directly, as it precompiles content too when needed
+iex> Eml.render e, names: ~w(john james jesse)
+{:safe, "<ul><li>john</li><li>james</li><li>jesse</li></ul>"}
 
-iex> Eml.render(e, [], render_params: true)
-"<h1>#param{atoms} #param{are} #param{converted} #param{to_parameters}</h1>"
-
-iex> unbound = Eml.compile(e)
-#Template<[:atoms, :are, :converted, :to_parameters]>
-
-iex> t = Eml.Template.bind(unbound, atoms: "Atoms", are: "are")
-#Template<[:converted, :to_parameters]>
-
-iex> bound = Eml.Template.bind(t, converted: "converted", to_parameters: "to parameters.")
-#Template<BOUND>
-
-iex> Eml.render(bound)
-"<h1>Atoms are converted to parameters.</h1>"
-```
-When creating eml, atoms are automatically converted to parameters.
-When you render eml with the `render_params: true` option, parameters
-are converted into a string representation. If Eml parses back html that
-contains these strings, it will automatically convert those into parameters.
-To bind data to parameters in Eml, you can either compile eml data to a template
-and use its various binding options, or you can directly bind data to parameters
-by providing bindings to `Eml.render`. If there are still unbound parameters left,
-`Eml.render` will return an error. The output of templates on Elixir's shell provides
-some information about their state. The returned template in the 4th example
-tells that it has four unbound parameters. The returned template in the second last
-example tells that whatever parameters it has, they are all bound and the template
-is ready to render. Parameters with the same name can occur multiple times in a
-template.
-
-#### Precompiling
-
-Eml also provides a precompile macro. `eml` code inside a precompile block will be
-compiled to a template during compile time of your project. In other words, the code
-gets evaluated when for example you invoke `mix compile`. the precompile macro can be
-called in two ways: inside a function and inside a module. When called inside a
-function it will return the compiled template and when called inside a module it will
-define a function that returns the template when called. Lets start with an example
-that uses precompile in a function (or in this case, in the interpreter)
-```elixir
-# Calling `use Eml` imports its macro's
-iex> use Eml
-iex> t = precompile do
-...>   div do
-...>     span :a
-...>     span :b
-...>   end
+iex> t = template_fn do
+...>   ul(quote do
+...>     for n <- @names, do: li n
+...>   end)
 ...> end
-#Template<[:a, :b]>
-iex> Eml.render t, a: 1, b: 2
-"<div><span>1</span><span>2</span></div>"
+#Function<6.90072148/1 in :erl_eval.expr/5>
+iex> t.(names: ~w(john james jesse))
+{:safe, "<ul><li>john</li><li>james</li><li>jesse</li></ul>"}
 ```
-
-Of course, calling `precompile` from iex doesn't make much sense, because the
-precompiling is done on the fly and doesn't give any performance benefits
-compared to `Eml.compile`.
-
-An example using precompile in a module
-```elixir
-iex> defmodule PrecompileTest do
-...>   use Eml
-...>   precompile my_template do
-...>     div do
-...>       span :a
-...>       span :b
-...>     end
-...>   end
-...> end
-{:module, PrecompileTest,
- <<...>>,
- {:my_template, 1}}
-iex> PrecompileTest.my_template(a: 42, b: 43) |> Eml.render
-"<div><span>42</span><span>43</span></div>"
-```
-
-As you can see, using precompile in a module defines a function that (optionally) accepts a
-list of bindings.
-
-Instead of defining a block of `eml`, `precompile` also accepts a path to a file. See the
-documentation for more info about the options of `precompile`
+To bind data to assigns in Eml, you can either compile eml data to a template
+and use `Eml.render` to bind data to assigns, or you can directly `Eml.render`,
+which also precompiles on the fly when needed. However, any performance benefits of
+using templates is lost this way. See the documentation of `Eml.template` for more info
+and examples about templates.
 
 **WARNING**
 
-Since the code in a precompile block is evaluated during compile time, you can't call
+Since unquoted expressions in a template are evaluated during compile time, you can't call
 functions or macro's from the same module, since the module isn't compiled yet. Also
 you can't reliably call functions or macro's from other modules in the same project as
 they might still not be compiled. Calling functions or macro's from dependencies should
 work, as Elixir always compiles dependencies before the project itself.
 
-Generally, you want to keep your templates as pure as possible.
-
+Quoted expressions however have normal access to other functions, because they are evaluated
+at runtime.
 
 #### Unpacking
 
@@ -326,14 +308,14 @@ Let's continue with some other examples
 iex> Enum.member?(e, "TODO")
 true
 
-iex> Enum.filter(e, &Eml.Element.has?(&1, tag: :h3))
+iex> Enum.filter(e, &Element.has?(&1, tag: :h3))
 [#h3<["Hello world"]>]
 
-iex> Enum.filter(e, &Eml.Element.has?(&1, class: "article"))
+iex> Enum.filter(e, &Element.has?(&1, class: "article"))
 [#section<%{class: ["intro", "article"]} [#h3<["Hello world"]>]>,
  #section<%{class: ["conclusion", "article"]} ["TODO"]>]
 
-iex> Enum.filter(e, &Eml.Element.has?(&1, tag: :h3, class: "article"))
+iex> Enum.filter(e, &Element.has?(&1, tag: :h3, class: "article"))
 []
 ```
 
@@ -429,14 +411,7 @@ continuing with its children. If the parent node gets removed,
 the children will be removed too and won't get evaluated.
 
 
-#### Languages and parser behaviour
-
-Let's turn back to Eml's data types. A language implements the Eml.Language behaviour,
-providing a `parse`, `render` and `element?` function. The `parse` function converts strings
-into eml. The `render` function converts eml into the string representation the
-language has. The `element?` function tells if the language provides element macros.
-By default Eml provides `Eml.Language.HTML`. Other languages can be implemented as long as
-it implements the Eml.Language behaviour.
+#### Encoding data in Eml
 
 In order to provide conversions from various data types, Eml provides the `Eml.Data`
 protocol. Eml provides a implementation for strings, numbers and atoms, but you can

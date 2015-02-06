@@ -54,13 +54,18 @@ defimpl Eml.Data, for: Atom do
   def to_eml(nil),   do: nil
   def to_eml(true),  do: "true"
   def to_eml(false), do: "false"
-  def to_eml(param), do: %Eml.Parameter{id: param}
+  def to_eml(assign), do: { :quoted, quote do: @unquote(Macro.var(assign, __MODULE__)) }
 end
 
 defimpl Eml.Data, for: Tuple do
   def to_eml({ :safe, data }) when is_binary(data), do: { :safe, data }
-  def to_eml(unsupported_tuple) do
-    raise Protocol.UndefinedError, protocol: Eml.Data, value: unsupported_tuple
+  def to_eml({ :quoted, quoted }), do: { :quoted, quoted }
+  def to_eml(data) do
+    if Macro.validate(data) == :ok do
+      { :quoted, data }
+    else
+      raise Protocol.UndefinedError, protocol: Eml.Data, value: data
+    end
   end
 end
 

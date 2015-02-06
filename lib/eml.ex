@@ -9,7 +9,7 @@ defmodule Eml do
 
   This piece of code
   ```elixir
-  use Eml.Language.HTML
+  use Eml.HTML.Elements
 
   name = "Vincent"
   age  = 36
@@ -41,208 +41,125 @@ defmodule Eml do
   ```
 
   The functions and macro's in the `Eml` module cover most of
-  Eml's public API. 
+  Eml's public API.
   """
 
   alias Eml.Element
-  alias Eml.Template
   alias Eml.Data
 
-  @default_lang Eml.Language.HTML
+  @default_renderer Eml.HTML.Renderer
+  @default_parser Eml.HTML.Parser
 
-  @type t             :: String.t | Eml.Element.t | Eml.Parameter.t | Eml.Template.t | { :safe, String.t }
-  @type content       :: [t]
-  @type enumerable    :: Eml.Element.t | [Eml.Element.t]
-  @type transformable :: t | [t]
-  @type lang          :: module
-
+  @type t               :: String.t | Eml.Element.t | { :safe, String.t } | { :quoted, Macro.t }
+  @type content         :: [t]
+  @type enumerable      :: Eml.Element.t | [Eml.Element.t]
+  @type transformable   :: t | [t]
+  @type bindings        :: [{ atom, Eml.Data.t }]
   @type unpackr_result  :: funpackr_result | [unpackr_result]
-  @type funpackr_result :: String.t | Eml.Parameter.t | Eml.Template.t | [String.t | Eml.Parameter.t | Eml.Template.t]
-
-  @doc false
-  def do_eml(quoted \\ nil, opts) do
-    (quoted || opts[:do])
-    |> handle_file(opts[:file])
-    |> handle_type(opts[:use] || @default_lang, opts[:type] || :eml)
-    |> handle_precompile(opts[:env] || [], opts[:file], opts[:precompile])
-    |> handle_assign(opts[:handle_assign])
-  end
-
-  defp handle_file(_, file) when is_binary(file) do
-    file
-    |> File.read!()
-    |> Code.string_to_quoted!(file: file, line: 1)
-  end
-  defp handle_file(ast, _), do: ast
-
-  defp handle_type(ast, lang, :template) do
-    quote do
-      use unquote(lang)
-      Eml.compile unquote(ast)
-    end
-  end
-  defp handle_type(ast, lang, :markup) do
-    quote do
-      use unquote(lang)
-      Eml.render unquote(ast)
-    end
-  end
-  defp handle_type(ast, lang, :eml) do
-    quote do
-      use unquote(lang)
-      unquote(ast)
-    end
-  end
-
-  defp handle_precompile(ast, env, file, true) do
-    if file do
-      env = [file: file, line: 1]
-    end
-    { expr, _ } = Code.eval_quoted(ast, [] , env)
-    expr
-  end
-  defp handle_precompile(ast, _, _, _) do
-    ast
-  end
-
-  defp handle_assign(ast, true), do: Macro.prewalk(ast, &EEx.Engine.handle_assign/1)
-  defp handle_assign(ast, _), do: ast
+  @type funpackr_result :: String.t | Macro.t | [String.t | Macro.t]
 
   @doc """
-  Define a function that produces eml.
+  Define a template that renders eml to a string during compile time.
 
-  This macro is provided both for convenience and
-  to be able to show intention of code.
+  Quoted expressions are evaluated at runtime and it's results are
+  rendered to eml and concatenated with the precompiled eml.
 
-  This:
+  Eml uses the assigns extension from `EEx` for easy data access in
+  a template. See the `EEx` docs for more info about them. Since all
+  runtime behaviour is written in quoted expressions, assigns need to
+  be quoted too. To prevent you from writing `quote do: @my_assign` all
+  the time, atoms can be used as a shortcut. This means that for example
+  `div(:a)` and `div(quote do: @a)` have the same result. This convertion
+  is being performed by the `Eml.Data` protocol. The function that the
+  template macro defines accepts optionally an Keyword list for binding
+  values to assigns.
 
-  ```elixir
-  defeml mydiv(content), do: div(content)
-  ```
-
-  is effectively the same as:
-
-  ```elixir
-  def mydiv(content) do 
-    use Eml.Language.HTML
-    div(content)
-  end
-  ```
-
-  """
-  defmacro defeml(call, do_block) do
-    block = do_block[:do]
-    ast   = do_eml(block, type: :eml)
-    quote do
-      def unquote(call) do
-        unquote(ast)
-      end
-    end
-  end
-
-  @doc """
-  Define a function that produces html.
-
-  This macro is provided both for convenience and
-  to be able to show intention of code.
-
-  This:
-
-  ```elixir
-  defhtml mydiv(content), do: div(content)
-  ```
-
-  is effectively the same as:
-
-  ```elixir
-  def mydiv(content) do
-    use Eml.Language.HTML
-    div(content) |> Eml.render
-  end
-  ```
-
-  """
-  defmacro defhtml(call, do_block) do
-    block = do_block[:do]
-    ast   = do_eml(block, type: :markup, use: Eml.Language.HTML)
-    quote do
-      def unquote(call) do
-        unquote(ast)
-      end
-    end
-  end
-
-  @doc """
-  Define a function that compiles eml to a template during compile time.
-
-  The function that this macro defines accepts optionally a bindings
-  object as argument for binding values to parameters. Note that because
-  the code in the do block is evaluated at compile time, it's not possible
-  to call other functions from the same module.
+  Note that because the unquoted code is evaluated at compile time, it's not
+  possible to call other functions from the same module. Quoted expressions
+  however can call any local function, including other templates.
 
   Instead of defining a do block, you can also provide a path to a file with
-  eml content.
+  the `:file` option.
 
-  When you ommit the name, this macro can also be used to precompile a
-  block or file inside any function.
+  In addition, all options of `Eml.render/3` also apply to the template macro.
 
   ### Example:
 
-      iex> File.write! "test.eml.exs", "div [id: "name"], :name"
+      iex> File.write! "test.eml.exs", "div(quote do: @number + @number)"
       iex> defmodule MyTemplates do
       ...>   use Eml
+      ...>   use Eml.HTML.Elements
       ...>
-      ...>   precompile test1 do
+      ...>   template fruit do
       ...>     prefix = "fruit"
       ...>     div do
       ...>       span [class: "prefix"], prefix
-      ...>       span [class: "content"], :fruit
+      ...>       span [class: "name"], :name
       ...>     end
       ...>   end
       ...>
-      ...>   precompile from_file, file: "test.eml.exs"
-      ...>
-      ...>   defhtml test2 do
-      ...>     precompiled = precompile do
-      ...>       # Everything inside this block is evaluated at compile time
-      ...>       p [], :fruit
-      ...>     end
-      ...>
-      ...>     # the rest of the function is evaluated at runtime
+      ...>   template tropical_fruit do
       ...>     body do
-      ...>       bind precompiled, fruit: "Strawberry"
+      ...>       h2 "Tropical Fruit"
+      ...>       quote do
+      ...>         for n <- @names do
+      ...>           fruit name: n
+      ...>         end
+      ...>       end
       ...>     end
       ...>   end
+      ...>
+      ...>   template from_file, file: "test.eml.exs"
       ...> end
       iex> File.rm! "test.eml.exs"
-      iex> MyTemplates.test1
-      #Template<[:fruit]>
-      iex> MyTemplates.test fruit: "lemon"
-      "<div><span class='prefix'>fruit</span><span class='content'>lemon</span></div>"
-      iex> MyTemplates.from_file name: "Vincent"
-      "<div id='name'>Vincent</div>"
-      iex> MyTemplated.test2
+      iex> MyTemplates.tropical_fruit names: ~w(mango papaya banana acai)
+      {:safe,
+       "<body><h2>Tropical Fruit</h2><div><span class='prefix'>fruit</span><span class='name'>mango</span></div><div><span class='prefix'>fruit</span><span class='name'>papaya</span></div><div><span class='prefix'>fruit</span><span class='name'>banana</span></div><div><span class='prefix'>fruit</span><span class='name'>acai</span></div></body>"}
+      iex> MyTemplates.from_file number: 21
+      { :safe, "<div>42</div>" }
+      iex> MyTemplates.precompile()
       "<body><p>Strawberry</p></body>"
 
   """
-
-  defmacro precompile(name \\ nil, opts) do
-    ast = opts
-    |> Keyword.put(:type, :template)
-    |> Keyword.put(:precompile, true)
-    |> Keyword.put_new(:env, __CALLER__)
-    |> do_eml()
-    |> Macro.escape()
-    if is_nil(name) do
-      quote do
-        unquote(ast)
+  defmacro template(name, opts, do_block \\ []) do
+    opts = Keyword.merge(opts, do_block)
+    compiled = precompile(__CALLER__, opts)
+    { name, _, _ } = name
+    quote do
+      def unquote(name)(var!(assigns) \\ []) do
+        _ = var!(assigns)
+        unquote(compiled)
       end
-    else
-      { name, _, _ } = name
-      quote do
-        def unquote(name)(bindings \\ []) do
-          Eml.compile(unquote(ast), bindings)
-        end
+    end
+  end
+
+
+  @doc """
+  Define a template as an anonymous function.
+
+  All non quoted expressions are precompiled and the anonymous function that
+  is returned expects a Keyword list for binding assigns.
+
+  See `Eml.template/3` for more info.
+
+  ### Example
+      iex> t = template_fn do
+      ...>   names = quote do
+      ...>     for n <- @names, do: li n
+      ...>   end
+      ...>   ul names
+      ...> end
+      iex> t.(names: ~w(john james jesse))
+      {:safe, "<ul><li>john</li><li>james</li><li>jesse</li></ul>"}
+
+  """
+  defmacro template_fn(opts, do_block \\ []) do
+    opts = Keyword.merge(opts, do_block)
+    compiled = precompile(__CALLER__, opts)
+    quote do
+      fn var!(assigns) ->
+        _ = var!(assigns)
+        unquote(compiled)
       end
     end
   end
@@ -251,7 +168,7 @@ defmodule Eml do
   Selects content from arbritary eml.
 
   It will traverse the complete eml tree, so all nodes are
-  evaluated. There is however currently no way to select templates
+  evaluated. There is however currently no way to select quoteds
   or parameters.
 
   Nodes are matched depending on the provided options.
@@ -300,7 +217,7 @@ defmodule Eml do
     Enum.flat_map(content, &select(&1, opts))
   end
 
-  def select(%Template{}, _opts), do: []
+  def select(node, _opts) when is_tuple(node), do: []
 
   def select(node, opts) do
     tag            = opts[:tag] || :any
@@ -640,7 +557,7 @@ defmodule Eml do
       ["123 miles"]
 
   You can also use this function to add data to existing content:
- 
+
       iex> Eml.to_content(42, [" is the number"], :begin)
       ["42 is the number"]
 
@@ -695,8 +612,8 @@ defmodule Eml do
   @doc """
   Parses data and converts it to eml
 
-  How the data is interpreted depends on the `lang` argument.
-  The default value is `Eml.Language.HTML', which means that
+  How the data is interpreted depends on the `parser` argument.
+  The default value is `Eml.HTML.Parser', which means that
   strings are parsed as html.
 
   In case of error, raises an Eml.ParseError exception.
@@ -706,75 +623,117 @@ defmodule Eml do
       iex> Eml.parse("<body><h1 id='main-title'>The title</h1></body>")
       [#body<[#h1<%{id: "main-title"} ["The title"]>]>]
   """
-  @spec parse(String.t, lang) :: content
-  def parse(data, lang \\ @default_lang)
+  @spec parse(String.t, module) :: content
+  def parse(data, parser \\ @default_parser)
 
-  def parse(data, lang) when is_binary(data) do
-    lang.parse(data)
+  def parse(data, parser) when is_binary(data) do
+    parser.parse(data)
   end
   def parse(data, _) do
     raise Eml.ParseError, type: :unsupported_input, value: data
   end
 
   @doc """
-  Renders eml content to the specified language, which is
-  html by default.
+  Renders eml content with the specified markup renderer, which is html by default.
 
-  When the provided eml contains a template, you can bind
-  its parameters by providing a Keyword list as the
-  second argument where the keys are the parameter id's.
+  When the provided eml contains quoted expressions that use assigns,
+  you can bind to these by providing a Keyword list as the
+  second argument.
 
   The accepted options are:
 
-  * `:lang` - The language to render to, by default `Eml.Language.HTML`
-  * `:quote` - The type of quotes used for attribute values. Accepted values are `:single` (default) and `:double`.
-  * `:escape` - Escape `&`, `<` and `>` in attribute values and content to HTML entities.
+  * `:renderer` - The renderer to use, by default `Eml.HTML.Renderer`
+  * `:quotes` - The type of quotes used for attribute values. Accepted values are `:single` (default) and `:double`.
+  * `:safe` - When true, escape `&`, `<`, `>` `'` and `\"` in attribute values and content.
      Accepted values are `true` (default) and `false`.
 
-  In case of error, raises an Eml.CompileError exception.
+  If the option `:safe` is true, the rendered string will be wrapped in a `{ :safe, string }`
+  tuple. This allows the result to be inserted as content in other Eml elements, without the markup
+  getting escaped.
+
+  In case of error, raises an Eml.CompileError exception. If the input contains a quoted expression
+  that has a compile or runtime error, an exception will be raised for those too.
 
   ### Examples:
 
       iex> Eml.render(body(h1([id: "main-title"], "A title")))
-      "<body><h1 id='main-title'>A title</h1></body>"
+      {:safe, "<body><h1 id='main-title'>A title</h1></body>"}
 
-      iex> Eml.render(body(h1([id: "main-title"], "A title")), quote: :double)
-      "<body><h1 id=\"main-title\">A title</h1></body>"
+      iex> Eml.render(body(h1([id: "main-title"], "A title")), quotes: :double)
+      {:safe, "<body><h1 id=\"main-title\">A title</h1></body>"}
 
       iex> Eml.render(p "Tom & Jerry")
-      "<p>Tom &amp; Jerry</p>"
+      {:safe, "<p>Tom &amp; Jerry</p>"}
+
+      iex> Eml.render(p("Tom & Jerry"), [], safe: false)
+      "<p>Tom & Jerry</p>"
+
+      iex> Eml.render(p(quote do: @names), names: "Tom & Jerry")
+      {:safe, "<p>Tom &amp; Jerry</p>"}
+
+      iex> Eml.render(p(:names), names: "Tom & Jerry")
+      {:safe, "<p>Tom &amp; Jerry</p>"}
 
   """
-  @spec render(t, Eml.Template.bindings, Keyword.t) :: String.t
-  def render(eml, bindings \\ [], opts \\ []) do
-    { lang, opts } = Keyword.pop(opts, :lang, @default_lang)
-    opts = Keyword.put(opts, :bindings, bindings)
+  @spec render(t, Eml.bindings, Keyword.t) :: String.t
+  def render(eml, assigns \\ [], opts \\ [])
+
+  def render({ :safe, string }, _assigns, _opts) do
+    { :safe, string }
+  end
+  def render({ :quoted, quoted }, assigns, _opts) do
+    { string, _ } = Code.eval_quoted(quoted, [assigns: assigns])
+    string
+  end
+  def render(content, assigns, opts) do
+    { renderer, opts } = Keyword.pop(opts, :renderer, @default_renderer)
     opts = Keyword.put(opts, :mode, :render)
-    lang.render(eml, opts)
+    case renderer.render(content, opts) do
+      quoted = { :quoted, _ } -> render(quoted, assigns, opts)
+      string -> string
+    end
   end
 
   @doc """
-  Same as `Eml.render/3` except that it returns a template
-  that might conatain unbound parameters.
+  Compiles eml to a quoted expression.
+
+  Accepts the same options as `Eml.render/3` and its result
+  can be rendered to a string with a subsequent call to `Eml.render/3`.
 
   In case of error, raises an Eml.CompileError exception.
 
   ### Examples:
 
       iex> t = Eml.compile(body(h1([id: "main-title"], :the_title)))
-      #Template<[:the_title]>
+      #Quoted<[:the_title]>
       iex> t.chunks
       ["<body><h1 id='main-title'>", #param:the_title, "</h1></body>"]
       iex> Eml.render(t, the_title: "The Title")
       "<body><h1 id='main-title'>The Title</h1></body>"
 
   """
-  @spec compile(t, Eml.Template.bindings, Keyword.t) :: Eml.Template.t
-  def compile(eml, bindings \\ [], opts \\ []) do
-    { lang, opts } = Keyword.pop(opts, :lang, @default_lang)
-    opts = Keyword.put(opts, :bindings, bindings)
+
+  @spec compile(t, Keyword.t) :: Eml.Quoted.t
+  def compile(eml, opts \\ []) do
+    { renderer, opts } = Keyword.pop(opts, :renderer, @default_renderer)
     opts = Keyword.put(opts, :mode, :compile)
-    lang.render(eml, opts)
+    renderer.render(eml, opts)
+  end
+
+  @doc false
+  @spec precompile(Macro.Env.t | Keyword.t, Keyword.t) :: Macro.t
+  def precompile(env \\ [], opts) do
+    file = opts[:file]
+    ast = if file do
+            string = File.read!(file)
+            Code.string_to_quoted!(string, file: file, line: 1)
+          else
+            opts[:do]
+          end
+    { res, _ } = Code.eval_quoted(ast, [], env)
+    compile_opts = Keyword.take(opts, [:escape, :quotes, :renderer])
+    { :quoted, compiled } = Eml.compile(res, compile_opts)
+    compiled
   end
 
   @doc """
@@ -795,11 +754,11 @@ defmodule Eml do
       "hallo"
 
   """
-  @spec unpack(t) :: t
-  def unpack(%Element{content: [node]}), do: node
-  def unpack(%Element{content: content}),   do: content
-  def unpack([node]),                   do: node
-  def unpack(eml),                         do: eml
+  @spec unpack(t | [t]) :: t | [t]
+  def unpack({ :safe, string }),          do: string
+  def unpack(%Element{content: content}), do: unpack(content)
+  def unpack([node]),                     do: node
+  def unpack(content_or_node),            do: content_or_node
 
   @doc """
   Extracts a value recursively from content or an element
@@ -814,11 +773,12 @@ defmodule Eml do
 
   """
   @spec unpackr(t) :: unpackr_result
-  def unpackr(%Element{content: [node]}),   do: unpackr(node)
-  def unpackr(%Element{content: content}),     do: unpack_content(content)
-  def unpackr([node]),                     do: unpackr(node)
+  def unpackr({ :safe, string }),             do: string
+  def unpackr(%Element{content: [node]}),     do: unpackr(node)
+  def unpackr(%Element{content: content}),    do: unpack_content(content)
+  def unpackr([node]),                        do: unpackr(node)
   def unpackr(content) when is_list(content), do: unpack_content(content)
-  def unpackr(node),                       do: node
+  def unpackr(node),                          do: node
 
   defp unpack_content(content) do
     for node <- content, do: unpackr(node)
@@ -845,24 +805,15 @@ defmodule Eml do
   @doc """
   Returns the type of content.
 
-  The types are `:string`, `:element`, `:template`, `:parameter`, or `:undefined`.
+  The types are `:string`, `:safe_string`, `:element`, `:quoted`, or `:undefined`.
   """
-  @spec type(t) :: :string | :element | :template | :parameter | :undefined
+  @spec type(t) :: :string | :safe_string | :element | :quoted | :undefined
   def type(node) when is_binary(node), do: :string
+  def type({ :safe, _ }), do: :safe_string
+  def type({ :quoted, _ }), do: :quoted
   def type(%Element{}), do: :element
-  def type(%Template{}), do: :template
-  def type(%Eml.Parameter{}), do: :parameter
   def type(_), do: :undefined
 
-  @doc false
-  def default_alias_and_imports do
-    quote do
-      alias Eml.Element
-      alias Eml.Template
-      import Eml.Template, only: [bind: 2]
-    end
-  end
-    
   # use Eml
   @doc """
   Import `defeml`, `defhtml` and `precompile` macro's.
@@ -874,7 +825,8 @@ defmodule Eml do
   """
   defmacro __using__(_) do
     quote do
-      import Eml, only: [defeml: 2, defhtml: 2, precompile: 1, precompile: 2]
+      alias Eml.Element
+      import Eml, only: [template_fn: 1, template_fn: 2, template: 2, template: 3]
     end
   end
 end

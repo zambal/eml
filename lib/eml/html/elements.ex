@@ -1,8 +1,9 @@
-defmodule Eml.Language.HTML.Elements do
+defmodule Eml.HTML.Elements do
   @moduledoc """
   This is the container module of all the generated HTML element macro's.
-  
-  To import all these macro's into current scope, invoke `use Eml.Language.HTML`
+
+  To import all these macro's into current scope, invoke `use Eml.Elements.HTML`
+  instead of `import Eml.HTML.Elements`, because it also handles ambiguous named elements.
   """
 
   use Eml.Element.Generator, tags: [:html, :head, :title, :base, :link, :meta, :style,
@@ -18,48 +19,4 @@ defmodule Eml.Language.HTML.Elements do
                                    :tr, :td, :th, :form, :fieldset, :legend, :label, :input, :button, :select,
                                    :datalist, :optgroup, :option, :textarea, :keygen, :output, :progress,
                                    :meter, :details, :summary, :menuitem, :menu]
-end
-
-defmodule Eml.Language.HTML do
-  @moduledoc """
-  This module implements the `Eml.Language` behaviour and
-  contains a `use` macro for importing all the generated
-  element macro's in to the current scope.
-  """
-  @behaviour Eml.Language
-
-  @doc false
-  def element?(), do: true
-
-  @doc false
-  def parse(data) do
-    Eml.Language.HTML.Parser.parse(data)
-  end
-
-  @doc false
-  def render(eml, opts) do
-    Eml.Language.HTML.Renderer.render(eml, opts)
-  end
-
-  @doc """
-  Import HTML element macro's
-
-  Invoking `use Eml.Language.HTML` translates to:
-  ```elixir
-  alias Eml.Element
-  alias Eml.Template
-  import Eml.Template, only: [bind: 2]
-  import Kernel, except: [div: 2]
-  import Eml.Language.HTML.Elements
-  ```
-
-  Note that it unimports `Kernel.div/2` to avoid clashing with the `div` element macro.
-  """
-  defmacro __using__(_opts) do
-    quote do
-      unquote(Eml.default_alias_and_imports)
-      import Kernel, except: [div: 2]
-      import unquote(__MODULE__).Elements
-    end
-  end
 end

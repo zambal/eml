@@ -1,5 +1,7 @@
-defmodule Eml.Language.HTML.Parser do
+defmodule Eml.HTML.Parser do
   @moduledoc false
+
+  import Eml.Parser
 
   # API
 
@@ -40,24 +42,6 @@ defmodule Eml.Language.HTML.Parser do
   end
   defp tokenize(<<_, rest::binary>>, buf, acc, :doctype) do
     tokenize(rest, buf, acc, :doctype)
-  end
-
-  # Parameters
-  defp tokenize(<<"#param{", rest::binary>>, buf, acc, state) do
-    case state do
-      s when s in [:content, :blank, :start_close, :end_close, :close] ->
-        next(rest, buf, "", acc, :param_content)
-      s when s in [:attr_single_open, :attr_double_open, :attr_value] ->
-        next(rest, buf, "", acc, :param_attr)
-      _ ->
-        error("#param", rest, buf, acc, state)
-    end
-  end
-  defp tokenize(<<"}", rest::binary>>, buf, acc, :param_content) do
-    next(rest, buf, "", acc, :content)
-  end
-  defp tokenize(<<"}", rest::binary>>, buf, acc, :param_attr) do
-    next(rest, buf, "", acc, :attr_value)
   end
 
   # CDATA
@@ -206,10 +190,10 @@ defmodule Eml.Language.HTML.Parser do
   # Default parsing
   defp tokenize(chars, buf, acc, state), do: def_tokenize(chars, buf, acc, state)
 
-  # Either start or consume content, tag or parameter.
+  # Either start or consume content or tag.
   defp def_tokenize(<<char, rest::binary>>, buf, acc, state) do
     case state do
-      s when s in [:start_tag, :end_tag, :attr_field, :content, :param_content, :param_attr] ->
+      s when s in [:start_tag, :end_tag, :attr_field, :content] ->
         consume(char, rest, buf, acc, state)
       s when s in [:blank, :start_close, :end_close, :close] ->
         next(rest, buf, char, acc, :content)
@@ -305,40 +289,6 @@ defmodule Eml.Language.HTML.Parser do
     end
   end
 
-  # Entity helpers
-
-  @entity_map %{"amp"    => "&",
-                "lt"     => "<",
-                "gt"     => ">",
-                "quot"   => "\"",
-                "#39"    => "'",
-                "hellip" => "…"}
-
-  defp get_entity(chars) do
-    entities = Map.keys(@entity_map)
-    max_length = Enum.reduce(entities, 0, fn e, acc ->
-      length = String.length(e)
-      if length > acc, do: length, else: acc
-    end)
-    case get_entity(chars, "", entities, max_length) do
-      { e, rest } -> { @entity_map[e], rest }
-      nil         -> { "&", chars }
-    end
-  end
-
-  defp get_entity(<<";", rest::binary>>, acc, entities, _) do
-    if acc in entities do
-      { acc, rest }
-    end
-  end
-  defp get_entity(<<char, rest::binary>>, acc, entities, max_length) do
-    acc = acc <> <<char>>
-    unless String.length(acc) > max_length do
-      get_entity(rest, acc, entities, max_length)
-    end
-  end
-  defp get_entity("", _, _, _), do: nil
-
   # Parse the genrated tokens
 
   defp parse_content(tokens) do
@@ -422,9 +372,6 @@ defmodule Eml.Language.HTML.Parser do
 
   defp preparse(:cdata, token), do: { :cdata, token }
 
-  defp preparse(:param_content, id), do: { :content, String.to_atom(id) }
-  defp preparse(:param_attr, id), do: { :attr_value, String.to_atom(id) }
-
   defp maybe_trim_whitespace(content, tag)
   when tag in [:textarea, :pre], do: content
   defp maybe_trim_whitespace(content, _) do
@@ -472,12 +419,4 @@ defmodule Eml.Language.HTML.Parser do
   end
   defp trim_whitespace({ :cdata, noop }, _, _, _), do: noop
   defp trim_whitespace(noop, _, _, _), do: noop
-
-  defp class_value(nil), do: nil
-  defp class_value(value) do
-    case String.split(value, " ") do
-      [class] -> class
-      classes -> classes
-    end
-  end
 end

@@ -11,9 +11,9 @@ defmodule Eml.Element do
   defstruct tag: :div, content: [], attrs: %{}
 
   @type attr_name     :: atom
-  @type attr_value    :: String.t | Eml.Parameter.t | [String.t | Eml.Parameter]
+  @type attr_value    :: String.t | Macro.t | [String.t | Macro.t]
   @type attrs         :: %{ attr_name => attr_value }
-  @type attr_value_in :: String.t | atom | number | Eml.Parameter.t | [String.t | atom | number | Eml.Parameter.t]
+  @type attr_value_in :: String.t | atom | number | Macro.t | [String.t | atom | number | Macro.t]
   @type attrs_in      :: [{ attr_name, attr_value_in }]
                        | %{ attr_name => attr_value_in }
 
@@ -341,7 +341,6 @@ defmodule Eml.Element do
     end
   end
 
-  defp to_attr_value(nil),    do: nil
   defp to_attr_value([]),     do: nil
   defp to_attr_value([data]), do: to_attr_value(data)
 
@@ -352,11 +351,7 @@ defmodule Eml.Element do
     if res === [], do: nil, else: res
   end
 
-  defp to_attr_value(%Eml.Parameter{} = param), do: param
-  defp to_attr_value(param) when is_atom(param)
-  and not param in [true, false], do: %Eml.Parameter{id: param, type: :attr}
-
-  defp to_attr_value(data), do: to_string(data)
+  defp to_attr_value(data), do: Eml.Data.to_eml(data)
 
   @doc false
   def ensure_list(data) when is_list(data), do: data

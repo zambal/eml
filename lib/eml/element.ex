@@ -328,6 +328,27 @@ defmodule Eml.Element do
   end
 
   @doc false
+  def pat_match?({ :safe, text }, pat) do
+    pat_match?(text, pat)
+  end
+  def pat_match?(node, pat) do
+    is_binary(node) and Regex.match?(pat, node)
+  end
+
+  @doc false
+  def child_match?(%El{} = el, tag, id, class) do
+    Enum.any?(el.content, &match?(&1, tag, id, class))
+  end
+  def child_match?(_, _pat), do: false
+
+  @doc false
+  def child_pat_match?(%El{} = el, pat) do
+    Enum.any?(el.content, &pat_match?(&1, pat))
+  end
+  def child_pat_match?(_, _pat), do: false
+  
+
+  @doc false
   def maybe_include(attrs1, attrs2) do
     for { field, value } <- attrs2, value != nil, into: attrs1 do
       { field, value }

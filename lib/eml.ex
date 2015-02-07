@@ -165,11 +165,11 @@ defmodule Eml do
   end
 
   @doc """
-  Selects content from arbritary eml.
+  Selects nodes from arbritary content.
 
   It will traverse the complete eml tree, so all nodes are
-  evaluated. There is however currently no way to select quoteds
-  or parameters.
+  evaluated. There is however currently no way to select quoted
+  expressions.
 
   Nodes are matched depending on the provided options.
 
@@ -216,42 +216,29 @@ defmodule Eml do
   def select(content, opts) when is_list(content) do
     Enum.flat_map(content, &select(&1, opts))
   end
-
-  def select(node, _opts) when is_tuple(node), do: []
-
   def select(node, opts) do
     tag            = opts[:tag] || :any
     id             = opts[:id] || :any
     class          = opts[:class] || :any
     pat            = opts[:pat]
     select_parent? = opts[:parent] || false
-    if select_parent? do
-      if pat do
-        pat_fun = fn node ->
-          element?(node) and
-          Enum.any?(node.content, fn el -> is_binary(el) and Regex.match?(pat, el) end)
-        end
-        Enum.filter(node, pat_fun)
+    select_fun     =
+      if select_parent? do
+        if pat, 
+          do: &Element.child_pat_match?(&1, pat),
+        else: &Element.child_match?(&1, tag, id, class)
       else
-        idclass_fun = fn node ->
-          element?(node) and
-          Enum.any?(node.content, fn el -> Element.match?(el, tag, id, class) end)
-        end
-        Enum.filter(node, idclass_fun)
+        if pat,
+          do: &Element.pat_match?(&1, pat),
+        else: &Element.match?(&1, tag, id, class)
       end
-    else
-      if pat do
-        pat_fun = fn
-          node when is_binary(node) -> Regex.match?(pat, node)
-          _                         -> false
-        end
-        Enum.filter(node, pat_fun)
-      else
-        Enum.filter(node, &Element.match?(&1, tag, id, class))
-      end
-    end
+    enum = case node do
+             %Element{} -> node
+             _other     -> [node]
+           end
+    Enum.filter(enum, select_fun)
   end
-
+  
   @doc """
   Adds content to matched elements.
 
@@ -293,11 +280,7 @@ defmodule Eml do
     tag     = opts[:tag] || :any
     id      = opts[:id] || :any
     class   = opts[:class] || :any
-    add_fun = fn node ->
-      if element?(node) and Element.match?(node, tag, id, class),
-        do:   Element.add(node, data, opts),
-        else: node
-    end
+    add_fun = &(if Element.match?(&1, tag, id, class), do: Element.add(&1, data, opts), else: &1)
     transform(eml, add_fun)
   end
 
@@ -357,37 +340,19 @@ defmodule Eml do
     pat            = opts[:pat]
     update_parent? = opts[:parent] || false
     update_fun     =
-     if update_parent? do
-       if pat do
-          fn node ->
-            if element?(node) and
-            Enum.any?(node.content, fn el -> is_binary(el) and Regex.match?(pat, el) end),
-              do: fun.(node),
-            else: node
-          end
+      if update_parent? do
+        if pat do
+          &(if Element.child_pat_match?(&1, pat), do: fun.(&1), else: &1)
         else
-          fn node ->
-            if element?(node) and
-            Enum.any?(node.content, fn el -> Element.match?(el, tag, id, class) end),
-              do: fun.(node),
-            else: node
-          end
+          &(if Element.child_match?(&1, tag, id, class), do: fun.(&1), else: &1)
         end
       else
         if pat do
-          fn node ->
-            if is_binary(node) and Regex.match?(pat, node),
-             do: fun.(node),
-           else: node
-          end
+          &(if Element.pat_match?(&1, pat), do: fun.(&1), else: &1)
         else
-          fn node ->
-            if Element.match?(node, tag, id, class),
-              do: fun.(node),
-            else: node
-          end
+          &(if Element.match?(&1, tag, id, class), do: fun.(&1), else: &1)
         end
-     end
+      end
     transform(eml, update_fun)
   end
 
@@ -423,35 +388,17 @@ defmodule Eml do
     remove_fun     =
       if remove_parent? do
         if pat do
-          fn node ->
-            if element?(node) and
-            Enum.any?(node.content, fn el -> is_binary(el) and Regex.match?(pat, el) end),
-              do: nil,
-            else: node
-          end
+          &(if Element.child_pat_match?(&1, pat), do: nil, else: &1)
         else
-          fn node ->
-            if element?(node) and
-            Enum.any?(node.content, fn el -> Element.match?(el, tag, id, class) end),
-              do: nil,
-            else: node
-          end
+          &(if Element.child_match?(&1, tag, id, class), do: nil, else: &1)
         end
       else
         if pat do
-          fn node ->
-            if is_binary(node) and Regex.match?(pat, node),
-             do: nil,
-           else: node
-          end
+          &(if Element.pat_match?(&1, pat), do: nil, else: &1)
         else
-          fn node ->
-            if Element.match?(node, tag, id, class),
-              do: nil,
-            else: node
-          end
+          &(if Element.match?(&1, tag, id, class), do: nil, else: &1)
         end
-    end
+      end
     transform(eml, remove_fun)
   end
 
@@ -530,12 +477,9 @@ defmodule Eml do
 
   """
   @spec transform(transformable, (t -> Eml.Data.t)) :: transformable | nil
-  def transform(eml, fun)
-
   def transform(eml, fun) when is_list(eml) do
     for node <- eml, t = transform(node, fun), do: t
   end
-
   def transform(node, fun) do
     node = fun.(node) |> Data.to_eml()
     if element?(node) do

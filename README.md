@@ -319,43 +319,44 @@ iex> Enum.filter(e, &Element.has?(&1, tag: :h3, class: "article"))
 []
 ```
 
-Eml also provides the `Eml.select` and `Eml.member?` functions, which
+Eml also provides the `Eml.Query.select` and `Eml.Query.member?` functions, which
 can be used to select content and check for membership more easily.
-Check the docs for more info about the options `Eml.select` accepts.
+Check the docs for more info about the options `Eml.Query.select` accepts.
 ```elixir
-iex> Eml.select(e, class: "article")
+iex> Eml.Query.select(e, class: "article")
 [#section<%{class: ["intro", "article"]} [#h3<["Hello world"]>]>,
  #section<%{class: ["conclusion", "article"]} ["TODO"]>]
 
-# using `parent: true` instructs `Eml.select` to select the parent
+# using `parent: true` instructs `Eml.Query.select` to select the parent
 # of the matched node(s)
-iex> Eml.select(e, tag: :meta, parent: true)
+iex> Eml.Query.select(e, tag: :meta, parent: true)
 [#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>]
 
 # when using the :pat option, a regular expression can be used to
 # match binary content
-iex> Eml.select(e, pat: ~r/H.*d/)
+iex> Eml.Query.select(e, pat: ~r/H.*d/)
 ["Hello world"]
 
-iex> Eml.select(e, pat: ~r/TOD/, parent: true)
+iex> Eml.Query.select(e, pat: ~r/TOD/, parent: true)
 [#section<%{class: ["conclusion", "article"]} ["TODO"]>]
 
-iex> Eml.member?(e, class: "head")
+iex> Eml.Query.member?(e, class: "head")
 true
 
-iex> Eml.member?(e, tag: :article, class: "conclusion")
+iex> Eml.Query.member?(e, tag: :article, class: "conclusion")
 false
 ```
 
 
 #### Transforming eml
 
-Eml provides three high-level constructs for transforming eml: `Transform.update`,
-`Transform.remove`, and `Transform.add`. Like `Query.select` they traverse the complete
+Eml provides three high-level constructs for transforming eml: `Eml.Transform.update`,
+`Eml.Transform.remove`, and `Eml.Transform.add`. Like `Eml.Query.select` they traverse the complete
 eml tree. Check the docs for more info about these functions. The following
 examples work with the same eml snippet as in the previous section.
 
 ```elixir
+iex> use Eml.Transform
 iex> Transform.remove(e, class: "article")
 #html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>,
  #body<[#article<%{id: "main-content"}>]>]>
@@ -387,7 +388,7 @@ iex> Transform.add(e, section([class: "post-conclusion"], "...."), id: "main-con
    #section<%{class: "post-conclusion"} ["...."]>]>]>]>
 ```
 
-Eml also provides `transform`. All functions from the previous section are
+Eml also provides `Eml.Transform.transform`. All functions from the previous section are
 implemented with it. `transform` mostly works like enumeration. The key
 difference is that `transform` returns a modified version of the eml tree that
 was passed as an argument, instead of collecting nodes in a list.

@@ -45,15 +45,12 @@ defmodule Eml do
   """
 
   alias Eml.Element
-  alias Eml.Encoder
 
   @default_renderer Eml.HTML.Renderer
   @default_parser Eml.HTML.Parser
 
   @type t               :: String.t | Eml.Element.t | { :safe, String.t } | { :quoted, Macro.t }
   @type content         :: [t]
-  @type enumerable      :: Eml.Element.t | [Eml.Element.t]
-  @type transformable   :: t | [t]
   @type bindings        :: [{ atom, Eml.Encoder.t }]
   @type unpackr_result  :: funpackr_result | [unpackr_result]
   @type funpackr_result :: String.t | Macro.t | [String.t | Macro.t]
@@ -199,7 +196,7 @@ defmodule Eml do
 
   # Convert data to eml node
   def encode(data, acc, insert_at) do
-    Encoder.encode(data) |> add_node(acc, insert_at)
+    Eml.Encoder.encode(data) |> add_node(acc, insert_at)
   end
 
   defp add_node(node, [], _), do: [node]
@@ -445,11 +442,8 @@ defmodule Eml do
   defmacro __using__(_) do
     quote do
       alias Eml.Element
-      alias Eml.Query
-      alias Eml.Transform
-      
+      alias Eml.Query      
       import Eml, only: [template_fn: 1, template_fn: 2, template: 2, template: 3]
-      import Eml.Transform, only: [transform: 2]
     end
   end
 end

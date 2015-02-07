@@ -1,4 +1,7 @@
 defmodule Eml.Query do
+  alias Eml.Element
+
+  @type enumerable :: Eml.Element.t | [Eml.Element.t]
 
   @doc """
   Selects nodes from arbritary content.
@@ -33,20 +36,20 @@ defmodule Eml.Query do
       ...> end
       #div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
        #span<%{id: "inner2", class: "inner"} ["world"]>]>
-      iex> Query.select(e, id: "inner1")
+      iex> Eml.Query.select(e, id: "inner1")
       [#span<%{id: "inner1", class: "inner"} ["hello "]>]
-      iex> Query.select(e, class: "inner")
+      iex> Eml.Query.select(e, class: "inner")
       [#span<%{id: "inner1", class: "inner"} ["hello "]>,
        #span<%{id: "inner2", class: "inner"} ["world"]>]
-      iex> Query.select(e, class: "inner", id: "test")
+      iex> Eml.Query.select(e, class: "inner", id: "test")
       []
-      iex> Query.select(e, pat: ~r/h.*o/)
+      iex> Eml.Query.select(e, pat: ~r/h.*o/)
       ["hello "]
-      iex> Query.select(e, pat: ~r/H.*o/, parent: true)
+      iex> Eml.Query.select(e, pat: ~r/H.*o/, parent: true)
       [#span<%{id: "inner1", class: "inner"} ["hello "]>]
 
   """
-  @spec select(enumerable) :: [t]
+  @spec select(enumerable) :: [Eml.t]
   def select(eml, opts \\ [])
 
   def select(content, opts) when is_list(content) do
@@ -82,21 +85,22 @@ defmodule Eml.Query do
   In other words, returns true when the same select query
   would return a non-empty list.
 
-  See `select/3` for a description of the provided options.
+  See `Eml.Query.select/3` for a description of the provided options.
 
   ### Examples:
 
+      iex> use Eml.Query
       iex> e = div do
       ...>   span [id: "inner1", class: "inner"], "hello "
       ...>   span [id: "inner2", class: "inner"], "world"
       ...> end
       #div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
        #span<%{id: "inner2", class: "inner"} ["world"]>]>
-      iex> Query.member?(e, id: "inner1")
+      iex> member?(e, id: "inner1")
       true
-      iex> Query.member?(e, class: "inner", id: "test")
+      iex> member?(e, class: "inner", id: "test")
       false
-      iex> Query.member?(e, pat: ~r/h.*o/)
+      iex> member?(e, pat: ~r/h.*o/)
       true
 
   """

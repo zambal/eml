@@ -1,6 +1,8 @@
 defmodule EmlTest do
   use ExUnit.Case
   use Eml.HTML.Elements
+  use Eml.Transform
+
   alias Eml.Element, as: M
 
   defp doc() do
@@ -141,7 +143,7 @@ defmodule EmlTest do
     to_add = div("Hello world!")
     expected = body([id: "test"], to_add)
 
-    assert expected == Eml.add(input, to_add, id: "test")
+    assert expected == Transform.add(input, to_add, id: "test")
   end
 
   test "Select by class1" do
@@ -149,7 +151,7 @@ defmodule EmlTest do
       title([class: "title"], "Eml is HTML for developers"),
       h1([class: "title"], "Eml is HTML for developers")
     ]
-    result = Eml.select(doc(), class: "title")
+    result = Eml.Query.select(doc(), class: "title")
 
     # The order of the returned content is unspecified,
     # so we need to compare the nodes.
@@ -170,7 +172,7 @@ defmodule EmlTest do
       end,
       span([class: "test"], "Some notes...")
     ]
-    result = Eml.select(doc(), class: "test")
+    result = Eml.Query.select(doc(), class: "test")
 
     assert Enum.all?(result, fn node -> node in expected end)
   end
@@ -179,7 +181,7 @@ defmodule EmlTest do
     expected = [div id: "main-side-bar", class: ["content", "side-bar"] do
       span [class: "test"], "Some notes..."
     end]
-    result = Eml.select(doc(), id: "main-side-bar")
+    result = Eml.Query.select(doc(), id: "main-side-bar")
 
     assert expected == result
   end
@@ -189,7 +191,7 @@ defmodule EmlTest do
       span [class: "test"], "Some notes..."
     end]
 
-    result = Eml.select(doc(), id: "main-side-bar", class: "content")
+    result = Eml.Query.select(doc(), id: "main-side-bar", class: "content")
 
     # If both an id and a class are specified,
     # only return the element that satisfies both.
@@ -200,7 +202,7 @@ defmodule EmlTest do
   test "Select by id and class 2" do
     expected = []
 
-    result = Eml.select(doc(), id: "main-side-bar", class: "test")
+    result = Eml.Query.select(doc(), id: "main-side-bar", class: "test")
 
     assert expected == result
   end
@@ -214,14 +216,14 @@ defmodule EmlTest do
         h1 [class: "title"], "Eml is HTML for developers"
       end
     end
-    result = Eml.remove(doc(), class: "content")
+    result = Transform.remove(doc(), class: "content")
 
     assert expected == result
   end
 
   test "Remove by class 2" do
     expected = html []
-    result   = Eml.remove(doc(), class: "test")
+    result   = Transform.remove(doc(), class: "test")
 
     assert expected == result
   end
@@ -235,7 +237,7 @@ defmodule EmlTest do
         "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."
       end
     end
-    result = Eml.remove(doc(), id: "main-side-bar")
+    result = Transform.remove(doc(), id: "main-side-bar")
 
     assert expected == result
   end
@@ -249,13 +251,13 @@ defmodule EmlTest do
         "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."
       end
     end
-    result = Eml.remove(doc(), id: "main-side-bar", class: "content")
+    result = Transform.remove(doc(), id: "main-side-bar", class: "content")
 
     assert expected == result
   end
 
   test "Member?" do
-    assert Eml.member?(doc(), id: "main-side-bar")
+    assert Eml.Query.member?(doc(), id: "main-side-bar")
   end
 
   test "Assigns" do

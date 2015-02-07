@@ -1,4 +1,7 @@
 defmodule Eml.Transform do
+  alias Eml.Element
+
+  @type transformable :: Eml.t | [Eml.t]
 
   @doc """
   Recursively transforms `eml` content.
@@ -21,6 +24,7 @@ defmodule Eml.Transform do
 
   ### Examples:
 
+      iex> use Eml.Transform
       iex> e = div do
       ...>   span [id: "inner1", class: "inner"], "hello "
       ...>   span [id: "inner2", class: "inner"], "world"
@@ -41,13 +45,13 @@ defmodule Eml.Transform do
         #span<%{id: "inner2", class: "inner"} ["world"]>]>]
 
   """
-  @spec transform(transformable, (t -> Eml.Encoder.t)) :: transformable | nil
+  @spec transform(transformable, (Eml.t -> Eml.Encoder.t)) :: transformable | nil
   def transform(eml, fun) when is_list(eml) do
     for node <- eml, t = transform(node, fun), do: t
   end
   def transform(node, fun) do
-    node = fun.(node) |> Encoder.encode()
-    if element?(node) do
+    node = fun.(node) |> Eml.Encoder.encode()
+    if Eml.element?(node) do
       %Element{node| content: transform(node.content, fun)}
     else
       node
@@ -147,7 +151,7 @@ defmodule Eml.Transform do
       "<div><span id='inner1' class='inner'>HELLO </span><span id='inner2' class='inner'>WORLD</span></div>"
 
   """
-  @spec update(transformable, (t -> Eml.Encoder.t), Keyword.t) :: transformable
+  @spec update(transformable, (Eml.t -> Eml.Encoder.t), Keyword.t) :: transformable
   def update(eml, fun, opts \\ []) do
     tag            = opts[:tag] || :any
     id             = opts[:id] || :any
@@ -215,5 +219,12 @@ defmodule Eml.Transform do
         end
       end
     transform(eml, remove_fun)
+  end
+
+  defmacro __using__(_) do
+    quote do
+      alias unquote(__MODULE__)
+      import unquote(__MODULE__), only: [transform: 2]
+    end
   end
 end

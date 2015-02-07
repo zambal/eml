@@ -432,17 +432,17 @@ defmodule Eml do
 
   # use Eml
   @doc """
-  Import `defeml`, `defhtml` and `precompile` macro's.
+  Import macro's and alias Eml.Element.
 
   Invoking it translates to:
   ```
-  import Eml, only: [defeml: 2, defhtml: 2, precompile: 1, precompile: 2]
+  alias Eml.Element
+  import Eml, only: [template_fn: 1, template_fn: 2, template: 2, template: 3]
   ```
   """
   defmacro __using__(_) do
     quote do
       alias Eml.Element
-      alias Eml.Query      
       import Eml, only: [template_fn: 1, template_fn: 2, template: 2, template: 3]
     end
   end

@@ -224,7 +224,7 @@ defmodule Eml do
     select_parent? = opts[:parent] || false
     select_fun     =
       if select_parent? do
-        if pat, 
+        if pat,
           do: &Element.child_pat_match?(&1, pat),
         else: &Element.child_match?(&1, tag, id, class)
       else
@@ -238,7 +238,7 @@ defmodule Eml do
            end
     Enum.filter(enum, select_fun)
   end
-  
+
   @doc """
   Adds content to matched elements.
 

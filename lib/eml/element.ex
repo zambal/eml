@@ -346,7 +346,7 @@ defmodule Eml.Element do
     Enum.any?(el.content, &pat_match?(&1, pat))
   end
   def child_pat_match?(_, _pat), do: false
-  
+
 
   @doc false
   def maybe_include(attrs1, attrs2) do

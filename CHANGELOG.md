@@ -17,7 +17,9 @@
   * `Eml.compile` and `Eml.render` return results by default as `{ :safe, result }` so that
     they can be easily added to other elements, witout getting escaped
   * Importing all HTML element macro's is now done via `use Eml.HTML.Elements` instead of `use Eml.Language.HTML`
-
+  * Renamed `Eml.Data` protocol to `Eml.Encoder` and `Eml.to_content` to `Eml.encode`
+  * Moved query functions from the `Eml` module to `Eml.Query`
+  * Moved transform functions from the `Eml` module to `Eml.Transform`
 
 ## v0.7.1
  * Enhancements

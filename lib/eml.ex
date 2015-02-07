@@ -45,7 +45,7 @@ defmodule Eml do
   """
 
   alias Eml.Element
-  alias Eml.Data
+  alias Eml.Encoder
 
   @default_renderer Eml.HTML.Renderer
   @default_parser Eml.HTML.Parser
@@ -54,7 +54,7 @@ defmodule Eml do
   @type content         :: [t]
   @type enumerable      :: Eml.Element.t | [Eml.Element.t]
   @type transformable   :: t | [t]
-  @type bindings        :: [{ atom, Eml.Data.t }]
+  @type bindings        :: [{ atom, Eml.Encoder.t }]
   @type unpackr_result  :: funpackr_result | [unpackr_result]
   @type funpackr_result :: String.t | Macro.t | [String.t | Macro.t]
 
@@ -70,7 +70,7 @@ defmodule Eml do
   be quoted too. To prevent you from writing `quote do: @my_assign` all
   the time, atoms can be used as a shortcut. This means that for example
   `div(:a)` and `div(quote do: @a)` have the same result. This convertion
-  is being performed by the `Eml.Data` protocol. The function that the
+  is being performed by the `Eml.Encoder` protocol. The function that the
   template macro defines accepts optionally an Keyword list for binding
   values to assigns.
 
@@ -165,366 +165,41 @@ defmodule Eml do
   end
 
   @doc """
-  Selects nodes from arbritary content.
-
-  It will traverse the complete eml tree, so all nodes are
-  evaluated. There is however currently no way to select quoted
-  expressions.
-
-  Nodes are matched depending on the provided options.
-
-  Those options can be:
-
-  * `:tag` - match element by tag (`atom`)
-  * `:id` - match element by id (`binary`)
-  * `:class` - match element by class (`binary`)
-  * `:pat` - match binary content by regular expression (`RegEx.t`)
-  * `:parent` - when set to true, selects the parent node
-    of the matched node (`boolean`)
-
-  When `:tag`, `:id`, or `:class` are combined, only elements are
-  selected that satisfy all conditions.
-
-  When the `:pat` options is used, `:tag`, `:id` and `:class` will
-  be ignored.
-
-
-  ### Examples:
-
-      iex> e = div do
-      ...>   span [id: "inner1", class: "inner"], "hello "
-      ...>   span [id: "inner2", class: "inner"], "world"
-      ...> end
-      #div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
-       #span<%{id: "inner2", class: "inner"} ["world"]>]>
-      iex> Eml.select(e, id: "inner1")
-      [#span<%{id: "inner1", class: "inner"} ["hello "]>]
-      iex> Eml.select(e, class: "inner")
-      [#span<%{id: "inner1", class: "inner"} ["hello "]>,
-       #span<%{id: "inner2", class: "inner"} ["world"]>]
-      iex> Eml.select(e, class: "inner", id: "test")
-      []
-      iex> Eml.select(e, pat: ~r/h.*o/)
-      ["hello "]
-      iex> Eml.select(e, pat: ~r/H.*o/, parent: true)
-      [#span<%{id: "inner1", class: "inner"} ["hello "]>]
-
-  """
-  @spec select(enumerable) :: [t]
-  def select(eml, opts \\ [])
-
-  def select(content, opts) when is_list(content) do
-    Enum.flat_map(content, &select(&1, opts))
-  end
-  def select(node, opts) do
-    tag            = opts[:tag] || :any
-    id             = opts[:id] || :any
-    class          = opts[:class] || :any
-    pat            = opts[:pat]
-    select_parent? = opts[:parent] || false
-    select_fun     =
-      if select_parent? do
-        if pat,
-          do: &Element.child_pat_match?(&1, pat),
-        else: &Element.child_match?(&1, tag, id, class)
-      else
-        if pat,
-          do: &Element.pat_match?(&1, pat),
-        else: &Element.match?(&1, tag, id, class)
-      end
-    enum = case node do
-             %Element{} -> node
-             _other     -> [node]
-           end
-    Enum.filter(enum, select_fun)
-  end
-
-  @doc """
-  Adds content to matched elements.
-
-  It traverses and returns the complete eml tree.
-  Nodes are matched depending on the provided options.
-
-  Those options can be:
-
-  * `:tag` - match element by tag (`atom`)
-  * `:id` - match element by id (`binary`)
-  * `:class` - match element by class (`binary`)
-  * `:at` -  add new content at begin or end of existing
-    content, default is `:end` (`:begin | :end`)
-
-  When `:tag`, `:id`, or `:class` are combined, only elements are
-  selected that satisfy all conditions.
-
-
-  ### Examples:
-
-      iex> e = div do
-      ...>   span [id: "inner1", class: "inner"], "hello "
-      ...>   span [id: "inner2", class: "inner"], "world"
-      ...> end
-      #div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
-       #span<%{id: "inner2", class: "inner"} ["world"]>]>
-      iex> Eml.add(e, "dear ", id: "inner1")
-      [#div<[#span<%{id: "inner1", class: "inner"} ["hello dear "]>,
-        #span<%{id: "inner2", class: "inner"} ["world"]>]>]
-      iex> Eml.add(e, "__", class: "inner", at: :begin)
-      [#div<[#span<%{id: "inner1", class: "inner"} ["__hello "]>,
-        #span<%{id: "inner2", class: "inner"} ["__world"]>]>]
-      iex> Eml.add(e, span("!"), tag: :div) |> Eml.render()
-      "<div><span id='inner1' class='inner'>hello </span><span id='inner2' class='inner'>world</span><span>!</span></div>"
-
-  """
-  @spec add(transformable, Eml.Data.t, Keyword.t) :: transformable
-  def add(eml, data, opts \\ []) do
-    tag     = opts[:tag] || :any
-    id      = opts[:id] || :any
-    class   = opts[:class] || :any
-    add_fun = &(if Element.match?(&1, tag, id, class), do: Element.add(&1, data, opts), else: &1)
-    transform(eml, add_fun)
-  end
-
-  @doc """
-  Updates matched nodes.
-
-  When nodes are matched, the provided function will be evaluated
-  with the matched node as argument.
-
-  When the provided function returns `nil`, the node will
-  be removed from the eml tree. Any other returned value will be
-  evaluated by `Eml.to_content/3` in order to guarantee valid eml.
-
-  Nodes are matched depending on the provided options.
-
-  Those options can be:
-
-  * `:tag` - match element by tag (`atom`)
-  * `:id` - match element by id (`binary`)
-  * `:class` - match element by class (`binary`)
-  * `:pat` - match binary content by regular expression (`RegEx.t`)
-  * `:parent` - when set to true, selects the parent node
-    of the matched node (`boolean`)
-
-  When `:tag`, `:id`, or `:class` are combined, only elements are
-  selected that satisfy all conditions.
-
-  When the `:pat` options is used, `:tag`, `:id` and `:class` will
-  be ignored.
-
-
-  ### Examples:
-
-      iex> e = div do
-      ...>   span [id: "inner1", class: "inner"], "hello "
-      ...>   span [id: "inner2", class: "inner"], "world"
-      ...> end
-      #div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
-       #span<%{id: "inner2", class: "inner"} ["world"]>]>
-      iex> Eml.update(e, fn m -> Element.id(m, "outer") end, tag: :div)
-      [#div<%{id: "outer"}
-       [#span<%{id: "inner1", class: "inner"} ["hello "]>,
-        #span<%{id: "inner2", class: "inner"} ["world"]>]>]
-      iex> Eml.update(e, fn m -> Element.id(m, "outer") end, id: "inner2", parent: true)
-      [#div<%{id: "outer"}
-       [#span<%{id: "inner1", class: "inner"} ["hello "]>,
-        #span<%{id: "inner2", class: "inner"} ["world"]>]>]
-      iex> Eml.update(e, fn s -> String.upcase(s) end, pat: ~r/.+/) |> Eml.render()
-      "<div><span id='inner1' class='inner'>HELLO </span><span id='inner2' class='inner'>WORLD</span></div>"
-
-  """
-  @spec update(transformable, (t -> Eml.Data.t), Keyword.t) :: transformable
-  def update(eml, fun, opts \\ []) do
-    tag            = opts[:tag] || :any
-    id             = opts[:id] || :any
-    class          = opts[:class] || :any
-    pat            = opts[:pat]
-    update_parent? = opts[:parent] || false
-    update_fun     =
-      if update_parent? do
-        if pat do
-          &(if Element.child_pat_match?(&1, pat), do: fun.(&1), else: &1)
-        else
-          &(if Element.child_match?(&1, tag, id, class), do: fun.(&1), else: &1)
-        end
-      else
-        if pat do
-          &(if Element.pat_match?(&1, pat), do: fun.(&1), else: &1)
-        else
-          &(if Element.match?(&1, tag, id, class), do: fun.(&1), else: &1)
-        end
-      end
-    transform(eml, update_fun)
-  end
-
-  @doc """
-  Removes matched nodes from the eml tree.
-
-  See `update/3` for a description of the provided options.
-
-  ### Examples:
-
-      iex> e = div do
-      ...>   span [id: "inner1", class: "inner"], "hello "
-      ...>   span [id: "inner2", class: "inner"], "world"
-      ...> end
-      #div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
-       #span<%{id: "inner2", class: "inner"} ["world"]>]>
-      iex> Eml.remove(e, tag: :div)
-      []
-      iex> Eml.remove(e, id: "inner1")
-      [#div<[#span<%{id: "inner2", class: "inner"} ["world"]>]>]
-      iex> Eml.remove(e, pat: ~r/.+/)
-      [#div<[#span<%{id: "inner1", class: "inner"}>,
-        #span<%{id: "inner2", class: "inner"}>]>]
-
-  """
-  @spec remove(transformable, Keyword.t) :: transformable
-  def remove(eml, opts \\ []) do
-    tag            = opts[:tag] || :any
-    id             = opts[:id] || :any
-    class          = opts[:class] || :any
-    pat            = opts[:pat]
-    remove_parent? = opts[:parent] || false
-    remove_fun     =
-      if remove_parent? do
-        if pat do
-          &(if Element.child_pat_match?(&1, pat), do: nil, else: &1)
-        else
-          &(if Element.child_match?(&1, tag, id, class), do: nil, else: &1)
-        end
-      else
-        if pat do
-          &(if Element.pat_match?(&1, pat), do: nil, else: &1)
-        else
-          &(if Element.match?(&1, tag, id, class), do: nil, else: &1)
-        end
-      end
-    transform(eml, remove_fun)
-  end
-
-  @doc """
-  Returns true if there's at least one node matches
-  the provided options, returns false otherwise.
-
-  In other words, returns true when the same select query
-  would return a non-empty list.
-
-  See `select/3` for a description of the provided options.
-
-  ### Examples:
-
-      iex> e = div do
-      ...>   span [id: "inner1", class: "inner"], "hello "
-      ...>   span [id: "inner2", class: "inner"], "world"
-      ...> end
-      #div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
-       #span<%{id: "inner2", class: "inner"} ["world"]>]>
-      iex> Eml.member?(e, id: "inner1")
-      true
-      iex> Eml.member?(e, class: "inner", id: "test")
-      false
-      iex> Eml.member?(e, pat: ~r/h.*o/)
-      true
-
-  """
-  @spec member?(enumerable, Keyword.t) :: boolean
-  def member?(eml, opts) do
-    case select(eml, opts) do
-      [] -> false
-      _  -> true
-    end
-  end
-
-  @doc """
-  Recursively transforms `eml` content.
-
-  This is the most low level operation provided by Eml for manipulating
-  eml nodes. For example, `update/3` and `remove/2` are implemented by
-  using this function.
-
-  It accepts any eml and traverses all nodes of the provided eml tree.
-  The provided transform function will be evaluated for every node `transform/3`
-  encounters. Parent nodes will be transformed before their children. Child nodes
-  of a parent will be evaluated before moving to the next sibling.
-
-  When the provided function returns `nil`, the node will
-  be removed from the eml tree. Any other returned value will be
-  evaluated by `Eml.to_content/3` in order to guarantee valid eml.
-
-  Note that because parent nodes are evaluated before their children,
-  no children will be evaluated if the parent is removed.
-
-  ### Examples:
-
-      iex> e = div do
-      ...>   span [id: "inner1", class: "inner"], "hello "
-      ...>   span [id: "inner2", class: "inner"], "world"
-      ...> end
-      #div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
-       #span<%{id: "inner2", class: "inner"} ["world"]>]>
-      iex> Eml.transform(e, fn x -> if Element.has?(x, tag: :span), do: "matched", else: x end)
-      [#div<["matched", "matched"]>]
-      iex> Eml.transform(e, fn x ->
-      ...> IO.puts(inspect x)
-      ...> x end)
-      #div<[#span<%{id: "inner1", class: "inner"} ["hello "]>, #span<%{id: "inner2", class: "inner"} ["world"]>]>
-      #span<%{id: "inner1", class: "inner"} ["hello "]>
-      "hello "
-      #span<%{id: "inner2", class: "inner"} ["world"]>
-      "world"
-      [#div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
-        #span<%{id: "inner2", class: "inner"} ["world"]>]>]
-
-  """
-  @spec transform(transformable, (t -> Eml.Data.t)) :: transformable | nil
-  def transform(eml, fun) when is_list(eml) do
-    for node <- eml, t = transform(node, fun), do: t
-  end
-  def transform(node, fun) do
-    node = fun.(node) |> Data.to_eml()
-    if element?(node) do
-      %Element{node| content: transform(node.content, fun)}
-    else
-      node
-    end
-  end
-
-  @doc """
-  Converts data to `eml` content by using the `Eml.Data` protocol.
+  Converts data to `eml` content by using the `Eml.Encoder` protocol.
 
   It also concatenates binaries and flatten lists to ensure the result
   is valid content.
 
   ### Example
 
-      iex> Eml.to_content(["1", 2, [3], " ", ["miles"]])
+      iex> Eml.encode(["1", 2, [3], " ", ["miles"]])
       ["123 miles"]
 
   You can also use this function to add data to existing content:
 
-      iex> Eml.to_content(42, [" is the number"], :begin)
+      iex> Eml.encode(42, [" is the number"], :begin)
       ["42 is the number"]
 
-      iex> Eml.to_content(42, ["the number is "], :end)
+      iex> Eml.encode(42, ["the number is "], :end)
       ["the number is 42"]
 
   """
-  @spec to_content(Eml.Data.t | [Eml.Data.t], content, atom) :: content
-  def to_content(data, acc \\ [], insert_at \\ :begin)
+  @spec encode(Eml.Encoder.t | [Eml.Encoder.t], content, atom) :: content
+  def encode(data, acc \\ [], insert_at \\ :begin)
 
   # No-ops
-  def to_content(nondata, acc, _)
+  def encode(nondata, acc, _)
   when nondata in [nil, "", []], do: acc
 
   # Handle lists
-  def to_content(data, acc, :end)
+  def encode(data, acc, :end)
   when is_list(data), do: add_nodes(data, :lists.reverse(acc), :end) |> :lists.reverse()
-  def to_content(data, acc, :begin)
+  def encode(data, acc, :begin)
   when is_list(data), do: add_nodes(:lists.reverse(data), acc, :begin)
 
   # Convert data to eml node
-  def to_content(data, acc, insert_at) do
-    Data.to_eml(data) |> add_node(acc, insert_at)
+  def encode(data, acc, insert_at) do
+    Encoder.encode(data) |> add_node(acc, insert_at)
   end
 
   defp add_node(node, [], _), do: [node]
@@ -547,7 +222,7 @@ defmodule Eml do
     acc = if is_list(h) and insert_at === :end do
             add_nodes(h, acc, insert_at)
           else
-            to_content(h, acc, insert_at)
+            encode(h, acc, insert_at)
           end
     add_nodes(t, acc, insert_at)
   end
@@ -770,7 +445,11 @@ defmodule Eml do
   defmacro __using__(_) do
     quote do
       alias Eml.Element
+      alias Eml.Query
+      alias Eml.Transform
+      
       import Eml, only: [template_fn: 1, template_fn: 2, template: 2, template: 3]
+      import Eml.Transform, only: [transform: 2]
     end
   end
 end

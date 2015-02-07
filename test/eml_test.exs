@@ -77,23 +77,23 @@ defmodule EmlTest do
     assert :element     == Eml.type Eml.Element.new()
     assert :string      == Eml.type "some text"
     assert :string      == Eml.type Eml.unpackr div(42)
-    assert :string      == Eml.type Eml.unpack Eml.to_content([1,2,"z"])
+    assert :string      == Eml.type Eml.unpack Eml.encode([1,2,"z"])
     assert :safe_string == Eml.type { :safe, "<div>some text &amp; markup</div>" }
-    assert :safe_string == Eml.type Eml.render(Eml.to_content(:a))
-    assert :safe_string == Eml.type Eml.to_content(:name)
+    assert :safe_string == Eml.type Eml.render(Eml.encode(:a))
+    assert :safe_string == Eml.type Eml.encode(:name)
                                   |> Eml.compile()
                                   |> Eml.render(name: "Vincent")
-    assert :quoted      == Eml.type Eml.compile(Eml.to_content(:name))
+    assert :quoted      == Eml.type Eml.compile(Eml.encode(:name))
     assert :quoted      == Eml.type Eml.compile([div([], 1), div([], 2), div([], quote do 2 + @a end), "..."])
   end
 
-  test "Eml.Data protocol and to_content" do
-    assert []                  == Eml.to_content [nil, "", []]
-    assert ["truefalse"]       == Eml.to_content [true, false]
-    assert ["12345678"]        == Eml.to_content Enum.to_list(1..8)
-    assert ["Hello world"]     == Eml.to_content ["H", ["el", "lo", [" "]], ["wor", ["ld"]]]
-    assert ["Happy new 2015!"] == Eml.to_content ["Happy new ", 2, 0, 1, 5, "!"]
-    assert_raise Protocol.UndefinedError, fn -> Eml.to_content({}) end
+  test "Eml.Encoder protocol and encode" do
+    assert []                  == Eml.encode [nil, "", []]
+    assert ["truefalse"]       == Eml.encode [true, false]
+    assert ["12345678"]        == Eml.encode Enum.to_list(1..8)
+    assert ["Hello world"]     == Eml.encode ["H", ["el", "lo", [" "]], ["wor", ["ld"]]]
+    assert ["Happy new 2015!"] == Eml.encode ["Happy new ", 2, 0, 1, 5, "!"]
+    assert_raise Protocol.UndefinedError, fn -> Eml.encode({}) end
   end
 
   test "Unpack" do
@@ -259,9 +259,9 @@ defmodule EmlTest do
   end
 
   test "Assigns" do
-    assign = { :quoted, quote context: Eml.Data.Atom, do: @an_assign }
-    assert [assign]               == Eml.to_content(:an_assign)
-    assert [assign, "and", assign] == Eml.to_content([:an_assign, "and", :an_assign])
+    assign = { :quoted, quote context: Eml.Encoder.Atom, do: @an_assign }
+    assert [assign]               == Eml.encode(:an_assign)
+    assert [assign, "and", assign] == Eml.encode([:an_assign, "and", :an_assign])
   end
 
   test "Compiling 1" do

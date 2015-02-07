@@ -33,10 +33,10 @@ defmodule Eml.Element do
       "<div id='42'>hallo!</div>"
 
   """
-  @spec new(atom, attrs_in, Eml.Data.t) :: t
+  @spec new(atom, attrs_in, Eml.Encoder.t) :: t
   def new(tag, attrs \\ %{}, content \\ []) when is_atom(tag) and (is_map(attrs) or is_list(attrs)) do
     attrs   = to_attrs(attrs)
-    content = Eml.to_content(content)
+    content = Eml.encode(content)
     %El{tag: tag, attrs: attrs, content: content}
   end
 
@@ -102,9 +102,9 @@ defmodule Eml.Element do
       #div<["Hallo 2015"]>
 
   """
-  @spec content(t, Eml.Data.t) :: t
+  @spec content(t, Eml.Encoder.t) :: t
   def content(%El{} = el, data) do
-    %El{el| content: Eml.to_content(data)}
+    %El{el| content: Eml.encode(data)}
   end
 
   @doc """
@@ -123,10 +123,10 @@ defmodule Eml.Element do
       #div<["Hallo 2015 !!!"]>
 
   """
-  @spec add(t, Eml.Data.t, Keyword.t) :: t
+  @spec add(t, Eml.Encoder.t, Keyword.t) :: t
   def add(%El{content: current} = el, data, opts \\ []) do
     at      = opts[:at] || :end
-    content = Eml.to_content(data, current, at)
+    content = Eml.encode(data, current, at)
     %El{el| content: content}
   end
 
@@ -144,10 +144,10 @@ defmodule Eml.Element do
       #div<["HALLO"]>
 
   """
-  @spec update(t, (Eml.t -> Eml.Data.t)) :: t
+  @spec update(t, (Eml.t -> Eml.Encoder.t)) :: t
   def update(%El{content: content} = el, fun) do
     content = for node <- content, data = fun.(node) do
-      Eml.Data.to_eml(data)
+      Eml.Encoder.encode(data)
     end
     %El{el| content: content}
   end
@@ -247,7 +247,7 @@ defmodule Eml.Element do
     { id, opts }       = Keyword.pop(opts, :id, :any)
     { class, opts }    = Keyword.pop(opts, :class, :any)
     { content, attrs } = Keyword.pop(opts, :content)
-    content            = Eml.to_content(content)
+    content            = Eml.encode(content)
     content            = if content == [], do: :any, else: content
 
     has_tag?(el, tag)         and
@@ -372,7 +372,7 @@ defmodule Eml.Element do
     if res === [], do: nil, else: res
   end
 
-  defp to_attr_value(data), do: Eml.Data.to_eml(data)
+  defp to_attr_value(data), do: Eml.Encoder.encode(data)
 
   @doc false
   def ensure_list(data) when is_list(data), do: data

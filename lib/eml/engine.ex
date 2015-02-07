@@ -5,7 +5,7 @@ defmodule Eml.Engine do
     expr = Macro.prewalk(expr, &EEx.Engine.handle_assign/1)
     quote do
       tmp = unquote(buffer)
-      tmp <> Eml.unpack(Eml.render(Eml.to_content(unquote(expr)), [], renderer: unquote(renderer)))
+      tmp <> Eml.unpack(Eml.render(Eml.encode(unquote(expr)), [], renderer: unquote(renderer)))
     end
   end
 end

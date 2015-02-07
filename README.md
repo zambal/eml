@@ -183,23 +183,23 @@ runtime behaviour is written in quoted expressions, assigns need to
 be quoted too. To prevent you from writing `quote do: @my_assign` all
 the time, atoms can be used as a shortcut. This means that for example
 `div(:a)` and `div(quote do: @a)` have the same result. This convertion
-is being performed by the `Eml.Data` protocol. The function that the
+is being performed by the `Eml.Encoder` protocol. The function that the
 template macro defines accepts optionally an Keyword list for binding
 values to assigns.
 ```elixir
 iex> e = h1 [:atoms, " ", :are, " ", :converted, " ", :to_assigns]
 #h1<[{:quoted,
-  {:@, [context: Eml.Data.Atom, import: Kernel],
-   [{:atoms, [], Eml.Data.Atom}]}}, " ",
+  {:@, [context: Eml.Encoder.Atom, import: Kernel],
+   [{:atoms, [], Eml.Encoder.Atom}]}}, " ",
  {:quoted,
-  {:@, [context: Eml.Data.Atom, import: Kernel], [{:are, [], Eml.Data.Atom}]}},
+  {:@, [context: Eml.Encoder.Atom, import: Kernel], [{:are, [], Eml.Encoder.Atom}]}},
  " ",
  {:quoted,
-  {:@, [context: Eml.Data.Atom, import: Kernel],
-   [{:converted, [], Eml.Data.Atom}]}}, " ",
+  {:@, [context: Eml.Encoder.Atom, import: Kernel],
+   [{:converted, [], Eml.Encoder.Atom}]}}, " ",
  {:quoted,
-  {:@, [context: Eml.Data.Atom, import: Kernel],
-   [{:to_assigns, [], Eml.Data.Atom}]}}]>
+  {:@, [context: Eml.Encoder.Atom, import: Kernel],
+   [{:to_assigns, [], Eml.Encoder.Atom}]}}]>
 iex> t = Eml.compile(e)
 {:quoted,
  {:safe,
@@ -350,36 +350,36 @@ false
 
 #### Transforming eml
 
-Eml provides three high-level constructs for transforming eml: `Eml.update`,
-`Eml.remove`, and `Eml.add`. Like `Eml.select` they traverse the complete
+Eml provides three high-level constructs for transforming eml: `Transform.update`,
+`Transform.remove`, and `Transform.add`. Like `Query.select` they traverse the complete
 eml tree. Check the docs for more info about these functions. The following
 examples work with the same eml snippet as in the previous section.
 
 ```elixir
-iex> Eml.remove(e, class: "article")
+iex> Transform.remove(e, class: "article")
 #html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>,
  #body<[#article<%{id: "main-content"}>]>]>
 
-iex> Eml.remove(e, pat: ~r/orld/)
+iex> Transform.remove(e, pat: ~r/orld/)
 #html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>,
  #body<[#article<%{id: "main-content"}
   [#section<%{class: ["intro", "article"]} [#h3<>]>,
    #section<%{class: ["conclusion", "article"]} ["TODO"]>]>]>]>
 
-iex> Eml.update(e, &String.downcase(&1), pat: ~r/.*/)
+iex> Transform.update(e, &String.downcase(&1), pat: ~r/.*/)
 #html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>,
  #body<[#article<%{id: "main-content"}
   [#section<%{class: ["intro", "article"]} [#h3<["hello world"]>]>,
    #section<%{class: ["conclusion", "article"]} ["todo"]>]>]>]>
 
-iex> Eml.add(e, section([class: "pre-intro"], "...."), id: "main-content", at: :begin)
+iex> Transform.add(e, section([class: "pre-intro"], "...."), id: "main-content", at: :begin)
 #html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>,
  #body<[#article<%{id: "main-content"}
   [#section<%{class: "pre-intro"} ["...."]>,
    #section<%{class: ["intro", "article"]} [#h3<["Hello world"]>]>,
    #section<%{class: ["conclusion", "article"]} ["TODO"]>]>]>]>
 
-iex> Eml.add(e, section([class: "post-conclusion"], "...."), id: "main-content", at: :end)
+iex> Transform.add(e, section([class: "post-conclusion"], "...."), id: "main-content", at: :end)
 #html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>,
  #body<[#article<%{id: "main-content"}
   [#section<%{class: ["intro", "article"]} [#h3<["Hello world"]>]>,
@@ -387,22 +387,22 @@ iex> Eml.add(e, section([class: "post-conclusion"], "...."), id: "main-content",
    #section<%{class: "post-conclusion"} ["...."]>]>]>]>
 ```
 
-Eml also provides `Eml.transform`. All functions from the previous section are
-implemented with it. `Eml.transform` mostly works like enumeration. The key
-difference is that `Eml.transform` returns a modified version of the eml tree that
+Eml also provides `transform`. All functions from the previous section are
+implemented with it. `transform` mostly works like enumeration. The key
+difference is that `transform` returns a modified version of the eml tree that
 was passed as an argument, instead of collecting nodes in a list.
-`Eml.transform` passes any node it encounters to the provided transformation
+`transform` passes any node it encounters to the provided transformation
 function. The transformation function can return any data that can be converted by the
-`Eml.Data` protocol or `nil`, in which case the node is discarded, so it works a bit
+`Eml.Encoder` protocol or `nil`, in which case the node is discarded, so it works a bit
 like a map and filter function in one pass.
 ```elixir
-iex> Eml.transform(e, fn x -> if Element.has?(x, class: "article"), do: Element.content(x, "#"), else: x end)
+iex> transform(e, fn x -> if Element.has?(x, class: "article"), do: Element.content(x, "#"), else: x end)
 #html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>,
  #body<[#article<%{id: "main-content"}
   [#section<%{class: ["intro", "article"]} ["#"]>,
    #section<%{class: ["conclusion", "article"]} ["#"]>]>]>]>
 
-iex> Eml.transform(e, fn x -> if Element.has?(x, class: "article"), do: Element.content(x, "#"), else: nil end)
+iex> transform(e, fn x -> if Element.has?(x, class: "article"), do: Element.content(x, "#"), else: nil end)
 nil
 ```
 The last result may seem unexpected, but the `section` elements aren't
@@ -413,29 +413,29 @@ the children will be removed too and won't get evaluated.
 
 #### Encoding data in Eml
 
-In order to provide conversions from various data types, Eml provides the `Eml.Data`
+In order to provide conversions from various data types, Eml provides the `Eml.Encoder`
 protocol. Eml provides a implementation for strings, numbers and atoms, but you can
-provide a protocol implementation for your own types by just implementing a `to_eml`
+provide a protocol implementation for your own types by just implementing a `encode`
 function that converts your type to a valid Eml node. Most functions in Eml that need
-type conversions don't directly call `Eml.Data.to_eml`, but use `Eml.to_content`
+type conversions don't directly call `Eml.Encoder.encode`, but use `Eml.encode`
 instead. This function adds nodes to existing content and tries to concatenate all
 binary data. Furthermore, although Eml content is always a list, its
-nodes can not be lists. `to_content` thus flattens all input data in order to
+nodes can not be lists. `Eml.encode` thus flattens all input data in order to
 guarantee Eml content always is a single list.
 
-Some examples using `Eml.to_content`
+Some examples using `Eml.encode`
 ```elixir
-iex> Eml.to_content(nil)
+iex> Eml.encode(nil)
 []
 
-iex> Eml.to_content([1, 2, h1("hello"), 4])
+iex> Eml.encode([1, 2, h1("hello"), 4])
 ["12", #h1<["hello"]>, "4"]
 
-iex> Eml.to_content(["Hello ", ["world", ["!"]]])
+iex> Eml.encode(["Hello ", ["world", ["!"]]])
 ["Hello world!"]
 
-iex> Eml.to_content([a: 1, b: 2])
-** (Protocol.UndefinedError) protocol Eml.Data not implemented for {:b, 2}
+iex> Eml.encode([a: 1, b: 2])
+** (Protocol.UndefinedError) protocol Eml.Encoder not implemented for {:b, 2}
 ```
 
 ### Notes

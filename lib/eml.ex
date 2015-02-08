@@ -51,6 +51,7 @@ defmodule Eml do
 
   @type t               :: String.t | Eml.Element.t | { :safe, String.t } | { :quoted, Macro.t }
   @type content         :: [t]
+  @type transformable   :: t | [t]
   @type bindings        :: [{ atom, Eml.Encoder.t }]
   @type unpackr_result  :: funpackr_result | [unpackr_result]
   @type funpackr_result :: String.t | Macro.t | [String.t | Macro.t]
@@ -353,6 +354,61 @@ defmodule Eml do
   end
 
   @doc """
+  Recursively transforms `eml` content.
+
+  This is the most low level operation provided by Eml for manipulating
+  eml nodes. For example, `update/3` and `remove/2` are implemented by
+  using this function.
+
+  It accepts any eml and traverses all nodes of the provided eml tree.
+  The provided transform function will be evaluated for every node `transform/3`
+  encounters. Parent nodes will be transformed before their children. Child nodes
+  of a parent will be evaluated before moving to the next sibling.
+
+  When the provided function returns `nil`, the node will
+  be removed from the eml tree. Any other returned value will be
+  evaluated by `Eml.encode/3` in order to guarantee valid eml.
+
+  Note that because parent nodes are evaluated before their children,
+  no children will be evaluated if the parent is removed.
+
+  ### Examples:
+
+      iex> use Eml.Transform
+      iex> e = div do
+      ...>   span [id: "inner1", class: "inner"], "hello "
+      ...>   span [id: "inner2", class: "inner"], "world"
+      ...> end
+      #div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
+       #span<%{id: "inner2", class: "inner"} ["world"]>]>
+      iex> transform(e, fn x -> if Element.has?(x, tag: :span), do: "matched", else: x end)
+      [#div<["matched", "matched"]>]
+      iex> transform(e, fn x ->
+      ...> IO.puts(inspect x)
+      ...> x end)
+      #div<[#span<%{id: "inner1", class: "inner"} ["hello "]>, #span<%{id: "inner2", class: "inner"} ["world"]>]>
+      #span<%{id: "inner1", class: "inner"} ["hello "]>
+      "hello "
+      #span<%{id: "inner2", class: "inner"} ["world"]>
+      "world"
+      [#div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
+        #span<%{id: "inner2", class: "inner"} ["world"]>]>]
+
+  """
+  @spec transform(transformable, (t -> Eml.Encoder.t)) :: transformable | nil
+  def transform(eml, fun) when is_list(eml) do
+    for node <- eml, t = transform(node, fun), do: t
+  end
+  def transform(node, fun) do
+    node = fun.(node) |> Eml.Encoder.encode()
+    if element?(node) do
+      %Element{node| content: transform(node.content, fun)}
+    else
+      node
+    end
+  end
+
+  @doc """
   Extracts a value from content (which is always a list) or an element
 
   ### Examples
@@ -432,17 +488,21 @@ defmodule Eml do
 
   # use Eml
   @doc """
-  Import macro's and alias Eml.Element.
+  Import macro's and alias core modules.
 
   Invoking it translates to:
   ```
   alias Eml.Element
+  alias Eml.Query
+  alias Eml.Transform
   import Eml, only: [template_fn: 1, template_fn: 2, template: 2, template: 3]
   ```
   """
   defmacro __using__(_) do
     quote do
       alias Eml.Element
+      alias Eml.Query
+      alias Eml.Transform
       import Eml, only: [template_fn: 1, template_fn: 2, template: 2, template: 3]
     end
   end

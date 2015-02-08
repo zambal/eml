@@ -1,7 +1,7 @@
 defmodule EmlTest do
   use ExUnit.Case
+  use Eml
   use Eml.HTML.Elements
-  use Eml.Transform
 
   alias Eml.Element, as: M
 
@@ -151,7 +151,7 @@ defmodule EmlTest do
       title([class: "title"], "Eml is HTML for developers"),
       h1([class: "title"], "Eml is HTML for developers")
     ]
-    result = Eml.Query.select(doc(), class: "title")
+    result = Query.select(doc(), class: "title")
 
     # The order of the returned content is unspecified,
     # so we need to compare the nodes.
@@ -172,7 +172,7 @@ defmodule EmlTest do
       end,
       span([class: "test"], "Some notes...")
     ]
-    result = Eml.Query.select(doc(), class: "test")
+    result = Query.select(doc(), class: "test")
 
     assert Enum.all?(result, fn node -> node in expected end)
   end
@@ -181,7 +181,7 @@ defmodule EmlTest do
     expected = [div id: "main-side-bar", class: ["content", "side-bar"] do
       span [class: "test"], "Some notes..."
     end]
-    result = Eml.Query.select(doc(), id: "main-side-bar")
+    result = Query.select(doc(), id: "main-side-bar")
 
     assert expected == result
   end
@@ -191,7 +191,7 @@ defmodule EmlTest do
       span [class: "test"], "Some notes..."
     end]
 
-    result = Eml.Query.select(doc(), id: "main-side-bar", class: "content")
+    result = Query.select(doc(), id: "main-side-bar", class: "content")
 
     # If both an id and a class are specified,
     # only return the element that satisfies both.
@@ -202,7 +202,7 @@ defmodule EmlTest do
   test "Select by id and class 2" do
     expected = []
 
-    result = Eml.Query.select(doc(), id: "main-side-bar", class: "test")
+    result = Query.select(doc(), id: "main-side-bar", class: "test")
 
     assert expected == result
   end
@@ -257,7 +257,7 @@ defmodule EmlTest do
   end
 
   test "Member?" do
-    assert Eml.Query.member?(doc(), id: "main-side-bar")
+    assert Query.member?(doc(), id: "main-side-bar")
   end
 
   test "Assigns" do

@@ -19,7 +19,7 @@
   * Importing all HTML element macro's is now done via `use Eml.HTML.Elements` instead of `use Eml.Language.HTML`
   * Renamed `Eml.Data` protocol to `Eml.Encoder` and `Eml.to_content` to `Eml.encode`
   * Moved query functions from the `Eml` module to `Eml.Query`
-  * Moved transform functions from the `Eml` module to `Eml.Transform`
+  * Moved transform functions from the `Eml` module to `Eml.Transform`, except Eml.transform itself.
 
 ## v0.7.1
  * Enhancements

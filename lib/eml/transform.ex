@@ -1,63 +1,6 @@
 defmodule Eml.Transform do
   alias Eml.Element
 
-  @type transformable :: Eml.t | [Eml.t]
-
-  @doc """
-  Recursively transforms `eml` content.
-
-  This is the most low level operation provided by Eml for manipulating
-  eml nodes. For example, `update/3` and `remove/2` are implemented by
-  using this function.
-
-  It accepts any eml and traverses all nodes of the provided eml tree.
-  The provided transform function will be evaluated for every node `transform/3`
-  encounters. Parent nodes will be transformed before their children. Child nodes
-  of a parent will be evaluated before moving to the next sibling.
-
-  When the provided function returns `nil`, the node will
-  be removed from the eml tree. Any other returned value will be
-  evaluated by `Eml.encode/3` in order to guarantee valid eml.
-
-  Note that because parent nodes are evaluated before their children,
-  no children will be evaluated if the parent is removed.
-
-  ### Examples:
-
-      iex> use Eml.Transform
-      iex> e = div do
-      ...>   span [id: "inner1", class: "inner"], "hello "
-      ...>   span [id: "inner2", class: "inner"], "world"
-      ...> end
-      #div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
-       #span<%{id: "inner2", class: "inner"} ["world"]>]>
-      iex> transform(e, fn x -> if Element.has?(x, tag: :span), do: "matched", else: x end)
-      [#div<["matched", "matched"]>]
-      iex> transform(e, fn x ->
-      ...> IO.puts(inspect x)
-      ...> x end)
-      #div<[#span<%{id: "inner1", class: "inner"} ["hello "]>, #span<%{id: "inner2", class: "inner"} ["world"]>]>
-      #span<%{id: "inner1", class: "inner"} ["hello "]>
-      "hello "
-      #span<%{id: "inner2", class: "inner"} ["world"]>
-      "world"
-      [#div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
-        #span<%{id: "inner2", class: "inner"} ["world"]>]>]
-
-  """
-  @spec transform(transformable, (Eml.t -> Eml.Encoder.t)) :: transformable | nil
-  def transform(eml, fun) when is_list(eml) do
-    for node <- eml, t = transform(node, fun), do: t
-  end
-  def transform(node, fun) do
-    node = fun.(node) |> Eml.Encoder.encode()
-    if Eml.element?(node) do
-      %Element{node| content: transform(node.content, fun)}
-    else
-      node
-    end
-  end
-
   @doc """
   Adds content to matched elements.
 
@@ -94,13 +37,13 @@ defmodule Eml.Transform do
       "<div><span id='inner1' class='inner'>hello </span><span id='inner2' class='inner'>world</span><span>!</span></div>"
 
   """
-  @spec add(transformable, Eml.Encoder.t, Keyword.t) :: transformable
+  @spec add(Eml.transformable, Eml.Encoder.t, Keyword.t) :: Eml.transformable
   def add(eml, data, opts \\ []) do
     tag     = opts[:tag] || :any
     id      = opts[:id] || :any
     class   = opts[:class] || :any
     add_fun = &(if Element.match?(&1, tag, id, class), do: Element.add(&1, data, opts), else: &1)
-    transform(eml, add_fun)
+    Eml.transform(eml, add_fun)
   end
 
   @doc """
@@ -151,7 +94,7 @@ defmodule Eml.Transform do
       "<div><span id='inner1' class='inner'>HELLO </span><span id='inner2' class='inner'>WORLD</span></div>"
 
   """
-  @spec update(transformable, (Eml.t -> Eml.Encoder.t), Keyword.t) :: transformable
+  @spec update(Eml.transformable, (Eml.t -> Eml.Encoder.t), Keyword.t) :: Eml.transformable
   def update(eml, fun, opts \\ []) do
     tag            = opts[:tag] || :any
     id             = opts[:id] || :any
@@ -172,7 +115,7 @@ defmodule Eml.Transform do
           &(if Element.match?(&1, tag, id, class), do: fun.(&1), else: &1)
         end
       end
-    transform(eml, update_fun)
+    Eml.transform(eml, update_fun)
   end
 
   @doc """
@@ -197,7 +140,7 @@ defmodule Eml.Transform do
         #span<%{id: "inner2", class: "inner"}>]>]
 
   """
-  @spec remove(transformable, Keyword.t) :: transformable
+  @spec remove(Eml.transformable, Keyword.t) :: Eml.transformable
   def remove(eml, opts \\ []) do
     tag            = opts[:tag] || :any
     id             = opts[:id] || :any
@@ -218,13 +161,6 @@ defmodule Eml.Transform do
           &(if Element.match?(&1, tag, id, class), do: nil, else: &1)
         end
       end
-    transform(eml, remove_fun)
-  end
-
-  defmacro __using__(_) do
-    quote do
-      alias unquote(__MODULE__)
-      import unquote(__MODULE__), only: [transform: 2]
-    end
+    Eml.transform(eml, remove_fun)
   end
 end

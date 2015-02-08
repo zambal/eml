@@ -80,13 +80,13 @@ nil
 ```
 
 By invoking `use Eml`, some macro's are imported into the current scope
-and the `Eml.Element` module is aliased. `use Eml.HTML.Elements` imports all
-generated html element macros from `Eml.HTML.Elements` into the current scope.
-The element macro's just translate to a call to `Eml.Element.new`, except when
-used as a pattern in a match operation. When used inside a match, the macro
-will be translated to %Eml.Element{...}. The nodes of an element can be
-`String.t`, `Eml.Element.t`, `{ :quoted, Macro.t }` and `{ :safe, String.t }`.
-We'll focus on strings and elements for now.
+and core API modules are aliased. `use Eml.HTML.Elements` imports all
+generated html element macros from `Eml.HTML.Elements` into the current
+scope. The element macro's just translate to a call to `Eml.Element.new`,
+except when used as a pattern in a match operation. When used inside a match,
+the macro will be translated to %Eml.Element{...}. The nodes of an element
+can be `String.t`, `Eml.Element.t`, `{ :quoted, Macro.t }` and
+`{ :safe, String.t }`. We'll focus on strings and elements for now.
 ```elixir
 iex> div 42
 #div<["42"]>
@@ -323,27 +323,27 @@ Eml also provides the `Eml.Query.select` and `Eml.Query.member?` functions, whic
 can be used to select content and check for membership more easily.
 Check the docs for more info about the options `Eml.Query.select` accepts.
 ```elixir
-iex> Eml.Query.select(e, class: "article")
+iex> Query.select(e, class: "article")
 [#section<%{class: ["intro", "article"]} [#h3<["Hello world"]>]>,
  #section<%{class: ["conclusion", "article"]} ["TODO"]>]
 
 # using `parent: true` instructs `Eml.Query.select` to select the parent
 # of the matched node(s)
-iex> Eml.Query.select(e, tag: :meta, parent: true)
+iex> Query.select(e, tag: :meta, parent: true)
 [#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>]
 
 # when using the :pat option, a regular expression can be used to
 # match binary content
-iex> Eml.Query.select(e, pat: ~r/H.*d/)
+iex> Query.select(e, pat: ~r/H.*d/)
 ["Hello world"]
 
-iex> Eml.Query.select(e, pat: ~r/TOD/, parent: true)
+iex> Query.select(e, pat: ~r/TOD/, parent: true)
 [#section<%{class: ["conclusion", "article"]} ["TODO"]>]
 
-iex> Eml.Query.member?(e, class: "head")
+iex> Query.member?(e, class: "head")
 true
 
-iex> Eml.Query.member?(e, tag: :article, class: "conclusion")
+iex> Query.member?(e, tag: :article, class: "conclusion")
 false
 ```
 
@@ -356,7 +356,6 @@ eml tree. Check the docs for more info about these functions. The following
 examples work with the same eml snippet as in the previous section.
 
 ```elixir
-iex> use Eml.Transform
 iex> Transform.remove(e, class: "article")
 #html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>,
  #body<[#article<%{id: "main-content"}>]>]>
@@ -388,7 +387,7 @@ iex> Transform.add(e, section([class: "post-conclusion"], "...."), id: "main-con
    #section<%{class: "post-conclusion"} ["...."]>]>]>]>
 ```
 
-Eml also provides `Eml.Transform.transform`. All functions from the previous section are
+Eml also provides `Eml.transform`. All functions from the previous section are
 implemented with it. `transform` mostly works like enumeration. The key
 difference is that `transform` returns a modified version of the eml tree that
 was passed as an argument, instead of collecting nodes in a list.
@@ -397,13 +396,13 @@ function. The transformation function can return any data that can be converted 
 `Eml.Encoder` protocol or `nil`, in which case the node is discarded, so it works a bit
 like a map and filter function in one pass.
 ```elixir
-iex> transform(e, fn x -> if Element.has?(x, class: "article"), do: Element.content(x, "#"), else: x end)
+iex> Eml.transform(e, fn x -> if Element.has?(x, class: "article"), do: Element.content(x, "#"), else: x end)
 #html<[#head<%{class: "head"} [#meta<%{charset: "UTF-8"}>]>,
  #body<[#article<%{id: "main-content"}
   [#section<%{class: ["intro", "article"]} ["#"]>,
    #section<%{class: ["conclusion", "article"]} ["#"]>]>]>]>
 
-iex> transform(e, fn x -> if Element.has?(x, class: "article"), do: Element.content(x, "#"), else: nil end)
+iex> Eml.transform(e, fn x -> if Element.has?(x, class: "article"), do: Element.content(x, "#"), else: nil end)
 nil
 ```
 The last result may seem unexpected, but the `section` elements aren't

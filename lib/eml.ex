@@ -263,6 +263,8 @@ defmodule Eml do
   * `:quotes` - The type of quotes used for attribute values. Accepted values are `:single` (default) and `:double`.
   * `:safe` - When true, escape `&`, `<`, `>` `'` and `\"` in attribute values and content.
      Accepted values are `true` (default) and `false`.
+  * `:prerender` - A function that receives every node just before it gets rendered.
+  * `:postrender` - A function that receives all rendered chunks.
 
   If the option `:safe` is true, the rendered string will be wrapped in a `{ :safe, string }`
   tuple. This allows the result to be inserted as content in other Eml elements, without the markup

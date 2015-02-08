@@ -6,6 +6,7 @@
   * Removed all generic functionality from the html parser and renderer,
     which makes it easier to implement other parsers and renderers
   * Added `{ :safe, String.t }` as a new content type which you can use when you need to add content to an element that should not get escaped
+  * Added `prerender` and `postrender` options to `Eml.render/3`
 
  * Bug fixes
   * Using element macro's in a match had different confusing behaviour

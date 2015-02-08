@@ -6,6 +6,8 @@ defmodule Eml.Renderer do
   # Options helper
 
   @default_opts %{safe: true,
+                  prerender: nil,
+                  postrender: nil,
                   mode: :render}
 
   def new_opts(opts \\ %{}), do: Dict.merge(@default_opts, opts)
@@ -19,24 +21,37 @@ defmodule Eml.Renderer do
 
   # Content helpers
 
-  def default_render_content({ :quoted, quoted }, _opts, %{chunks: chunks} = s) do
-    %{s| type: :quoted, chunks: [quoted | chunks] }
+  def default_render_content({ :quoted, quoted }, opts, %{chunks: chunks} = s) do
+    %{s| type: :quoted, chunks: [maybe_prerender(quoted, opts) | chunks] }
   end
 
-  def default_render_content({ :safe, data }, _opts, %{chunks: chunks} = s) do
-    %{s| chunks: [data | chunks]}
+  def default_render_content({ :safe, data }, opts, %{chunks: chunks} = s) do
+    %{s| chunks: [maybe_prerender(data, opts) | chunks]}
   end
 
-  def default_render_content(data, %{safe: false}, %{chunks: chunks} = s) when is_binary(data) do
-    %{s| chunks: [data | chunks]}
+  def default_render_content(node, %{safe: false, prerender: fun}, %{chunks: chunks} = s) when is_binary(node) do
+    %{s| chunks: [maybe_prerender(node, fun) | chunks]}
   end
 
-  def default_render_content(data, %{safe: true}, %{chunks: chunks} = s) when is_binary(data) do
-    %{s| chunks: [escape(data) | chunks]}
+  def default_render_content(node, %{safe: true, prerender: fun}, %{chunks: chunks} = s) when is_binary(node) do
+    %{s| chunks: [maybe_prerender(node, fun) |> escape() | chunks]}
   end
 
   def default_render_content(data, _, _) do
     raise Eml.CompileError, type: :unsupported_content_type, value: data
+  end
+
+  def maybe_prerender(node, nil) do
+    node
+  end
+  def maybe_prerender(node, %{prerender: nil}) do
+    node
+  end
+  def maybe_prerender(node, fun) when is_function(fun) do
+    fun.(node)
+  end
+  def maybe_prerender(node, %{prerender: fun}) when is_function(fun) do
+    fun.(node)
   end
 
   # Attribute helpers
@@ -99,11 +114,12 @@ defmodule Eml.Renderer do
 
   # Create final result.
 
-  def to_result(%{type: type, chunks: chunks}, %{safe: safe}, engine) do
+  def to_result(%{type: type, chunks: chunks}, %{safe: safe, postrender: fun}, engine) do
     chunks
     |> :lists.reverse()
     |> maybe_quoted(type)
     |> generate_buffer(engine)
+    |> maybe_postrender(fun)
     |> maybe_safe(safe)
   end
 
@@ -113,6 +129,20 @@ defmodule Eml.Renderer do
   defp maybe_quoted(chunks, _) do
     chunks
   end
+
+  defp maybe_postrender(chunks, nil) do
+    chunks
+  end
+  defp maybe_postrender({ :quoted, chunks }, fun) do
+    { :quoted, maybe_postrender(chunks, fun) }
+  end
+  defp maybe_postrender(chunk, fun) when is_binary(chunk) do
+    maybe_postrender([chunk], fun) |> hd()
+  end
+  defp maybe_postrender(chunks, fun) when is_function(fun) do
+    for c <- chunks, do: fun.(c)
+  end
+
   defp maybe_safe({ :quoted, chunks }, true) do
     { :quoted, { :safe, chunks } }
   end

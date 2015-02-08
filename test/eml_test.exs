@@ -387,4 +387,24 @@ defmodule EmlTest do
     html = "<p data-custom=\"Tom &quot; Jerry\"></p>"
     assert [p("data-custom": "Tom \" Jerry")] == Eml.parse(html)
   end
+
+  test "Prerender" do
+    e = div do
+      span "hallo "
+      span "world"
+    end
+    expected = {:safe, "<div><span>HALLO </span><span>WORLD</span></div>"}
+
+    assert expected == Eml.render(e, [], prerender: &(if is_binary(&1), do: String.upcase(&1), else: &1))
+  end
+
+  test "Postrender" do
+    e = div do
+      span "hallo "
+      span "world"
+    end
+    expected = {:safe, "<DIV><SPAN>HALLO </SPAN><SPAN>WORLD</SPAN></DIV>"}
+
+    assert expected == Eml.render(e, [], postrender: &(if is_binary(&1), do: String.upcase(&1), else: &1))
+  end
 end

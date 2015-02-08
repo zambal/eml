@@ -328,8 +328,8 @@ defmodule Eml.Element do
   end
 
   @doc false
-  def pat_match?({ :safe, text }, pat) do
-    pat_match?(text, pat)
+  def pat_match?({ :safe, string }, pat) do
+    pat_match?(string, pat)
   end
   def pat_match?(node, pat) do
     is_binary(node) and Regex.match?(pat, node)

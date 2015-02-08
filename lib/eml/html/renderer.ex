@@ -14,9 +14,8 @@ defmodule Eml.HTML.Renderer do
 
   # Eml parsing
 
-  defp render_content(%Element{tag: tag, attrs: attrs, content: content},
-                 opts, %{type: type, chunks: chunks}) do
-
+  defp render_content(%Element{} = el, opts, %{type: type, chunks: chunks}) do
+    %Element{tag: tag, attrs: attrs, content: content} = maybe_prerender(el, opts)
     type  = chunk_type(:element, type)
 
     chunks = chunks
@@ -39,12 +38,12 @@ defmodule Eml.HTML.Renderer do
     end)
   end
 
-  defp render_content(data, %{safe: true}, %{chunks: chunks, current_tag: tag} = s) when is_binary(data) do
-    %{s| chunks: [maybe_escape(data, tag) | chunks]}
+  defp render_content(node, %{safe: true, prerender: fun}, %{chunks: chunks, current_tag: tag} = s) when is_binary(node) do
+    %{s| chunks: [maybe_prerender(node, fun) |> maybe_escape(tag) | chunks]}
   end
 
-  defp render_content(data, opts, s) do
-    default_render_content(data, opts, s)
+  defp render_content(node, opts, s) do
+    default_render_content(node, opts, s)
   end
 
   # Attributes parsing
@@ -105,9 +104,9 @@ defmodule Eml.HTML.Renderer do
 
   # Element helpers
 
-  defp maybe_escape(data, tag)
-  when not tag in [:script, :style], do: escape(data)
-  defp maybe_escape(data, _tag),     do: data
+  defp maybe_escape(string, tag)
+  when not tag in [:script, :style], do: escape(string)
+  defp maybe_escape(string, _tag),   do: string
 
   defp is_void_element?(tag) do
     tag in [:area, :base, :br, :col, :embed, :hr, :img, :input, :keygen, :link, :meta, :param, :source, :track, :wbr]

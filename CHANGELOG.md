@@ -7,6 +7,7 @@
     which makes it easier to implement other parsers and renderers
   * Added `{ :safe, String.t }` as a new content type which you can use when you need to add content to an element that should not get escaped
   * Added `prerender` and `postrender` options to `Eml.render/3`
+  * Added `casing` option to `Eml.Element.Generator.__using__` to control the casing of tags for generated elements
 
  * Bug fixes
   * Using element macro's in a match had different confusing behaviour
@@ -20,7 +21,7 @@
   * Importing all HTML element macro's is now done via `use Eml.HTML.Elements` instead of `use Eml.Language.HTML`
   * Renamed `Eml.Data` protocol to `Eml.Encoder` and `Eml.to_content` to `Eml.encode`
   * Moved query functions from the `Eml` module to `Eml.Query`
-  * Moved transform functions from the `Eml` module to `Eml.Transform`, except Eml.transform itself.
+  * Moved transform functions from the `Eml` module to `Eml.Transform`, except `Eml.transform` itself.
 
 ## v0.7.1
  * Enhancements

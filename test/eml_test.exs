@@ -407,4 +407,15 @@ defmodule EmlTest do
 
     assert expected == Eml.render(e, [], postrender: &(if is_binary(&1), do: String.upcase(&1), else: &1))
   end
+
+  test "Element casing" do
+    name = :some_long_element_name
+
+    assert name == Eml.Element.Generator.do_casing(name, :snake)
+    assert :"SOME_LONG_ELEMENT_NAME" == Eml.Element.Generator.do_casing(name, :snake_upcase)
+    assert :"SomeLongElementName"    == Eml.Element.Generator.do_casing(name, :pascal)
+    assert :"someLongElementName"    == Eml.Element.Generator.do_casing(name, :camel)
+    assert :"some-long-element-name" == Eml.Element.Generator.do_casing(name, :lisp)
+    assert :"SOME-LONG-ELEMENT-NAME" == Eml.Element.Generator.do_casing(name, :lisp_upcase)
+  end
 end

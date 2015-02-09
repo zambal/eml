@@ -114,12 +114,12 @@ defmodule Eml.Renderer do
 
   # Create final result.
 
-  def to_result(%{type: type, chunks: chunks}, %{safe: safe, postrender: fun}, engine) do
+  def to_result(%{type: type, chunks: chunks}, %{safe: safe, postrender: fun} = opts, engine) do
     chunks
     |> :lists.reverse()
     |> maybe_postrender(fun)
     |> maybe_quoted(type)
-    |> generate_buffer(engine)
+    |> generate_buffer(engine, opts)
     |> maybe_safe(safe)
   end
 
@@ -147,22 +147,22 @@ defmodule Eml.Renderer do
     chunks
   end
 
-  defp generate_buffer({ :quoted, chunks }, engine) do
-    { :quoted, generate_buffer(chunks, "", engine) }
+  defp generate_buffer({ :quoted, chunks }, engine, opts) do
+    { :quoted, generate_buffer(chunks, "", engine, opts) }
   end
-  defp generate_buffer(chunks, _engine) do
+  defp generate_buffer(chunks, _engine, _opts) do
     IO.iodata_to_binary(chunks)
   end
 
-  defp generate_buffer([text | rest], buffer, engine) when is_binary(text) do
+  defp generate_buffer([text | rest], buffer, engine, opts) when is_binary(text) do
     buffer = engine.handle_text(buffer, text)
-    generate_buffer(rest, buffer, engine)
+    generate_buffer(rest, buffer, engine, opts)
   end
-  defp generate_buffer([expr | rest], buffer, engine) do
-    buffer = engine.handle_expr(buffer, "=", expr)
-    generate_buffer(rest, buffer, engine)
+  defp generate_buffer([expr | rest], buffer, engine, opts) do
+    buffer = engine.handle_expr(buffer, "=", expr, opts)
+    generate_buffer(rest, buffer, engine, opts)
   end
-  defp generate_buffer([], buffer, engine) do
+  defp generate_buffer([], buffer, engine, _opts) do
     engine.handle_body(buffer)
   end
 end

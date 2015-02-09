@@ -226,6 +226,18 @@ defmodule Eml do
   end
   defp add_nodes([], acc, _), do: acc
 
+  defmacro decode(eml, opts, do_block \\ []) do
+    opts = Keyword.merge(opts, do_block)
+    quote do
+      case unquote(eml) do
+        unquote(opts[:match]) ->
+          { :ok, unquote(opts[:do]) }
+        _ ->
+          { :error, :nomatch }
+      end
+    end
+  end
+
   @doc """
   Parses data and converts it to eml
 
@@ -505,7 +517,7 @@ defmodule Eml do
       alias Eml.Element
       alias Eml.Query
       alias Eml.Transform
-      import Eml, only: [template_fn: 1, template_fn: 2, template: 2, template: 3]
+      import Eml, only: [template_fn: 1, template_fn: 2, template: 2, template: 3, decode: 2, decode: 3]
     end
   end
 end

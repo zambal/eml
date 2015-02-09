@@ -405,7 +405,11 @@ defmodule EmlTest do
     end
     expected = {:safe, "<DIV><SPAN>HALLO </SPAN><SPAN>WORLD</SPAN></DIV>"}
 
-    assert expected == Eml.render(e, [], postrender: &(if is_binary(&1), do: String.upcase(&1), else: &1))
+    assert expected == Eml.render(e, [], postrender: fn chunks ->
+      for c <- chunks do
+        if is_binary(c), do: String.upcase(c), else: c
+      end
+    end)
   end
 
   test "Element casing" do

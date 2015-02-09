@@ -117,9 +117,9 @@ defmodule Eml.Renderer do
   def to_result(%{type: type, chunks: chunks}, %{safe: safe, postrender: fun}, engine) do
     chunks
     |> :lists.reverse()
+    |> maybe_postrender(fun)
     |> maybe_quoted(type)
     |> generate_buffer(engine)
-    |> maybe_postrender(fun)
     |> maybe_safe(safe)
   end
 
@@ -133,14 +133,8 @@ defmodule Eml.Renderer do
   defp maybe_postrender(chunks, nil) do
     chunks
   end
-  defp maybe_postrender({ :quoted, chunks }, fun) do
-    { :quoted, maybe_postrender(chunks, fun) }
-  end
-  defp maybe_postrender(chunk, fun) when is_binary(chunk) do
-    maybe_postrender([chunk], fun) |> hd()
-  end
   defp maybe_postrender(chunks, fun) when is_function(fun) do
-    for c <- chunks, do: fun.(c)
+    fun.(chunks)
   end
 
   defp maybe_safe({ :quoted, chunks }, true) do

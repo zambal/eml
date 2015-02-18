@@ -322,7 +322,7 @@ defmodule Eml do
     parser.parse(data)
   end
   def parse(data, _) do
-    raise Eml.ParseError, type: :unsupported_input, value: data
+    raise Eml.ParseError, type: :badarg, value: data
   end
 
   @doc """

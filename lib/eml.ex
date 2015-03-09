@@ -238,14 +238,77 @@ defmodule Eml do
   end
   defp add_nodes([], acc, _), do: acc
 
-  defmacro decode(eml, opts, do_block \\ []) do
+  defp collect_embeded_decoders(ast, _env) do
+    { match, decoders } = Macro.prewalk(ast, [], fn
+      { :decode, _ , _ } = decode, acc ->
+        decode = Macro.expand_once(decode, __ENV__)
+        { as, decode } = Keyword.pop(decode, :as)
+        decode = Keyword.put(decode, :from, as)
+        { as, [decode | acc] }
+      expr, acc ->
+        { expr, acc }
+    end)
+    exprs = for d <- decoders do
+      quote do
+        { :ok, unquote(d[:from]) } = Eml.decode(unquote(d)) 
+      end
+    end
+    { match, { :__block__, [], exprs } }
+  end
+  
+  defmacro decode(opts, do_block \\ []) do
     opts = Keyword.merge(opts, do_block)
+    if opts[:as] do
+      opts
+    else
+      { match, decoders } = collect_embeded_decoders(opts[:do], __CALLER__)
+      quote do
+        try do
+          from = unquote(opts[:from])
+          by   = unquote(opts[:by])
+          if is_list(from) do
+            res = for node <- from do
+              Eml.do_match(node, unquote(opts[:select]), by, unquote(match), unquote(decoders))
+            end
+            { :ok, res }
+          else
+            { :ok, Eml.do_match(from, unquote(opts[:select]), by, unquote(match), unquote(decoders)) }
+          end
+        rescue
+          MatchError ->
+            { :error, :nomatch }
+        end
+      end
+    end
+  end
+
+  defmacro decoder(opts, do_block \\ []) do
+    opts = Keyword.merge(opts, do_block)
+    name = opts[:name] || :decoder
     quote do
-      case unquote(eml) do
-        unquote(opts[:match]) ->
-          { :ok, unquote(opts[:do]) }
-        _ ->
-          { :error, :nomatch }
+      def unquote(name)(eml) do
+        Eml.decode(from: eml, select: unquote(opts[:select]), by: unquote(opts[:by]), do: unquote(opts[:do]))
+      end
+    end
+  end
+
+  @doc false
+  defmacro do_match(eml, select, by, match, decoders) do
+    quote do
+      eml = unquote(eml)
+      by  = unquote(by)
+      if is_function(by) or (is_atom(by) and not is_nil(by)) do
+        decoder = if is_function(by) do
+                    by
+                  else
+                    &by.decoder/1
+                  end
+        { :ok, res } = decoder.(eml)
+        res
+      else
+        unquote(match) = eml
+        unquote(decoders)
+        unquote(select)
       end
     end
   end
@@ -271,7 +334,7 @@ defmodule Eml do
     parser.parse(data)
   end
   def parse(data, _) do
-    raise Eml.ParseError, type: :unsupported_input, value: data
+    raise Eml.ParseError, type: :badarg, value: data
   end
 
   @doc """
@@ -529,7 +592,7 @@ defmodule Eml do
       alias Eml.Element
       alias Eml.Query
       alias Eml.Transform
-      import Eml, only: [template_fn: 1, template_fn: 2, template: 2, template: 3, decode: 2, decode: 3]
+      import Eml, only: [template_fn: 1, template_fn: 2, template: 2, template: 3, decoder: 1, decoder: 2]
     end
   end
 end

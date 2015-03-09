@@ -592,7 +592,7 @@ defmodule Eml do
       alias Eml.Element
       alias Eml.Query
       alias Eml.Transform
-      import Eml, only: [template_fn: 1, template_fn: 2, template: 2, template: 3, decoder: 1, decoder: 2]
+      import Eml, only: [template_fn: 1, template_fn: 2, template: 2, template: 3, templatep: 2, templatep: 3, decoder: 1, decoder: 2]
     end
   end
 end

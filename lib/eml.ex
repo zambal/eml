@@ -57,7 +57,7 @@ defmodule Eml do
   @type funpackr_result :: String.t | Macro.t | [String.t | Macro.t]
 
   @doc """
-  Define a template that renders eml to a string during compile time.
+  Define a template function that renders eml to a string during compile time.
 
   Quoted expressions are evaluated at runtime and it's results are
   rendered to eml and concatenated with the precompiled eml.
@@ -120,11 +120,23 @@ defmodule Eml do
 
   """
   defmacro template(name, opts, do_block \\ []) do
+    do_template(name, opts, do_block, __CALLER__, false)
+  end
+
+  @doc """
+  Same as `template/3`, except that it defines a private function.
+  """
+  defmacro templatep(name, opts, do_block \\ []) do
+    do_template(name, opts, do_block, __CALLER__, true)
+  end
+
+  defp do_template(name, opts, do_block, caller, private) do
     opts = Keyword.merge(opts, do_block)
-    compiled = precompile(__CALLER__, opts)
+    compiled = precompile(caller, opts)
     { name, _, _ } = name
+    def_call = if private, do: :defp, else: :def
     quote do
-      def unquote(name)(var!(assigns) \\ []) do
+      unquote(def_call)(unquote(name)(var!(assigns) \\ [])) do
         _ = var!(assigns)
         unquote(compiled)
       end
@@ -138,7 +150,7 @@ defmodule Eml do
   All non quoted expressions are precompiled and the anonymous function that
   is returned expects a Keyword list for binding assigns.
 
-  See `Eml.template/3` for more info.
+  See `template/3` for more info.
 
   ### Example
       iex> t = template_fn do

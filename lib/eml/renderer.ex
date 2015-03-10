@@ -29,6 +29,11 @@ defmodule Eml.Renderer do
     %{s| chunks: [maybe_prerender(data, opts) | chunks]}
   end
 
+  def default_render_content(%Eml.Component{} = component, opts, %{chunks: chunks} = s) do
+    { :safe, data } = Eml.Component.decode(component)
+    %{s| chunks: [maybe_prerender(data, opts) | chunks]}
+  end
+
   def default_render_content(node, %{safe: false, prerender: fun}, %{chunks: chunks} = s) when is_binary(node) do
     %{s| chunks: [maybe_prerender(node, fun) | chunks]}
   end

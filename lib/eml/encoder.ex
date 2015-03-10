@@ -69,6 +69,6 @@ defimpl Eml.Encoder, for: Tuple do
   end
 end
 
-defimpl Eml.Encoder, for: [BitString, Eml.Element, Eml.Parameter, Eml.Template] do
+defimpl Eml.Encoder, for: [BitString, Eml.Element, Eml.Component] do
   def encode(data), do: data
 end

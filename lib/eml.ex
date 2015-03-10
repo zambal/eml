@@ -45,11 +45,12 @@ defmodule Eml do
   """
 
   alias Eml.Element
+  alias Eml.Component
 
   @default_renderer Eml.HTML.Renderer
   @default_parser Eml.HTML.Parser
 
-  @type t               :: String.t | Eml.Element.t | { :safe, String.t } | { :quoted, Macro.t }
+  @type t               :: String.t | Eml.Element.t | Eml.Component.t | { :safe, String.t } | { :quoted, Macro.t }
   @type content         :: [t]
   @type transformable   :: t | [t]
   @type bindings        :: [{ atom, Eml.Encoder.t }]
@@ -143,7 +144,6 @@ defmodule Eml do
     end
   end
 
-
   @doc """
   Define a template as an anonymous function.
 
@@ -170,6 +170,32 @@ defmodule Eml do
       fn var!(assigns) ->
         _ = var!(assigns)
         unquote(compiled)
+      end
+    end
+  end
+
+  defmacro component(tag, opts, do_block \\ []) do
+    opts = Keyword.merge(opts, do_block) |> Macro.escape()
+    { tag, _, _ } = tag
+    caller = Macro.escape(__CALLER__)
+    quote do
+      defmacro unquote(tag)(content_or_attrs, maybe_content \\ nil) do
+        tag = unquote(tag)
+        compiled = Eml.precompile(unquote(caller), unquote(opts))
+        in_match = Macro.Env.in_match?(__CALLER__)
+        { attrs, content } = Eml.Element.Generator.extract_content(content_or_attrs, maybe_content, in_match)
+        if in_match do
+          quote do
+            %Eml.Component{tag: unquote(tag), attrs: unquote(attrs), content: unquote(content)}
+          end
+        else
+          quote do
+            Eml.Component.new(unquote(tag), unquote(attrs), unquote(content), fn var!(assigns) ->
+              _ = var!(assigns)
+              unquote(compiled)
+            end)
+          end
+        end
       end
     end
   end
@@ -490,10 +516,13 @@ defmodule Eml do
   end
   def transform(node, fun) do
     node = fun.(node) |> Eml.Encoder.encode()
-    if element?(node) do
-      %Element{node| content: transform(node.content, fun)}
-    else
-      node
+    cond do
+      element?(node) ->
+        %Element{node| content: transform(node.content, fun)}
+      component?(node) ->
+        %Component{node| content: transform(node.content, fun)}
+      true ->
+        node
     end
   end
 
@@ -516,10 +545,11 @@ defmodule Eml do
 
   """
   @spec unpack(t | [t]) :: t | [t]
-  def unpack({ :safe, string }),          do: string
-  def unpack(%Element{content: content}), do: unpack(content)
-  def unpack([node]),                     do: node
-  def unpack(content_or_node),            do: content_or_node
+  def unpack({ :safe, string }),            do: string
+  def unpack(%Element{content: content}),   do: unpack(content)
+  def unpack(%Component{content: content}), do: unpack(content)
+  def unpack([node]),                       do: node
+  def unpack(content_or_node),              do: content_or_node
 
   @doc """
   Extracts a value recursively from content or an element
@@ -537,6 +567,8 @@ defmodule Eml do
   def unpackr({ :safe, string }),             do: string
   def unpackr(%Element{content: [node]}),     do: unpackr(node)
   def unpackr(%Element{content: content}),    do: unpack_content(content)
+  def unpackr(%Component{content: [node]}),   do: unpackr(node)
+  def unpackr(%Component{content: content}),  do: unpack_content(content)
   def unpackr([node]),                        do: unpackr(node)
   def unpackr(content) when is_list(content), do: unpack_content(content)
   def unpackr(node),                          do: node
@@ -556,6 +588,11 @@ defmodule Eml do
   def element?(%Element{}), do: true
   def element?(_),   do: false
 
+  @doc "Checks if a term is a `Eml.Component` struct."
+  @spec element?(term) :: boolean
+  def component?(%Component{}), do: true
+  def component?(_),   do: false
+
   @doc "Checks if a value is regarded as empty by Eml."
   @spec empty?(term) :: boolean
   def empty?(nil), do: true
@@ -568,11 +605,12 @@ defmodule Eml do
 
   The types are `:string`, `:safe_string`, `:element`, `:quoted`, or `:undefined`.
   """
-  @spec type(t) :: :string | :safe_string | :element | :quoted | :undefined
+  @spec type(t) :: :string | :safe_string | :element | :component | :quoted | :undefined
   def type(node) when is_binary(node), do: :string
   def type({ :safe, _ }), do: :safe_string
   def type({ :quoted, _ }), do: :quoted
   def type(%Element{}), do: :element
+  def type(%Component{}), do: :component
   def type(_), do: :undefined
 
   # use Eml

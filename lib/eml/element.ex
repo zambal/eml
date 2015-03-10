@@ -355,8 +355,9 @@ defmodule Eml.Element do
     end
   end
 
-  defp to_attrs(nil), do: %{}
-  defp to_attrs(collection) do
+  @doc false
+  def to_attrs(nil), do: %{}
+  def to_attrs(collection) do
     for { field, value } <- collection, value != nil, into: %{} do
       { field, to_attr_value(value) }
     end
@@ -381,12 +382,31 @@ defmodule Eml.Element do
 
 end
 
-# Enumerable protocol implementation
+# Component implementation
 
-defimpl Enumerable, for: Eml.Element do
+defmodule Eml.Component do
+  defstruct tag: nil, content: [], attrs: %{}, decoder: nil
 
-  def count(_el),           do: { :error, __MODULE__ }
-  def member?(_el, _),      do: { :error, __MODULE__ }
+  @type t :: %__MODULE__{tag: atom, content: Eml.content, attrs: Eml.Element.attrs, decoder: function}
+
+  @spec new(atom, Eml.Element.attrs_in, Eml.Encoder.t, function) :: t
+  def new(tag, attrs, content, decoder) when is_atom(tag) and (is_map(attrs) or is_list(attrs)) do
+    attrs   = Eml.Element.to_attrs(attrs)
+    content = Eml.encode(content)
+    %__MODULE__{tag: tag, attrs: attrs, content: content, decoder: decoder}
+  end
+
+  @spec decode(t) :: Eml.t
+  def decode(component) do
+    assigns = Map.put(component.attrs, :__CONTENT__, component.content)
+    component.decoder.(assigns)
+  end
+end
+
+# Helper functions for implementing Enumerable and Inspect protocols
+
+defmodule Eml.ImplHelpers do
+  @moduledoc false
 
   def reduce(el, acc, fun) do
     case reduce_content([el], acc, fun) do
@@ -405,20 +425,18 @@ defimpl Enumerable, for: Eml.Element do
   defp reduce_content([%Eml.Element{content: content} = el | rest], { :cont, acc }, fun) do
     reduce_content(rest, reduce_content(content, fun.(el, acc), fun), fun)
   end
+  defp reduce_content([%Eml.Component{content: content} = el | rest], { :cont, acc }, fun) do
+    reduce_content(rest, reduce_content(content, fun.(el, acc), fun), fun)
+  end
   defp reduce_content([node | rest], { :cont, acc }, fun) do
     reduce_content(rest, fun.(node, acc), fun)
   end
   defp reduce_content([], acc, _fun) do
     acc
   end
-end
 
-# Inspect protocol implementation
-
-defimpl Inspect, for: Eml.Element do
-  import Inspect.Algebra
-
-  def inspect(%Eml.Element{tag: tag, attrs: attrs, content: content}, opts) do
+  def inspect(tag, attrs, content, opts) do
+    import Inspect.Algebra
     opts = if is_list(opts), do: Keyword.put(opts, :hide_content_type, true), else: opts
     tag   = Atom.to_string(tag)
     attrs = if attrs == %{}, do: "", else: to_doc(attrs, opts)
@@ -430,5 +448,33 @@ defimpl Inspect, for: Eml.Element do
                { _, _ }   -> glue(attrs, " ", content)
              end
     concat ["#", tag, "<", fields, ">"]
+  end
+end
+
+# Enumerable protocol implementation
+
+defimpl Enumerable, for: Eml.Element do
+  def count(_el),           do: { :error, __MODULE__ }
+  def member?(_el, _),      do: { :error, __MODULE__ }
+  def reduce(el, acc, fun), do: Eml.ImplHelpers.reduce(el, acc, fun)
+end
+
+defimpl Enumerable, for: Eml.Component do
+  def count(_el),           do: { :error, __MODULE__ }
+  def member?(_el, _),      do: { :error, __MODULE__ }
+  def reduce(el, acc, fun), do: Eml.ImplHelpers.reduce(el, acc, fun)
+end
+
+# Inspect protocol implementation
+
+defimpl Inspect, for: Eml.Element do
+  def inspect(%Eml.Element{tag: tag, attrs: attrs, content: content}, opts) do
+    Eml.ImplHelpers.inspect(tag, attrs, content, opts)
+  end
+end
+
+defimpl Inspect, for: Eml.Component do
+  def inspect(%Eml.Component{tag: tag, attrs: attrs, content: content}, opts) do
+    Eml.ImplHelpers.inspect(tag, attrs, content, opts)
   end
 end

@@ -45,12 +45,11 @@ defmodule Eml do
   """
 
   alias Eml.Element
-  alias Eml.Component
 
   @default_renderer Eml.HTML.Renderer
   @default_parser Eml.HTML.Parser
 
-  @type t               :: String.t | Eml.Element.t | Eml.Component.t | { :safe, String.t } | { :quoted, Macro.t }
+  @type t               :: String.t | Eml.Element.t | { :safe, String.t } | { :quoted, Macro.t }
   @type content         :: [t]
   @type transformable   :: t | [t]
   @type bindings        :: [{ atom, Eml.Encoder.t }]
@@ -70,8 +69,8 @@ defmodule Eml do
   the time, atoms can be used as a shortcut. This means that for example
   `div(:a)` and `div(quote do: @a)` have the same result. This convertion
   is being performed by the `Eml.Encoder` protocol. The function that the
-  template macro defines accepts optionally an Keyword list for binding
-  values to assigns.
+  template macro defines accepts optionally any Dict compatible argument for
+  binding values to assigns.
 
   Note that because the unquoted code is evaluated at compile time, it's not
   possible to call other functions from the same module. Quoted expressions
@@ -174,7 +173,53 @@ defmodule Eml do
     end
   end
 
-  defmacro component(tag, opts, do_block \\ []) do
+  @doc """
+  Define a custom element
+
+  Custom elements in Eml are a special kind of elements that inherit functionality from templates. Like templates,
+  everything within the do block gets precompiled, except quoted code. Defined attributes on a custom element can be
+  accessed as assigns, just like with templates. Content can be accessed via the the special assign `__CONTENT__`.
+  However, since the type of a custom element is `Eml.Element.t`, they can be queried and transformed, just like normal
+  Eml elements.
+
+  See `template/3` for more info about quoted blocks, assigns an accepted options.
+
+  ### Example
+
+      iex> use Eml
+      nil
+      iex> use Eml.HTML.Element
+      nil
+      iex> defmodule ElTest do
+      ...>
+      ...>   element my_list do
+      ...>     ul class: :class do
+      ...>       quote do
+      ...>         for item <- @__CONTENT__ do
+      ...>           li do
+      ...>             span "* "
+      ...>             item
+      ...>             span " *"
+      ...>           end
+      ...>         end
+      ...>       end
+      ...>     end
+      ...>   end
+      ...>
+      ...> end
+      {:module, ElTest, ...}
+      iex> import ElTest
+      nil
+      iex> el = my_list class: "some-class" do
+      ...>   span 1
+      ...>   span 2
+      ...> end
+      #my_list<%{class: "some-class"} [#span<["1"]>, #span<["2"]>]>
+      iex> Eml.render(el)
+      {:safe,
+       "<ul class='some-class'><li><span>* </span><span>1</span><span> *</span></li><li><span>* </span><span>2</span><span> *</span></li></ul>"}
+  """
+  defmacro element(tag, opts, do_block \\ []) do
     opts = Keyword.merge(opts, do_block) |> Macro.escape()
     { tag, _, _ } = tag
     caller = Macro.escape(__CALLER__)
@@ -186,11 +231,11 @@ defmodule Eml do
         { attrs, content } = Eml.Element.Generator.extract_content(content_or_attrs, maybe_content, in_match)
         if in_match do
           quote do
-            %Eml.Component{tag: unquote(tag), attrs: unquote(attrs), content: unquote(content)}
+            %Eml.Element{tag: unquote(tag), attrs: unquote(attrs), content: unquote(content)}
           end
         else
           quote do
-            Eml.Component.new(unquote(tag), unquote(attrs), unquote(content), fn var!(assigns) ->
+            Eml.Element.new(unquote(tag), unquote(attrs), unquote(content), fn var!(assigns) ->
               _ = var!(assigns)
               unquote(compiled)
             end)
@@ -276,12 +321,12 @@ defmodule Eml do
     end)
     exprs = for d <- decoders do
       quote do
-        { :ok, unquote(d[:from]) } = Eml.decode(unquote(d)) 
+        { :ok, unquote(d[:from]) } = Eml.decode(unquote(d))
       end
     end
     { match, { :__block__, [], exprs } }
   end
-  
+
   defmacro decode(opts, do_block \\ []) do
     opts = Keyword.merge(opts, do_block)
     if opts[:as] do
@@ -516,13 +561,10 @@ defmodule Eml do
   end
   def transform(node, fun) do
     node = fun.(node) |> Eml.Encoder.encode()
-    cond do
-      element?(node) ->
-        %Element{node| content: transform(node.content, fun)}
-      component?(node) ->
-        %Component{node| content: transform(node.content, fun)}
-      true ->
-        node
+    if element?(node) do
+      %Element{node| content: transform(node.content, fun)}
+    else
+      node
     end
   end
 
@@ -547,7 +589,6 @@ defmodule Eml do
   @spec unpack(t | [t]) :: t | [t]
   def unpack({ :safe, string }),            do: string
   def unpack(%Element{content: content}),   do: unpack(content)
-  def unpack(%Component{content: content}), do: unpack(content)
   def unpack([node]),                       do: node
   def unpack(content_or_node),              do: content_or_node
 
@@ -567,8 +608,6 @@ defmodule Eml do
   def unpackr({ :safe, string }),             do: string
   def unpackr(%Element{content: [node]}),     do: unpackr(node)
   def unpackr(%Element{content: content}),    do: unpack_content(content)
-  def unpackr(%Component{content: [node]}),   do: unpackr(node)
-  def unpackr(%Component{content: content}),  do: unpack_content(content)
   def unpackr([node]),                        do: unpackr(node)
   def unpackr(content) when is_list(content), do: unpack_content(content)
   def unpackr(node),                          do: node
@@ -588,10 +627,10 @@ defmodule Eml do
   def element?(%Element{}), do: true
   def element?(_),   do: false
 
-  @doc "Checks if a term is a `Eml.Component` struct."
-  @spec element?(term) :: boolean
-  def component?(%Component{}), do: true
-  def component?(_),   do: false
+  @doc "Checks if a term is a custom element"
+  @spec custom_element?(term) :: boolean
+  def custom_element?(%Element{template: t}) when is_function(t), do: true
+  def custom_element?(_), do: false
 
   @doc "Checks if a value is regarded as empty by Eml."
   @spec empty?(term) :: boolean
@@ -605,12 +644,11 @@ defmodule Eml do
 
   The types are `:string`, `:safe_string`, `:element`, `:quoted`, or `:undefined`.
   """
-  @spec type(t) :: :string | :safe_string | :element | :component | :quoted | :undefined
+  @spec type(t) :: :string | :safe_string | :element | :quoted | :undefined
   def type(node) when is_binary(node), do: :string
   def type({ :safe, _ }), do: :safe_string
   def type({ :quoted, _ }), do: :quoted
   def type(%Element{}), do: :element
-  def type(%Component{}), do: :component
   def type(_), do: :undefined
 
   # use Eml
@@ -634,7 +672,7 @@ defmodule Eml do
         template_fn: 1, template_fn: 2,
         template: 2, template: 3,
         templatep: 2, templatep: 3,
-        component: 2, component: 3,
+        element: 2, element: 3,
         decoder: 1, decoder: 2
       ]
     end

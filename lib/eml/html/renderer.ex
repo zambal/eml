@@ -14,7 +14,7 @@ defmodule Eml.HTML.Renderer do
 
   # Eml parsing
 
-  defp render_content(%Element{} = el, opts, %{type: type, chunks: chunks}) do
+  defp render_content(%Element{template: nil} = el, opts, %{type: type, chunks: chunks}) do
     %Element{tag: tag, attrs: attrs, content: content} = maybe_prerender(el, opts)
     type  = chunk_type(:element, type)
 

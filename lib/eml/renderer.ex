@@ -29,8 +29,8 @@ defmodule Eml.Renderer do
     %{s| chunks: [maybe_prerender(data, opts) | chunks]}
   end
 
-  def default_render_content(%Eml.Component{} = component, opts, %{chunks: chunks} = s) do
-    { :safe, data } = Eml.Component.decode(component)
+  def default_render_content(%Eml.Element{template: fun} = el, opts, %{chunks: chunks} = s) when is_function(fun) do
+    { :safe, data } = Eml.Element.apply_template(el)
     %{s| chunks: [maybe_prerender(data, opts) | chunks]}
   end
 

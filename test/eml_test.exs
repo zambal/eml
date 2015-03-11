@@ -1,3 +1,18 @@
+defmodule CustomElement do
+  use Eml
+  use Eml.HTML.Elements
+
+  element my_element do
+    div class: :class do
+      h1 :title
+      quote do
+        for el <- @__CONTENT__, do: el
+      end
+    end
+  end
+
+end
+
 defmodule EmlTest do
   use ExUnit.Case
   use Eml
@@ -278,7 +293,7 @@ defmodule EmlTest do
     assert expected == Eml.render quoted, myid: "fruit", fruit1: "lemon", fruit2: "orange"
   end
 
-  test "Templates 2" do
+  test "Templates" do
     e = for _ <- 1..4 do
       div [], :fruit
     end
@@ -287,6 +302,20 @@ defmodule EmlTest do
 
     assert :quoted == Eml.type quoted
     assert expected == Eml.render(quoted, fruit: "lemon")
+  end
+
+  test "Custom elements" do
+    import CustomElement
+
+    el = my_element class: "some-class", title: "My Title" do
+      p 1
+      p 2
+      p 3
+    end
+
+    expected = { :safe, "<div class='some-class'><h1>My Title</h1><p>1</p><p>2</p><p>3</p></div>" }
+
+    assert Eml.render(el) == expected
   end
 
   test "Quoted content in eml" do

@@ -8,7 +8,7 @@ defmodule Eml.Element do
   """
   alias __MODULE__, as: El
 
-  defstruct tag: :div, content: [], attrs: %{}
+  defstruct tag: :div, attrs: %{}, content: [], template: nil
 
   @type attr_name     :: atom
   @type attr_value    :: String.t | Macro.t | [String.t | Macro.t]
@@ -16,8 +16,9 @@ defmodule Eml.Element do
   @type attr_value_in :: String.t | atom | number | Macro.t | [String.t | atom | number | Macro.t]
   @type attrs_in      :: [{ attr_name, attr_value_in }]
                        | %{ attr_name => attr_value_in }
+  @type template_fn   :: ((Dict.t) -> { :safe, String.t })
 
-  @type t :: %El{tag: atom, content: Eml.content, attrs: attrs}
+  @type t :: %El{tag: atom, content: Eml.content, attrs: attrs, template: template_fn}
 
   @doc "Creates a new `Eml.Element` structure with default values."
   @spec new() :: t
@@ -33,11 +34,11 @@ defmodule Eml.Element do
       "<div id='42'>hallo!</div>"
 
   """
-  @spec new(atom, attrs_in, Eml.Encoder.t) :: t
-  def new(tag, attrs \\ %{}, content \\ []) when is_atom(tag) and (is_map(attrs) or is_list(attrs)) do
+  @spec new(atom, attrs_in, Eml.Encoder.t, template_fn) :: t
+  def new(tag, attrs \\ %{}, content \\ [], fun \\ nil) when is_atom(tag) and (is_map(attrs) or is_list(attrs)) do
     attrs   = to_attrs(attrs)
     content = Eml.encode(content)
-    %El{tag: tag, attrs: attrs, content: content}
+    %El{tag: tag, attrs: attrs, content: content, template: fun}
   end
 
   @doc "Gets the tag of an element."
@@ -228,6 +229,55 @@ defmodule Eml.Element do
   end
 
   @doc """
+  Calls the template function of an element with its attributes and content as argument.
+
+  Expects a custom element with an template function, raises an `Eml.CompileError` otherwise.
+
+  ### Example
+
+      iex> use Eml
+      nil
+      iex> use Eml.HTML.Element
+      nil
+      iex> defmodule ElTest do
+      ...>
+      ...>   element my_list do
+      ...>     ul class: :class do
+      ...>       quote do
+      ...>         for item <- @__CONTENT__ do
+      ...>           li do
+      ...>             span "* "
+      ...>             item
+      ...>             span " *"
+      ...>           end
+      ...>         end
+      ...>       end
+      ...>     end
+      ...>   end
+      ...>
+      ...> end
+      {:module, ElTest, ...}
+      iex> import ElTest
+      nil
+      iex> el = my_list class: "some-class" do
+      ...>   span 1
+      ...>   span 2
+      ...> end
+      #my_list<%{class: "some-class"} [#span<["1"]>, #span<["2"]>]>
+      iex> Eml.Element.apply_template(el)
+      {:safe,
+       "<ul class='some-class'><li><span>* </span><span>1</span><span> *</span></li><li><span>* </span><span>2</span><span> *</span></li></ul>"}
+  """
+  @spec apply_template(t) :: Eml.t
+  def apply_template(%El{attrs: attrs, content: content, template: fun}) when is_function(fun) do
+    assigns = Map.put(attrs, :__CONTENT__, content)
+    fun.(assigns)
+  end
+  def apply_template(badarg) do
+    raise Eml.CompileError, type: :not_a_template_element, data: badarg
+  end
+
+  @doc """
   Returns true if all properties of the opts argument are matching with the provided element.
 
   ### Example
@@ -382,31 +432,11 @@ defmodule Eml.Element do
 
 end
 
-# Component implementation
+# Enumerable protocol implementation
 
-defmodule Eml.Component do
-  defstruct tag: nil, content: [], attrs: %{}, decoder: nil
-
-  @type t :: %__MODULE__{tag: atom, content: Eml.content, attrs: Eml.Element.attrs, decoder: function}
-
-  @spec new(atom, Eml.Element.attrs_in, Eml.Encoder.t, function) :: t
-  def new(tag, attrs, content, decoder) when is_atom(tag) and (is_map(attrs) or is_list(attrs)) do
-    attrs   = Eml.Element.to_attrs(attrs)
-    content = Eml.encode(content)
-    %__MODULE__{tag: tag, attrs: attrs, content: content, decoder: decoder}
-  end
-
-  @spec decode(t) :: Eml.t
-  def decode(component) do
-    assigns = Map.put(component.attrs, :__CONTENT__, component.content)
-    component.decoder.(assigns)
-  end
-end
-
-# Helper functions for implementing Enumerable and Inspect protocols
-
-defmodule Eml.ImplHelpers do
-  @moduledoc false
+defimpl Enumerable, for: Eml.Element do
+  def count(_el),           do: { :error, __MODULE__ }
+  def member?(_el, _),      do: { :error, __MODULE__ }
 
   def reduce(el, acc, fun) do
     case reduce_content([el], acc, fun) do
@@ -425,18 +455,20 @@ defmodule Eml.ImplHelpers do
   defp reduce_content([%Eml.Element{content: content} = el | rest], { :cont, acc }, fun) do
     reduce_content(rest, reduce_content(content, fun.(el, acc), fun), fun)
   end
-  defp reduce_content([%Eml.Component{content: content} = el | rest], { :cont, acc }, fun) do
-    reduce_content(rest, reduce_content(content, fun.(el, acc), fun), fun)
-  end
   defp reduce_content([node | rest], { :cont, acc }, fun) do
     reduce_content(rest, fun.(node, acc), fun)
   end
   defp reduce_content([], acc, _fun) do
     acc
   end
+end
 
-  def inspect(tag, attrs, content, opts) do
-    import Inspect.Algebra
+# Inspect protocol implementation
+
+defimpl Inspect, for: Eml.Element do
+  import Inspect.Algebra
+
+  def inspect(%Eml.Element{tag: tag, attrs: attrs, content: content}, opts) do
     opts = if is_list(opts), do: Keyword.put(opts, :hide_content_type, true), else: opts
     tag   = Atom.to_string(tag)
     attrs = if attrs == %{}, do: "", else: to_doc(attrs, opts)
@@ -448,33 +480,5 @@ defmodule Eml.ImplHelpers do
                { _, _ }   -> glue(attrs, " ", content)
              end
     concat ["#", tag, "<", fields, ">"]
-  end
-end
-
-# Enumerable protocol implementation
-
-defimpl Enumerable, for: Eml.Element do
-  def count(_el),           do: { :error, __MODULE__ }
-  def member?(_el, _),      do: { :error, __MODULE__ }
-  def reduce(el, acc, fun), do: Eml.ImplHelpers.reduce(el, acc, fun)
-end
-
-defimpl Enumerable, for: Eml.Component do
-  def count(_el),           do: { :error, __MODULE__ }
-  def member?(_el, _),      do: { :error, __MODULE__ }
-  def reduce(el, acc, fun), do: Eml.ImplHelpers.reduce(el, acc, fun)
-end
-
-# Inspect protocol implementation
-
-defimpl Inspect, for: Eml.Element do
-  def inspect(%Eml.Element{tag: tag, attrs: attrs, content: content}, opts) do
-    Eml.ImplHelpers.inspect(tag, attrs, content, opts)
-  end
-end
-
-defimpl Inspect, for: Eml.Component do
-  def inspect(%Eml.Component{tag: tag, attrs: attrs, content: content}, opts) do
-    Eml.ImplHelpers.inspect(tag, attrs, content, opts)
   end
 end

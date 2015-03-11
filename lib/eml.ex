@@ -509,7 +509,9 @@ defmodule Eml do
           end
     { res, _ } = Code.eval_quoted(ast, [], env)
     compile_opts = Keyword.take(opts, [:escape, :quotes, :renderer])
-    { :quoted, compiled } = Eml.compile(res, compile_opts)
+    { :quoted, compiled } = res
+    |> Eml.encode()
+    |> Eml.compile(compile_opts)
     compiled
   end
 

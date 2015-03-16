@@ -210,11 +210,10 @@ defmodule Eml do
   defmacro element(tag, opts, do_block \\ []) do
     opts = Keyword.merge(opts, do_block) |> Macro.escape()
     { tag, _, _ } = tag
-    caller = Macro.escape(__CALLER__)
+    compiled = Eml.precompile(__CALLER__, opts)
     quote do
       defmacro unquote(tag)(content_or_attrs, maybe_content \\ nil) do
         tag = unquote(tag)
-        compiled = Eml.precompile(unquote(caller), unquote(opts))
         in_match = Macro.Env.in_match?(__CALLER__)
         { attrs, content } = Eml.Element.Generator.extract_content(content_or_attrs, maybe_content, in_match)
         if in_match do
@@ -222,6 +221,7 @@ defmodule Eml do
             %Eml.Element{tag: unquote(tag), attrs: unquote(attrs), content: unquote(content)}
           end
         else
+          compiled = unquote(compiled)
           quote do
             Eml.Element.new(unquote(tag), unquote(attrs), unquote(content), fn var!(assigns) ->
               _ = var!(assigns)

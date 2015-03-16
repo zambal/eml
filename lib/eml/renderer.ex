@@ -169,7 +169,7 @@ defmodule Eml.Renderer do
   end
 
   def finalize_chunks(chunks) do
-    case finalize_chunks(chunks, []) do
+    case finalize_chunks(chunks, []) |> :lists.reverse() do
       [{ :safe, string }] ->
         { :safe, string }
       quoted ->

@@ -5,8 +5,7 @@ defmodule Eml.Renderer do
 
   # Options helper
 
-  @default_opts %{safe: true,
-                  prerender: nil,
+  @default_opts %{prerender: nil,
                   postrender: nil,
                   mode: :render}
 
@@ -22,23 +21,23 @@ defmodule Eml.Renderer do
   # Content helpers
 
   def default_render_content({ :quoted, quoted }, opts, %{chunks: chunks} = s) do
-    %{s| type: :quoted, chunks: [maybe_prerender(quoted, opts) | chunks] }
+    %{s| type: :quoted, chunks: :lists.reverse(maybe_prerender(quoted, opts)) ++ chunks }
   end
 
-  def default_render_content({ :safe, data }, opts, %{chunks: chunks} = s) do
-    %{s| chunks: [maybe_prerender(data, opts) | chunks]}
+  def default_render_content({ :safe, node }, opts, %{chunks: chunks} = s) do
+    %{s| chunks: [maybe_prerender(node, opts) | chunks]}
   end
 
   def default_render_content(%Eml.Element{template: fun} = el, opts, %{chunks: chunks} = s) when is_function(fun) do
-    { :safe, data } = Eml.Element.apply_template(el)
-    %{s| chunks: [maybe_prerender(data, opts) | chunks]}
+    case Eml.Element.apply_template(el) do
+      { :quoted, quoted } ->
+        %{s| type: :quoted, chunks: :lists.reverse(maybe_prerender(quoted, opts)) ++ chunks}
+      { :safe, string } ->
+        %{s| chunks: [maybe_prerender(string, opts) | chunks]}
+    end
   end
 
-  def default_render_content(node, %{safe: false, prerender: fun}, %{chunks: chunks} = s) when is_binary(node) do
-    %{s| chunks: [maybe_prerender(node, fun) | chunks]}
-  end
-
-  def default_render_content(node, %{safe: true, prerender: fun}, %{chunks: chunks} = s) when is_binary(node) do
+  def default_render_content(node, %{prerender: fun}, %{chunks: chunks} = s) when is_binary(node) do
     %{s| chunks: [maybe_prerender(node, fun) |> escape() | chunks]}
   end
 
@@ -62,18 +61,14 @@ defmodule Eml.Renderer do
   # Attribute helpers
 
   def default_render_attr_value({ :quoted, quoted }, _opts, %{chunks: chunks} = s) do
-    %{s| type: :quoted, chunks: [quoted | chunks]}
+    %{s| type: :quoted, chunks: :lists.reverse(quoted) ++ chunks}
   end
 
   def default_render_attr_value({ :safe, value }, _opts, %{chunks: chunks} = s) do
     %{s| chunks: [value | chunks]}
   end
 
-  def default_render_attr_value(value, %{safe: false}, %{chunks: chunks} = s) when is_binary(value) do
-    %{s| chunks: [value | chunks]}
-  end
-
-  def default_render_attr_value(value, %{safe: true}, %{chunks: chunks} = s) when is_binary(value) do
+  def default_render_attr_value(value, _opts, %{chunks: chunks} = s) when is_binary(value) do
     %{s| chunks: [escape(value) | chunks]}
   end
 
@@ -119,13 +114,11 @@ defmodule Eml.Renderer do
 
   # Create final result.
 
-  def to_result(%{type: type, chunks: chunks}, %{safe: safe, postrender: fun} = opts, engine) do
+  def to_result(%{type: type, chunks: chunks}, %{postrender: fun} = opts, renderer) do
     chunks
-    |> :lists.reverse()
     |> maybe_postrender(fun)
     |> maybe_quoted(type)
-    |> generate_buffer(engine, opts)
-    |> maybe_safe(safe)
+    |> generate_buffer(renderer, opts)
   end
 
   defp maybe_quoted(chunks, :quoted) do
@@ -142,32 +135,61 @@ defmodule Eml.Renderer do
     fun.(chunks)
   end
 
-  defp maybe_safe({ :quoted, chunks }, true) do
-    { :quoted, { :safe, chunks } }
+  defp generate_buffer({ :quoted, chunks }, renderer, opts) do
+    { :quoted, generate_buffer(chunks, [], renderer, opts) }
   end
-  defp maybe_safe(chunks, true) do
-    { :safe, chunks }
-  end
-  defp maybe_safe(chunks, false) do
-    chunks
+  defp generate_buffer(chunks, _renderer, _opts) do
+    { :safe, chunks |> :lists.reverse() |> IO.iodata_to_binary() }
   end
 
-  defp generate_buffer({ :quoted, chunks }, engine, opts) do
-    { :quoted, generate_buffer(chunks, "", engine, opts) }
+  defp generate_buffer([chunk | rest], [{ :safe, h } | t], renderer, opts) when is_binary(chunk) do
+    generate_buffer(rest, [{ :safe, chunk <> h } | t], renderer, opts)
   end
-  defp generate_buffer(chunks, _engine, _opts) do
-    IO.iodata_to_binary(chunks)
+  defp generate_buffer([chunk | rest], buffer, renderer, opts) when is_binary(chunk) do
+    generate_buffer(rest, [{ :safe, chunk } | buffer], renderer, opts)
+  end
+  defp generate_buffer([{ :safe, chunk } | rest], [{ :safe, h } | t], renderer, opts) do
+    generate_buffer(rest, [{ :safe, chunk <> h } | t], renderer, opts)
+  end
+  defp generate_buffer([{ :safe, chunk } | rest], buffer, renderer, opts) do
+    generate_buffer(rest, [{ :safe, chunk } | buffer], renderer, opts)
+  end
+  defp generate_buffer([expr | rest], buffer, renderer, opts) do
+    opts = opts
+    |> Dict.put(:mode, :render)
+    |> Dict.put(:renderer, renderer)
+    expr = Macro.prewalk(expr, &EEx.Engine.handle_assign/1)
+    expr = quote do
+      Eml.render(Eml.encode(unquote(expr)), unquote(Macro.escape(opts)))
+    end
+    generate_buffer(rest, [expr | buffer], renderer, opts)
+  end
+  defp generate_buffer([], buffer, _renderer, _opts) do
+    buffer
   end
 
-  defp generate_buffer([text | rest], buffer, engine, opts) when is_binary(text) do
-    buffer = engine.handle_text(buffer, text)
-    generate_buffer(rest, buffer, engine, opts)
+  def finalize_chunks(chunks) do
+    case finalize_chunks(chunks, []) do
+      [{ :safe, string }] ->
+        { :safe, string }
+      quoted ->
+        { :quoted, quoted }
+    end
   end
-  defp generate_buffer([expr | rest], buffer, engine, opts) do
-    buffer = engine.handle_expr(buffer, "=", expr, opts)
-    generate_buffer(rest, buffer, engine, opts)
+
+  defp finalize_chunks([{ :safe, chunk } | rest], [{ :safe, h } | t]) do
+    finalize_chunks(rest, [{ :safe, h <> chunk } | t])
   end
-  defp generate_buffer([], buffer, engine, _opts) do
-    engine.handle_body(buffer)
+  defp finalize_chunks([chunks | rest], acc) when is_list(chunks) do
+    finalize_chunks(rest, finalize_chunks(chunks, acc))
+  end
+  defp finalize_chunks([], acc) do
+    acc
+  end
+  defp finalize_chunks([{ :quoted, chunks } | rest], acc)  do
+    finalize_chunks(rest, finalize_chunks(chunks, acc))
+  end
+  defp finalize_chunks([chunk | rest], acc) do
+    finalize_chunks(rest, [chunk | acc])
   end
 end

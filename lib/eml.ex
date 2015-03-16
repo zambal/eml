@@ -120,25 +120,13 @@ defmodule Eml do
 
   """
   defmacro template(name, opts, do_block \\ []) do
-    do_template(name, opts, do_block, __CALLER__, false)
-  end
-
-  @doc """
-  Same as `template/3`, except that it defines a private function.
-  """
-  defmacro templatep(name, opts, do_block \\ []) do
-    do_template(name, opts, do_block, __CALLER__, true)
-  end
-
-  defp do_template(name, opts, do_block, caller, private) do
     opts = Keyword.merge(opts, do_block)
-    compiled = precompile(caller, opts)
+    compiled = precompile(__CALLER__, opts)
     { name, _, _ } = name
-    def_call = if private, do: :defp, else: :def
     quote do
-      unquote(def_call)(unquote(name)(var!(assigns) \\ [])) do
+      def unquote(name)(var!(assigns) \\ []) do
         _ = var!(assigns)
-        unquote(compiled)
+        Eml.Renderer.finalize_chunks(unquote(compiled))
       end
     end
   end
@@ -168,7 +156,7 @@ defmodule Eml do
     quote do
       fn var!(assigns) ->
         _ = var!(assigns)
-        unquote(compiled)
+        Eml.Renderer.finalize_chunks(unquote(compiled))
       end
     end
   end
@@ -237,7 +225,7 @@ defmodule Eml do
           quote do
             Eml.Element.new(unquote(tag), unquote(attrs), unquote(content), fn var!(assigns) ->
               _ = var!(assigns)
-              unquote(compiled)
+              Eml.Renderer.finalize_chunks(unquote(compiled))
             end)
           end
         end
@@ -283,20 +271,8 @@ defmodule Eml do
     Eml.Encoder.encode(data) |> add_node(acc, insert_at)
   end
 
-  defp add_node(node, [], _), do: [node]
-  defp add_node(node, [h | t], :end) do
-    if is_binary(node) and is_binary(h) do
-      [h <> node | t]
-    else
-      [node, h | t]
-    end
-  end
-  defp add_node(node, [h | t], :begin) do
-    if is_binary(node) and is_binary(h) do
-      [node <> h | t]
-    else
-      [node, h | t]
-    end
+  defp add_node(node, acc, _) do
+      [node | acc]
   end
 
   defp add_nodes([h | t], acc, insert_at) do
@@ -452,23 +428,28 @@ defmodule Eml do
       {:safe, "<p>Tom &amp; Jerry</p>"}
 
   """
-  @spec render(t, Eml.bindings, Keyword.t) :: String.t
-  def render(eml, assigns \\ [], opts \\ [])
+  @spec render!(t, Eml.bindings, Keyword.t) :: String.t
+  def render!(eml, assigns \\ [], opts \\ [])
 
-  def render({ :safe, string }, _assigns, _opts) do
-    { :safe, string }
+  def render!({ :quoted, quoted }, assigns, _opts) do
+     { res, _ } = Code.eval_quoted(quoted, [assigns: assigns])
+     Eml.Renderer.finalize_chunks(res)
   end
-  def render({ :quoted, quoted }, assigns, _opts) do
-    { string, _ } = Code.eval_quoted(quoted, [assigns: assigns])
-    string
-  end
-  def render(content, assigns, opts) do
-    { renderer, opts } = Keyword.pop(opts, :renderer, @default_renderer)
-    opts = Keyword.put(opts, :mode, :render)
-    case renderer.render(content, opts) do
-      quoted = { :quoted, _ } -> render(quoted, assigns, opts)
+  def render!(content, assigns, opts) do
+    case render(content, opts) do
+      quoted = { :quoted, _ } -> render!(quoted, assigns, opts)
       string -> string
     end
+  end
+
+  def render(content, opts \\ [])
+  def render({ :safe, content }, _opts) when is_binary(content) do
+    { :safe, content }
+  end
+  def render(content, opts) do
+    { renderer, opts } = Dict.pop(opts, :renderer, @default_renderer)
+    opts = Dict.put(opts, :mode, :render)
+    renderer.render(content, opts)
   end
 
   @doc """
@@ -671,9 +652,8 @@ defmodule Eml do
       alias Eml.Query
       alias Eml.Transform
       import Eml, only: [
-        template_fn: 1, template_fn: 2,
         template: 2, template: 3,
-        templatep: 2, templatep: 3,
+        template_fn: 1, template_fn: 2,
         element: 2, element: 3,
         decoder: 1, decoder: 2
       ]

@@ -2,11 +2,22 @@ defmodule CustomElement do
   use Eml
   use Eml.HTML.Elements
 
+  template paragraph do
+    div do
+      quote do
+        for l <- @lines do
+          p l
+        end
+      end
+    end
+  end
+
   element my_element do
     div class: :class do
       h1 :title
       quote do
-        for el <- @__CONTENT__, do: el
+        import unquote(__MODULE__)
+        paragraph(lines: @__CONTENT__)
       end
     end
   end
@@ -94,22 +105,22 @@ defmodule EmlTest do
     assert :element     == Eml.type Eml.Element.new()
     assert :string      == Eml.type "some text"
     assert :string      == Eml.type Eml.unpackr div(42)
-    assert :string      == Eml.type Eml.unpack Eml.encode([1,2,"z"])
+    assert :undefined   == Eml.type Eml.unpack Eml.encode([1,2,"z"])
     assert :safe_string == Eml.type { :safe, "<div>some text &amp; markup</div>" }
-    assert :safe_string == Eml.type Eml.render(Eml.encode(:a))
+    assert :quoted      == Eml.type Eml.render(Eml.encode(:a))
     assert :safe_string == Eml.type Eml.encode(:name)
                                   |> Eml.compile()
-                                  |> Eml.render(name: "Vincent")
+                                  |> Eml.render!(name: "Vincent")
     assert :quoted      == Eml.type Eml.compile(Eml.encode(:name))
     assert :quoted      == Eml.type Eml.compile([div([], 1), div([], 2), div([], quote do 2 + @a end), "..."])
   end
 
   test "Eml.Encoder protocol and encode" do
-    assert []                  == Eml.encode [nil, "", []]
-    assert ["truefalse"]       == Eml.encode [true, false]
-    assert ["12345678"]        == Eml.encode Enum.to_list(1..8)
-    assert ["Hello world"]     == Eml.encode ["H", ["el", "lo", [" "]], ["wor", ["ld"]]]
-    assert ["Happy new 2015!"] == Eml.encode ["Happy new ", 2, 0, 1, 5, "!"]
+    assert []  == Eml.encode [nil, "", []]
+    assert ["true", "false"] == Eml.encode [true, false]
+    assert ["1", "2", "3", "4", "5", "6", "7", "8"] == Eml.encode Enum.to_list(1..8)
+    assert ["H", "el", "lo", " ", "wor", "ld"] == Eml.encode ["H", ["el", "lo", [" "]], ["wor", ["ld"]]]
+    assert ["Happy new ", "2", "0", "1", "5", "!"] == Eml.encode ["Happy new ", 2, 0, 1, 5, "!"]
     assert_raise Protocol.UndefinedError, fn -> Eml.encode({}) end
   end
 
@@ -276,7 +287,7 @@ defmodule EmlTest do
   end
 
   test "Assigns" do
-    assign = { :quoted, quote context: Eml.Encoder.Atom, do: @an_assign }
+    assign = { :quoted, [quote context: Eml.Encoder.Atom, do: @an_assign] }
     assert [assign]               == Eml.encode(:an_assign)
     assert [assign, "and", assign] == Eml.encode([:an_assign, "and", :an_assign])
   end
@@ -290,7 +301,7 @@ defmodule EmlTest do
     expected = { :safe, "<div id='fruit-collection'><div>lemon</div><div>orange</div></div>" }
 
     assert :quoted == Eml.type quoted
-    assert expected == Eml.render quoted, myid: "fruit", fruit1: "lemon", fruit2: "orange"
+    assert expected == Eml.render! quoted, myid: "fruit", fruit1: "lemon", fruit2: "orange"
   end
 
   test "Templates" do
@@ -301,19 +312,15 @@ defmodule EmlTest do
     expected = { :safe, "<div>lemon</div><div>lemon</div><div>lemon</div><div>lemon</div>" }
 
     assert :quoted == Eml.type quoted
-    assert expected == Eml.render(quoted, fruit: "lemon")
+    assert expected == Eml.render!(quoted, fruit: "lemon")
   end
 
   test "Custom elements" do
-    import CustomElement
+    require CustomElement
 
-    el = my_element class: "some-class", title: "My Title" do
-      p 1
-      p 2
-      p 3
-    end
+    el = CustomElement.my_element [class: "some-class", title: "My Title"], do: [1, 2, 3]
 
-    expected = { :safe, "<div class='some-class'><h1>My Title</h1><p>1</p><p>2</p><p>3</p></div>" }
+    expected = { :safe, "<div class='some-class'><h1>My Title</h1><div><p>1</p><p>2</p><p>3</p></div></div>" }
 
     assert Eml.render(el) == expected
   end
@@ -330,7 +337,7 @@ defmodule EmlTest do
       section "lemon"
     end
 
-    assert Eml.render(expected) == Eml.render(qaside, fruit: "lemon")
+    assert Eml.render(expected) == Eml.render!(qaside, fruit: "lemon")
   end
 
   test "Quoted attribute rendering" do
@@ -340,14 +347,14 @@ defmodule EmlTest do
             _custom2: (quote do: @custom + 2)
 
     expected = { :safe, "<div data-custom1='2' data-custom2='3' class='class1 class2 class3' id='assigned'></div>" }
-    assert expected == Eml.render(e, id_assign: "assigned",
+    assert expected == Eml.render!(e, id_assign: "assigned",
                                      class1: "class1",
                                      class3: "class3",
                                      custom: 1)
 
     quoted = Eml.compile(e)
     assert :quoted == Eml.type quoted
-    assert expected == Eml.render(quoted, id_assign: "assigned",
+    assert expected == Eml.render!(quoted, id_assign: "assigned",
                                           class1: "class1",
                                           class3: "class3",
                                           custom: 1)
@@ -383,10 +390,10 @@ defmodule EmlTest do
     assert expected == Eml.render div(_custom: "hello 'world'")
 
     expected = { :safe, "<div data-custom=\"hello &quot;world&quot;\"></div>" }
-    assert expected == Eml.render div(_custom: "hello \"world\""), [], quotes: :double
+    assert expected == Eml.render div(_custom: "hello \"world\""), quotes: :double
 
     expected = { :safe, "<div data-custom=\"hello &#39;world&#39;\"></div>" }
-    assert expected == Eml.render div(_custom: "hello 'world'"), [], quotes: :double
+    assert expected == Eml.render div(_custom: "hello 'world'"), quotes: :double
   end
 
   test "Content entity parsing" do
@@ -424,7 +431,7 @@ defmodule EmlTest do
     end
     expected = {:safe, "<div><span>HALLO </span><span>WORLD</span></div>"}
 
-    assert expected == Eml.render(e, [], prerender: &(if is_binary(&1), do: String.upcase(&1), else: &1))
+    assert expected == Eml.render(e, prerender: &(if is_binary(&1), do: String.upcase(&1), else: &1))
   end
 
   test "Postrender" do
@@ -434,7 +441,7 @@ defmodule EmlTest do
     end
     expected = {:safe, "<DIV><SPAN>HALLO </SPAN><SPAN>WORLD</SPAN></DIV>"}
 
-    assert expected == Eml.render(e, [], postrender: fn chunks ->
+    assert expected == Eml.render(e, postrender: fn chunks ->
       for c <- chunks do
         if is_binary(c), do: String.upcase(c), else: c
       end

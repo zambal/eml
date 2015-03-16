@@ -9,7 +9,7 @@ defmodule Eml.HTML.Renderer do
   def render(eml, opts) do
     opts = Dict.merge([quotes: :single], opts) |> new_opts()
     type = if opts.mode == :compile, do: :quoted, else: :content
-    render_content(eml, opts, new_state(type: type)) |> to_result(opts, Eml.HTML.Engine)
+    render_content(eml, opts, new_state(type: type)) |> to_result(opts, Eml.HTML.Renderer)
   end
 
   # Eml parsing
@@ -33,12 +33,12 @@ defmodule Eml.HTML.Renderer do
   end
 
   defp render_content(list, opts, s) when is_list(list) do
-    Enum.reduce(list, s, fn eml, s ->
-      render_content(eml, opts, s)
+    Enum.reduce(list, s, fn node, s ->
+      render_content(node, opts, s)
     end)
   end
 
-  defp render_content(node, %{safe: true, prerender: fun}, %{chunks: chunks, current_tag: tag} = s) when is_binary(node) do
+  defp render_content(node, %{prerender: fun}, %{chunks: chunks, current_tag: tag} = s) when is_binary(node) do
     %{s| chunks: [maybe_prerender(node, fun) |> maybe_escape(tag) | chunks]}
   end
 

@@ -605,8 +605,31 @@ defmodule Eml do
   def type(%Element{}), do: :element
   def type(_), do: :undefined
 
-  defdelegate escape(node), to: Eml.Renderer
-  defdelegate unescape(string), to: Eml.Parser
+  @doc """
+  Escape content
+
+  ### Examples
+
+      iex> escape "Tom & Jerry"
+      "Tom &amp; Jerry"
+      iex> escape div span("Tom & Jerry")
+      #div<[#span<["Tom &amp; Jerry"]>]>
+  """
+  @spec escape(t) :: t
+  defdelegate escape(eml), to: Eml.Renderer
+
+  @doc """
+  Unescape content
+
+  ### Examples
+
+      iex> unescape "Tom &amp; Jerry"
+      "Tom & Jerry"
+      iex> unescape div span("Tom &amp; Jerry")
+      #div<[#span<["Tom & Jerry"]>]>
+  """
+  @spec unescape(t) :: t
+  defdelegate unescape(eml), to: Eml.Parser
 
   # use Eml
   @doc """

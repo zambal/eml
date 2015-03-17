@@ -146,9 +146,7 @@ defmodule Eml.Renderer do
     create_quoted(rest, [chunk | buffer], renderer, opts)
   end
   defp create_quoted([expr | rest], buffer, renderer, opts) do
-    opts = opts
-    |> Dict.put(:mode, :render)
-    |> Dict.put(:renderer, renderer)
+    opts = Dict.put(opts, :renderer, renderer)
     expr = Macro.prewalk(expr, fn term ->
       term
       |> handle_unquoted_assign()

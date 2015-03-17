@@ -606,6 +606,7 @@ defmodule Eml do
   def type(_), do: :undefined
 
   defdelegate escape(node), to: Eml.Renderer
+  defdelegate unescape(string), to: Eml.Parser
 
   # use Eml
   @doc """
@@ -625,7 +626,7 @@ defmodule Eml do
       alias Eml.Query
       alias Eml.Transform
       import Eml, only: [
-        escape: 1,
+        escape: 1, unescape: 1,
         template: 2, template: 3,
         template_fn: 1, template_fn: 2,
         element: 2, element: 3,

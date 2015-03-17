@@ -73,12 +73,6 @@ defmodule Eml.HTML.Parser do
     end
   end
 
-  # Entities
-  defp tokenize("&" <> rest, buf, acc, state) do
-    { entity, rest } = get_entity(rest)
-    consume(entity, rest, buf, acc, state)
-  end
-
   # Attribute quotes
   defp tokenize("'" <> rest, buf, acc, :attr_sep) do
     next(rest, buf, "'", acc, :attr_single_open)

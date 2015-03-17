@@ -83,23 +83,34 @@ defmodule Eml.Renderer do
 
   # Text escaping
 
-  def escape(node) when is_binary(node) do
-    node
-    |> :binary.replace("&", "&amp;", [:global])
-    |> :binary.replace("<", "&lt;", [:global])
-    |> :binary.replace(">", "&gt;", [:global])
-    |> :binary.replace("'", "&#39;", [:global])
-    |> :binary.replace("\"", "&quot;", [:global])
+  entity_map = %{"&" => "&amp;",
+                 "<" => "&lt;",
+                 ">" => "&gt;",
+                 "\"" => "&quot;",
+                 "'" => "&#39;",
+                 "…" => "&hellip;"}
+
+  def escape(eml) do
+    Eml.transform(eml, fn
+      node when is_binary(node) ->
+        escape(node, "")
+      node ->
+        node
+    end)
   end
-  def escape(%Eml.Element{content: content} = el) do
-   %Eml.Element{el | content: escape(content)}
+
+  for {char, entity} <- entity_map do
+    defp escape(unquote(char) <> rest, acc) do
+      escape(rest, acc <> unquote(entity))
+    end
   end
-  def escape(nodes) when is_list(nodes) do
-    for node <- nodes, do: escape(node)
+  defp escape(<<char::utf8, rest::binary>>, acc) do
+    escape(rest, acc <> <<char>>)
   end
-  def escape(node) do
-    node
+  defp escape("", acc) do
+    acc
   end
+
 
   # Chunk helpers
 

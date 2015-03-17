@@ -352,7 +352,7 @@ defmodule EmlTest do
                                           custom: 1)
   end
 
-  test "Default content escaping" do
+  test "Content escaping" do
     expected = "Tom &amp; Jerry"
     assert expected == escape "Tom & Jerry"
 
@@ -367,6 +367,29 @@ defmodule EmlTest do
 
     expected = "hello &#39;world&#39;"
     assert expected == escape "hello 'world'"
+
+    expected = div span("Tom &amp; Jerry")
+    assert expected == escape div span("Tom & Jerry")
+  end
+
+  test "Content unescaping" do
+    expected = "Tom & Jerry"
+    assert expected == unescape "Tom &amp; Jerry"
+
+    expected = "Tom > Jerry"
+    assert expected == unescape "Tom &gt; Jerry"
+
+    expected = "Tom < Jerry"
+    assert expected == unescape "Tom &lt; Jerry"
+
+    expected = "hello \"world\""
+    assert expected == unescape "hello &quot;world&quot;"
+
+    expected = "hello 'world'"
+    assert expected == unescape "hello &#39;world&#39;"
+
+    expected = div span("Tom & Jerry")
+    assert expected == unescape div span("Tom &amp; Jerry")
   end
 
   test "Prerender" do

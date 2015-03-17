@@ -5,37 +5,35 @@ defmodule Eml.Parser do
 
   # Entity helpers
 
-  @entity_map %{"amp"    => "&",
-                "lt"     => "<",
-                "gt"     => ">",
-                "quot"   => "\"",
-                "#39"    => "'",
-                "hellip" => "…"}
+  entity_map = %{"&amp;"    => "&",
+                 "&lt;"     => "<",
+                 "&gt;"     => ">",
+                 "&quot;"   => "\"",
+                 "&hellip;" => "…"}
+  entity_map = for n <- 32..126, into: entity_map do
+    { "&##{n};", <<n>> }
+  end
 
-  def get_entity(chars) do
-    entities = Map.keys(@entity_map)
-    max_length = Enum.reduce(entities, 0, fn e, acc ->
-      length = String.length(e)
-      if length > acc, do: length, else: acc
+  def unescape(eml) do
+    Eml.transform(eml, fn
+      node when is_binary(node) ->
+        unescape(node, "")
+      node ->
+        node
     end)
-    case get_entity(chars, "", entities, max_length) do
-      { e, rest } -> { @entity_map[e], rest }
-      nil         -> { "&", chars }
-    end
   end
 
-  def get_entity(<<";", rest::binary>>, acc, entities, _) do
-    if acc in entities do
-      { acc, rest }
+  for {entity, char} <- entity_map do
+    defp unescape(unquote(entity) <> rest, acc) do
+      unescape(rest, acc <> unquote(char))
     end
   end
-  def get_entity(<<char, rest::binary>>, acc, entities, max_length) do
-    acc = acc <> <<char>>
-    unless String.length(acc) > max_length do
-      get_entity(rest, acc, entities, max_length)
-    end
+  defp unescape(<<char::utf8, rest::binary>>, acc) do
+    unescape(rest, acc <> <<char>>)
   end
-  def get_entity("", _, _, _), do: nil
+  defp unescape("", acc) do
+    acc
+  end
 
   # Attribute helper
 

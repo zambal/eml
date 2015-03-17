@@ -86,8 +86,8 @@ generated html element macros from `Eml.HTML.Elements` into the current
 scope. The element macro's just translate to a call to `Eml.Element.new`,
 except when used as a pattern in a match operation. When used inside a match,
 the macro will be translated to %Eml.Element{...}. The nodes of an element
-can be `String.t`, `Eml.Element.t`, `{ :quoted, Macro.t }` and
-`{ :safe, String.t }`. We'll focus on strings and elements for now.
+can be `String.t`, `Eml.Element.t` and `Macro.t`. We'll focus on strings
+and elements for now.
 ```elixir
 iex> div 42
 #div<["42"]>
@@ -130,21 +130,14 @@ Eml automatically inserts a doctype declaration when the html
 element is the root.
 ```elixir
 iex> html(body(div(42))) |> Eml.render
-{:safe, "<!doctype html>\n<html><body><div>42</div></body>\n</html>"}
+"<!doctype html>\n<html><body><div>42</div></body>\n</html>"
 
 iex> "text & more" |> div |> body |> html |> Eml.render
-{:safe, "<!doctype html>\n<html><body><div>text &amp; more</div></body></html>"}
+"<!doctype html>\n<html><body><div>text &amp; more</div></body></html>"
 ```
 As you can see, you can also use Elixir's pipe operator for creating markup.
 However, using do blocks, as can be seen in the introductory example,
-is more convenient most of the time. By default, Eml also escapes `&`, `'`, `"`,
-`<` and `>` characters in content or attribute values. `Eml.render` returns its 
-results in a { :safe, ... } tuple indicating that the string is safe to insert as
-content in other elements. This means that it is possible to turn of auto escaping
-for a text node by wrapping it in a `:safe` tagged tuplpe.
-
-iex> div({ :safe, "Tom & Jerry" }) |> Eml.render
-{ :safe, "<div>Tom & Jerry</div>" }
+is more convenient most of the time.
 
 #### Parsing
 
@@ -195,9 +188,9 @@ iex> e = h1 [&@assigns, " ", &@are, " ", &@pretty, " ", &@nifty]
  {:quoted, [{:@, [line: 12], [{:nifty, [line: 12], nil}]}]}]>
 iex> t = Eml.compile(e)
 {:quoted,
- [{:safe, "<h1>"}, ...]}
+ ["<h1>", ...]}
 iex> Eml.render!(t, assigns: "Assigns", are: "are", pretty: "pretty", nifty: "nifty!")
-{:safe, "<h1>Assigns are pretty nifty!</h1>"}
+"<h1>Assigns are pretty nifty!</h1>"
 
 iex> e = ul(quote do
 ...>   for n <- @names, do: li n
@@ -210,7 +203,7 @@ iex> e = ul(quote do
      [{:n, [], Elixir}]}]]}]>
 # You can also call `Eml.render!` directly, as it precompiles content too when needed
 iex> Eml.render! e, names: ~w(john james jesse)
-{:safe, "<ul><li>john</li><li>james</li><li>jesse</li></ul>"}
+"<ul><li>john</li><li>james</li><li>jesse</li></ul>"
 
 iex> t = template_fn do
 ...>   ul(quote do
@@ -219,7 +212,7 @@ iex> t = template_fn do
 ...> end
 #Function<6.90072148/1 in :erl_eval.expr/5>
 iex> t.(names: ~w(john james jesse))
-{:safe, "<ul><li>john</li><li>james</li><li>jesse</li></ul>"}
+"<ul><li>john</li><li>james</li><li>jesse</li></ul>"
 ```
 To bind data to assigns in Eml, you can either compile eml data to a template
 and use `Eml.render!` to bind data to assigns, or you can directly `Eml.render!`,
@@ -273,8 +266,7 @@ iex> el = my_list class: "some-class" do
 ...> end
 #my_list<%{class: "some-class"} ["Item 1", "Item 2"]>
 iex> Eml.render(el)
-{:safe,
- "<ul class='some-class'><li><span>* </span><span>Item 1</span><span> *</span></li><li><span>* </span><span>Item 2</span><span> *</span></li></u
+"<ul class='some-class'><li><span>* </span><span>Item 1</span><span> *</span></li><li><span>* </span><span>Item 2</span><span> *</span></li></ul>"
 ```
 
 Just like with templates, all non quoted expressions get precompiled and

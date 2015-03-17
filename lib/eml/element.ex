@@ -16,7 +16,7 @@ defmodule Eml.Element do
   @type attr_value_in :: String.t | atom | number | Macro.t | [String.t | atom | number | Macro.t]
   @type attrs_in      :: [{ attr_name, attr_value_in }]
                        | %{ attr_name => attr_value_in }
-  @type template_fn   :: ((Dict.t) -> { :safe, String.t })
+  @type template_fn   :: ((Dict.t) -> String.t | Macro.t)
 
   @type t :: %El{tag: atom, content: Eml.content, attrs: attrs, template: template_fn}
 
@@ -265,8 +265,7 @@ defmodule Eml.Element do
       ...> end
       #my_list<%{class: "some-class"} [#span<["1"]>, #span<["2"]>]>
       iex> Eml.Element.apply_template(el)
-      {:safe,
-       "<ul class='some-class'><li><span>* </span><span>1</span><span> *</span></li><li><span>* </span><span>2</span><span> *</span></li></ul>"}
+      "<ul class='some-class'><li><span>* </span><span>1</span><span> *</span></li><li><span>* </span><span>2</span><span> *</span></li></ul>"
   """
   @spec apply_template(t) :: Eml.t
   def apply_template(%El{attrs: attrs, content: content, template: fun}) when is_function(fun) do
@@ -378,9 +377,6 @@ defmodule Eml.Element do
   end
 
   @doc false
-  def pat_match?({ :safe, string }, pat) do
-    pat_match?(string, pat)
-  end
   def pat_match?(node, pat) do
     is_binary(node) and Regex.match?(pat, node)
   end

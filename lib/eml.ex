@@ -49,7 +49,7 @@ defmodule Eml do
   @default_renderer Eml.HTML.Renderer
   @default_parser Eml.HTML.Parser
 
-  @type t               :: String.t | Eml.Element.t | { :safe, String.t } | { :quoted, Macro.t }
+  @type t               :: String.t | Eml.Element.t | Macro.t
   @type content         :: [t]
   @type transformable   :: t | [t]
   @type bindings        :: [{ atom, Eml.Encoder.t }]
@@ -66,11 +66,11 @@ defmodule Eml do
   a template. See the `EEx` docs for more info about them. Since all
   runtime behaviour is written in quoted expressions, assigns need to
   be quoted too. To prevent you from writing `quote do: @my_assign` all
-  the time, atoms can be used as a shortcut. This means that for example
-  `div(:a)` and `div(quote do: @a)` have the same result. This convertion
-  is being performed by the `Eml.Encoder` protocol. The function that the
-  template macro defines accepts optionally any Dict compatible argument for
-  binding values to assigns.
+  the time, Eml provides `&` as a shortcut for `quote do:`. You
+  can use this shortcut only in element macro's. This means that for
+  example `div(&@a)` and `div(quote do: @a)` have the same result.
+  The function that the template macro defines accepts optionally any
+  Dict compatible dictionary as argument for binding values to assigns.
 
   Note that because the unquoted code is evaluated at compile time, it's not
   possible to call other functions from the same module. Quoted expressions
@@ -92,7 +92,7 @@ defmodule Eml do
       ...>     prefix = "fruit"
       ...>     div do
       ...>       span [class: "prefix"], prefix
-      ...>       span [class: "name"], :name
+      ...>       span [class: "name"], &@name
       ...>     end
       ...>   end
       ...>
@@ -111,10 +111,9 @@ defmodule Eml do
       ...> end
       iex> File.rm! "test.eml.exs"
       iex> MyTemplates.tropical_fruit names: ~w(mango papaya banana acai)
-      {:safe,
-       "<body><h2>Tropical Fruit</h2><div><span class='prefix'>fruit</span><span class='name'>mango</span></div><div><span class='prefix'>fruit</span><span class='name'>papaya</span></div><div><span class='prefix'>fruit</span><span class='name'>banana</span></div><div><span class='prefix'>fruit</span><span class='name'>acai</span></div></body>"}
+      "<body><h2>Tropical Fruit</h2><div><span class='prefix'>fruit</span><span class='name'>mango</span></div><div><span class='prefix'>fruit</span><span class='name'>papaya</span></div><div><span class='prefix'>fruit</span><span class='name'>banana</span></div><div><span class='prefix'>fruit</span><span class='name'>acai</span></div></body>"
       iex> MyTemplates.from_file number: 21
-      { :safe, "<div>42</div>" }
+      "<div>42</div>"
       iex> MyTemplates.precompile()
       "<body><p>Strawberry</p></body>"
 
@@ -147,7 +146,7 @@ defmodule Eml do
       ...>   ul names
       ...> end
       iex> t.(names: ~w(john james jesse))
-      {:safe, "<ul><li>john</li><li>james</li><li>jesse</li></ul>"}
+      "<ul><li>john</li><li>james</li><li>jesse</li></ul>"
 
   """
   defmacro template_fn(opts, do_block \\ []) do
@@ -186,7 +185,7 @@ defmodule Eml do
       ...>         for item <- @__CONTENT__ do
       ...>           li do
       ...>             span "* "
-      ...>             item
+      ...>             span item
       ...>             span " *"
       ...>           end
       ...>         end
@@ -199,13 +198,12 @@ defmodule Eml do
       iex> import ElTest
       nil
       iex> el = my_list class: "some-class" do
-      ...>   span 1
-      ...>   span 2
+      ...>   "Item 1"
+      ...>   "Item 2"
       ...> end
-      #my_list<%{class: "some-class"} [#span<["1"]>, #span<["2"]>]>
+      #my_list<%{class: "some-class"} ["Item 1", "Item 2"]>
       iex> Eml.render(el)
-      {:safe,
-       "<ul class='some-class'><li><span>* </span><span>1</span><span> *</span></li><li><span>* </span><span>2</span><span> *</span></li></ul>"}
+      "<ul class='some-class'><li><span>* </span><span>Item 1</span><span> *</span></li><li><span>* </span><span>Item 2</span><span> *</span></li></ul>"
   """
   defmacro element(tag, opts, do_block \\ []) do
     opts = Keyword.merge(opts, do_block) |> Macro.escape()
@@ -395,14 +393,8 @@ defmodule Eml do
 
   * `:renderer` - The renderer to use, by default `Eml.HTML.Renderer`
   * `:quotes` - The type of quotes used for attribute values. Accepted values are `:single` (default) and `:double`.
-  * `:safe` - When true, escape `&`, `<`, `>` `'` and `\"` in attribute values and content.
-     Accepted values are `true` (default) and `false`.
   * `:prerender` - A function that receives every node just before it gets rendered.
   * `:postrender` - A function that receives all rendered chunks.
-
-  If the option `:safe` is true, the rendered string will be wrapped in a `{ :safe, string }`
-  tuple. This allows the result to be inserted as content in other Eml elements, without the markup
-  getting escaped.
 
   In case of error, raises an Eml.CompileError exception. If the input contains a quoted expression
   that has a compile or runtime error, an exception will be raised for those too.
@@ -410,47 +402,26 @@ defmodule Eml do
   ### Examples:
 
       iex> Eml.render(body(h1([id: "main-title"], "A title")))
-      {:safe, "<body><h1 id='main-title'>A title</h1></body>"}
+      "<body><h1 id='main-title'>A title</h1></body>"
 
       iex> Eml.render(body(h1([id: "main-title"], "A title")), quotes: :double)
-      {:safe, "<body><h1 id=\"main-title\">A title</h1></body>"}
+      "<body><h1 id=\"main-title\">A title</h1></body>"
 
       iex> Eml.render(p "Tom & Jerry")
-      {:safe, "<p>Tom &amp; Jerry</p>"}
-
-      iex> Eml.render(p("Tom & Jerry"), [], safe: false)
-      "<p>Tom & Jerry</p>"
-
-      iex> Eml.render(p(quote do: @names), names: "Tom & Jerry")
-      {:safe, "<p>Tom &amp; Jerry</p>"}
-
-      iex> Eml.render(p(:names), names: "Tom & Jerry")
-      {:safe, "<p>Tom &amp; Jerry</p>"}
+      "<p>Tom &amp; Jerry</p>"
 
   """
-  @spec render!(t, Eml.bindings, Keyword.t) :: String.t
-  def render!(eml, assigns \\ [], opts \\ [])
-
-  def render!({ :quoted, quoted }, assigns, _opts) do
-     { res, _ } = Code.eval_quoted(quoted, [assigns: assigns])
-     Eml.Renderer.finalize_chunks(res)
-  end
-  def render!(content, assigns, opts) do
-    case render(content, opts) do
-      quoted = { :quoted, _ } -> render!(quoted, assigns, opts)
-      string -> string
+  @spec render(t, Eml.bindings, Dict.t) :: String.t | Macro.t
+  def render(content, assigns \\ [], opts \\ []) do
+    case compile(content, opts) do
+      string when is_binary(string) ->
+        string
+      quoted ->
+        { res, _ } = Code.eval_quoted(quoted, [assigns: assigns])
+        Eml.Renderer.finalize_chunks(res)
     end
   end
 
-  def render(content, opts \\ [])
-  def render({ :safe, content }, _opts) when is_binary(content) do
-    { :safe, content }
-  end
-  def render(content, opts) do
-    { renderer, opts } = Dict.pop(opts, :renderer, @default_renderer)
-    opts = Dict.put(opts, :mode, :render)
-    renderer.render(content, opts)
-  end
 
   @doc """
   Compiles eml to a quoted expression.
@@ -463,23 +434,28 @@ defmodule Eml do
   ### Examples:
 
       iex> t = Eml.compile(body(h1([id: "main-title"], :the_title)))
-      #Quoted<[:the_title]>
-      iex> t.chunks
-      ["<body><h1 id='main-title'>", #param:the_title, "</h1></body>"]
+      ["<body><h1 id='main-title'>",
+        {{:., [], [{:__aliases__, [alias: false], [:Eml]}, :render]}, [],
+         [{{:., [], [{:__aliases__, [alias: false], [:Eml]}, :encode]}, [],
+           [{:the_title, [line: 4], nil}]},
+          {:%{}, [],
+           [mode: :render, postrender: nil, prerender: nil, quotes: :single,
+            renderer: Eml.HTML.Renderer]}]}, "</h1></body>"]
+            iex> t.chunks
+            ["<body><h1 id='main-title'>", #param:the_title, "</h1></body>"]
       iex> Eml.render(t, the_title: "The Title")
       "<body><h1 id='main-title'>The Title</h1></body>"
 
   """
 
-  @spec compile(t, Keyword.t) :: Eml.Quoted.t
-  def compile(eml, opts \\ []) do
-    { renderer, opts } = Keyword.pop(opts, :renderer, @default_renderer)
-    opts = Keyword.put(opts, :mode, :compile)
-    renderer.render(eml, opts)
+  @spec compile(t, Dict.t) :: String.t | Macro.t
+  def compile(content, opts \\ []) do
+    { renderer, opts } = Dict.pop(opts, :renderer, @default_renderer)
+    renderer.render(content, opts)
   end
 
   @doc false
-  @spec precompile(Macro.Env.t | Keyword.t, Keyword.t) :: Macro.t
+  @spec precompile(Macro.Env.t | Keyword.t, Dict.t) :: String.t | Macro.t
   def precompile(env \\ [], opts) do
     file = opts[:file]
     ast = if file do
@@ -489,11 +465,8 @@ defmodule Eml do
             opts[:do]
           end
     { res, _ } = Code.eval_quoted(ast, [], env)
-    compile_opts = Keyword.take(opts, [:escape, :quotes, :renderer])
-    { :quoted, compiled } = res
-    |> Eml.encode()
-    |> Eml.compile(compile_opts)
-    compiled
+    compile_opts = Dict.take(opts, [:escape, :quotes, :renderer])
+    res |> Eml.encode() |> Eml.compile(compile_opts)
   end
 
   @doc """
@@ -570,10 +543,9 @@ defmodule Eml do
 
   """
   @spec unpack(t | [t]) :: t | [t]
-  def unpack({ :safe, string }),            do: string
   def unpack(%Element{content: content}),   do: unpack(content)
   def unpack([node]),                       do: node
-  def unpack(content_or_node),              do: content_or_node
+  def unpack(node),                         do: node
 
   @doc """
   Extracts a value recursively from content or an element
@@ -588,7 +560,6 @@ defmodule Eml do
 
   """
   @spec unpackr(t) :: unpackr_result
-  def unpackr({ :safe, string }),             do: string
   def unpackr(%Element{content: [node]}),     do: unpackr(node)
   def unpackr(%Element{content: content}),    do: unpack_content(content)
   def unpackr([node]),                        do: unpackr(node)
@@ -625,14 +596,16 @@ defmodule Eml do
   @doc """
   Returns the type of content.
 
-  The types are `:string`, `:safe_string`, `:element`, `:quoted`, or `:undefined`.
+  The types are `:string`, `:element`, `:quoted`, or `:undefined`.
   """
-  @spec type(t) :: :string | :safe_string | :element | :quoted | :undefined
+  @spec type(t) :: :string | :element | :quoted | :content | :undefined
   def type(node) when is_binary(node), do: :string
-  def type({ :safe, _ }), do: :safe_string
-  def type({ :quoted, _ }), do: :quoted
+  def type(node) when is_tuple(node), do: :quoted
+  def type(node) when is_list(node), do: :content
   def type(%Element{}), do: :element
   def type(_), do: :undefined
+
+  defdelegate escape(node), to: Eml.Renderer
 
   # use Eml
   @doc """
@@ -652,6 +625,7 @@ defmodule Eml do
       alias Eml.Query
       alias Eml.Transform
       import Eml, only: [
+        escape: 1,
         template: 2, template: 3,
         template_fn: 1, template_fn: 2,
         element: 2, element: 3,

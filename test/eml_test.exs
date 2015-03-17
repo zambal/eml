@@ -13,8 +13,8 @@ defmodule CustomElement do
   end
 
   element my_element do
-    div class: :class do
-      h1 :title
+    div class: &@class do
+      h1 &@title
       quote do
         import unquote(__MODULE__)
         paragraph(lines: @__CONTENT__)
@@ -96,7 +96,7 @@ defmodule EmlTest do
   test "Render => Parse => Compare" do
     # Parsing always return results in a list
     expected = [doc()]
-    { :safe, rendered } = Eml.render(doc())
+    rendered = Eml.render(doc())
     assert expected == Eml.parse(rendered)
   end
 
@@ -105,14 +105,12 @@ defmodule EmlTest do
     assert :element     == Eml.type Eml.Element.new()
     assert :string      == Eml.type "some text"
     assert :string      == Eml.type Eml.unpackr div(42)
-    assert :undefined   == Eml.type Eml.unpack Eml.encode([1,2,"z"])
-    assert :safe_string == Eml.type { :safe, "<div>some text &amp; markup</div>" }
-    assert :quoted      == Eml.type Eml.render(Eml.encode(:a))
-    assert :safe_string == Eml.type Eml.encode(:name)
+    assert :content     == Eml.type Eml.unpack Eml.encode([1,2,"z"])
+    assert :quoted      == Eml.type quote do: @a
+    assert :string      == Eml.type Eml.encode(quote do: @name)
                                   |> Eml.compile()
-                                  |> Eml.render!(name: "Vincent")
-    assert :quoted      == Eml.type Eml.compile(Eml.encode(:name))
-    assert :quoted      == Eml.type Eml.compile([div([], 1), div([], 2), div([], quote do 2 + @a end), "..."])
+                                  |> Eml.render(name: "Vincent")
+    assert :content     == Eml.type Eml.compile([div([], 1), div([], 2), div([], quote do 2 + @a end), "..."])
   end
 
   test "Eml.Encoder protocol and encode" do
@@ -286,33 +284,27 @@ defmodule EmlTest do
     assert Query.member?(doc(), id: "main-side-bar")
   end
 
-  test "Assigns" do
-    assign = { :quoted, [quote context: Eml.Encoder.Atom, do: @an_assign] }
-    assert [assign]               == Eml.encode(:an_assign)
-    assert [assign, "and", assign] == Eml.encode([:an_assign, "and", :an_assign])
-  end
-
   test "Compiling 1" do
     e = div id: (quote do: @myid <> "-collection") do
-      div :fruit1
-      div :fruit2
+      div &@fruit1
+      div (quote do: @fruit2)
     end
-    quoted = Eml.compile(e)
-    expected = { :safe, "<div id='fruit-collection'><div>lemon</div><div>orange</div></div>" }
+    compiled = Eml.compile(e)
+    expected = "<div id='fruit-collection'><div>lemon</div><div>orange</div></div>"
 
-    assert :quoted == Eml.type quoted
-    assert expected == Eml.render! quoted, myid: "fruit", fruit1: "lemon", fruit2: "orange"
+    assert :content == Eml.type compiled
+    assert expected == Eml.render compiled, myid: "fruit", fruit1: "lemon", fruit2: "orange"
   end
 
   test "Templates" do
     e = for _ <- 1..4 do
-      div [], :fruit
+      div [], &@fruit
     end
-    quoted = Eml.compile(e)
-    expected = { :safe, "<div>lemon</div><div>lemon</div><div>lemon</div><div>lemon</div>" }
+    compiled = Eml.compile(e)
+    expected = "<div>lemon</div><div>lemon</div><div>lemon</div><div>lemon</div>"
 
-    assert :quoted == Eml.type quoted
-    assert expected == Eml.render!(quoted, fruit: "lemon")
+    assert :content == Eml.type compiled
+    assert expected == Eml.render(compiled, fruit: "lemon")
   end
 
   test "Custom elements" do
@@ -320,108 +312,61 @@ defmodule EmlTest do
 
     el = CustomElement.my_element [class: "some-class", title: "My Title"], do: [1, 2, 3]
 
-    expected = { :safe, "<div class='some-class'><h1>My Title</h1><div><p>1</p><p>2</p><p>3</p></div></div>" }
+    expected = "<div class='some-class'><h1>My Title</h1><div><p>1</p><p>2</p><p>3</p></div></div>"
 
     assert Eml.render(el) == expected
   end
 
   test "Quoted content in eml" do
-    fruit  = section :fruit
+    fruit  = section &@fruit
     qfruit = Eml.compile(fruit)
     aside  = aside qfruit
     qaside = Eml.compile(aside)
 
-    assert :quoted == Eml.type qaside
+    assert :content == Eml.type qaside
 
     expected = aside do
       section "lemon"
     end
 
-    assert Eml.render(expected) == Eml.render!(qaside, fruit: "lemon")
+    assert Eml.render(expected) == Eml.render(qaside, fruit: "lemon")
   end
 
   test "Quoted attribute rendering" do
-    e = div id: :id_assign,
-            class: [:class1, "class2", :class3],
+    e = div id: &@id_assign,
+            class: [&@class1, "class2", &@class3],
             _custom1: (quote do: @custom + 1),
             _custom2: (quote do: @custom + 2)
 
-    expected = { :safe, "<div data-custom1='2' data-custom2='3' class='class1 class2 class3' id='assigned'></div>" }
-    assert expected == Eml.render!(e, id_assign: "assigned",
+    expected = "<div data-custom1='2' data-custom2='3' class='class1 class2 class3' id='assigned'></div>"
+    assert expected == Eml.render(e, id_assign: "assigned",
                                      class1: "class1",
                                      class3: "class3",
                                      custom: 1)
 
-    quoted = Eml.compile(e)
-    assert :quoted == Eml.type quoted
-    assert expected == Eml.render!(quoted, id_assign: "assigned",
+    compiled = Eml.compile(e)
+    assert :content == Eml.type compiled
+    assert expected == Eml.render(compiled, id_assign: "assigned",
                                           class1: "class1",
                                           class3: "class3",
                                           custom: 1)
   end
 
   test "Default content escaping" do
-    expected = { :safe, "<div>Tom &amp; Jerry</div>" }
-    assert expected == Eml.render div("Tom & Jerry")
+    expected = "Tom &amp; Jerry"
+    assert expected == escape "Tom & Jerry"
 
-    expected = { :safe, "<div>Tom &gt; Jerry</div>" }
-    assert expected == Eml.render div("Tom > Jerry")
+    expected = "Tom &gt; Jerry"
+    assert expected == escape "Tom > Jerry"
 
-    expected = { :safe, "<div>Tom &lt; Jerry</div>" }
-    assert expected == Eml.render div("Tom < Jerry")
-  end
+    expected = "Tom &lt; Jerry"
+    assert expected == escape "Tom < Jerry"
 
-  test "Default attributes escaping" do
-    expected = { :safe, "<div data-custom='Tom &amp; Jerry'></div>" }
-    assert expected == Eml.render div(_custom: "Tom & Jerry")
+    expected = "hello &quot;world&quot;"
+    assert expected == escape "hello \"world\""
 
-    expected = { :safe, "<div data-custom='Tom &gt; Jerry'></div>" }
-    assert expected == Eml.render div(_custom: "Tom > Jerry")
-
-    expected = { :safe, "<div data-custom='Tom &lt; Jerry'></div>" }
-    assert expected == Eml.render div(_custom: "Tom < Jerry")
-  end
-
-  test "Attribute quotes escaping" do
-    expected = { :safe, "<div data-custom='hello &quot;world&quot;'></div>" }
-    assert expected == Eml.render div(_custom: "hello \"world\"")
-
-    expected = { :safe, "<div data-custom='hello &#39;world&#39;'></div>" }
-    assert expected == Eml.render div(_custom: "hello 'world'")
-
-    expected = { :safe, "<div data-custom=\"hello &quot;world&quot;\"></div>" }
-    assert expected == Eml.render div(_custom: "hello \"world\""), quotes: :double
-
-    expected = { :safe, "<div data-custom=\"hello &#39;world&#39;\"></div>" }
-    assert expected == Eml.render div(_custom: "hello 'world'"), quotes: :double
-  end
-
-  test "Content entity parsing" do
-    html = "<p>Tom &amp; Jerry</p>"
-    assert [p("Tom & Jerry")] == Eml.parse(html)
-
-    html = "<p>Tom &gt; Jerry</p>"
-    assert [p("Tom > Jerry")] == Eml.parse(html)
-
-    html = "<p>Tom &lt; Jerry</p>"
-    assert [p("Tom < Jerry")] == Eml.parse(html)
-  end
-
-  test "Attributes entity parsing" do
-    html = "<p data-custom='Tom &amp; Jerry'></p>"
-    assert [p("data-custom": "Tom & Jerry")] == Eml.parse(html)
-
-    html = "<p data-custom='Tom &gt; Jerry'></p>"
-    assert [p("data-custom": "Tom > Jerry")] == Eml.parse(html)
-
-    html = "<p data-custom='Tom &lt; Jerry'></p>"
-    assert [p("data-custom": "Tom < Jerry")] == Eml.parse(html)
-
-    html = "<p data-custom='Tom &#39; Jerry'></p>"
-    assert [p("data-custom": "Tom ' Jerry")] == Eml.parse(html)
-
-    html = "<p data-custom=\"Tom &quot; Jerry\"></p>"
-    assert [p("data-custom": "Tom \" Jerry")] == Eml.parse(html)
+    expected = "hello &#39;world&#39;"
+    assert expected == escape "hello 'world'"
   end
 
   test "Prerender" do
@@ -429,9 +374,9 @@ defmodule EmlTest do
       span "hallo "
       span "world"
     end
-    expected = {:safe, "<div><span>HALLO </span><span>WORLD</span></div>"}
+    expected = "<div><span>HALLO </span><span>WORLD</span></div>"
 
-    assert expected == Eml.render(e, prerender: &(if is_binary(&1), do: String.upcase(&1), else: &1))
+    assert expected == Eml.compile(e, prerender: &(if is_binary(&1), do: String.upcase(&1), else: &1))
   end
 
   test "Postrender" do
@@ -439,9 +384,9 @@ defmodule EmlTest do
       span "hallo "
       span "world"
     end
-    expected = {:safe, "<DIV><SPAN>HALLO </SPAN><SPAN>WORLD</SPAN></DIV>"}
+    expected = "<DIV><SPAN>HALLO </SPAN><SPAN>WORLD</SPAN></DIV>"
 
-    assert expected == Eml.render(e, postrender: fn chunks ->
+    assert expected == Eml.compile(e, postrender: fn chunks ->
       for c <- chunks do
         if is_binary(c), do: String.upcase(c), else: c
       end

@@ -64,6 +64,7 @@ Please read on for a walkthrough that tries to cover most of Eml's features.
 - [Rendering](#rendering)
 - [Parsing](#parsing)
 - [Compiling and templates](#compiling-and-templates)
+- [Custom elements](#custom-elements)
 - [Unpacking](#unpacking)
 - [Querying eml](#querying-eml)
 - [Transforming eml](#transforming-eml)
@@ -139,11 +140,11 @@ However, using do blocks, as can be seen in the introductory example,
 is more convenient most of the time. By default, Eml also escapes `&`, `'`, `"`,
 `<` and `>` characters in content or attribute values. `Eml.render` returns its 
 results in a { :safe, ... } tuple indicating that the string is safe to insert as
-content in other elementsHowever, it is possible to turn of auto escaping when 
-rendering eml.
+content in other elements. This means that it is possible to turn of auto escaping
+for a text node by wrapping it in a `:safe` tagged tuplpe.
 
-iex> Eml.render(div("Tom & Jerry"), [], safe: false)
-"<div>Tom & Jerry</div>"
+iex> div({ :safe, "Tom & Jerry" }) |> Eml.render
+{ :safe, "<div>Tom & Jerry</div>" }
 
 #### Parsing
 
@@ -170,7 +171,7 @@ Compiling and templates can be used in situations where most content
 is static and performance is critical. A template is just Eml content
 that contains quoted expressions. `Eml.compile` precompiles all non quoted expressions.
 All quoted expressions are evaluated at runtime and it's results are
-rendered to eml and concatenated with the precompiled eml. You can use `Eml.render`
+rendered to eml and concatenated with the precompiled eml. You can use `Eml.render!/3`
 to render the compiled template to markup. It's not needed to work with `Eml.compile`
 directly as using `Eml.template` and `Eml.template_fn` is more convenient in most cases.
 `Eml.template` defines a function that has all non quoted expressions prerendered and
@@ -181,31 +182,22 @@ Eml uses the assigns extension from `EEx` for easy data access in
 a template. See the `EEx` docs for more info about them. Since all
 runtime behaviour is written in quoted expressions, assigns need to
 be quoted too. To prevent you from writing `quote do: @my_assign` all
-the time, atoms can be used as a shortcut. This means that for example
-`div(:a)` and `div(quote do: @a)` have the same result. This convertion
-is being performed by the `Eml.Encoder` protocol. The function that the
-template macro defines accepts optionally an Keyword list for binding
+the time, Eml provides `&` as a shortcut for `quote do ... end`. You
+can use this shortcut only in element macro's. This means that for example
+`div(&@a)` and `div(quote do: @a)` have the same result. The function
+that the template macro defines accepts optionally a Keyword list for binding
 values to assigns.
 ```elixir
-iex> e = h1 [:atoms, " ", :are, " ", :converted, " ", :to_assigns]
-#h1<[{:quoted,
-  {:@, [context: Eml.Encoder.Atom, import: Kernel],
-   [{:atoms, [], Eml.Encoder.Atom}]}}, " ",
- {:quoted,
-  {:@, [context: Eml.Encoder.Atom, import: Kernel], [{:are, [], Eml.Encoder.Atom}]}},
- " ",
- {:quoted,
-  {:@, [context: Eml.Encoder.Atom, import: Kernel],
-   [{:converted, [], Eml.Encoder.Atom}]}}, " ",
- {:quoted,
-  {:@, [context: Eml.Encoder.Atom, import: Kernel],
-   [{:to_assigns, [], Eml.Encoder.Atom}]}}]>
+iex> e = h1 [&@assigns, " ", &@are, " ", &@pretty, " ", &@nifty]
+#h1<[{:quoted, [{:@, [line: 12], [{:assigns, [line: 12], nil}]}]}, " ",
+ {:quoted, [{:@, [line: 12], [{:are, [line: 12], nil}]}]}, " ",
+ {:quoted, [{:@, [line: 12], [{:pretty, [line: 12], nil}]}]}, " ",
+ {:quoted, [{:@, [line: 12], [{:nifty, [line: 12], nil}]}]}]>
 iex> t = Eml.compile(e)
 {:quoted,
- {:safe,
-  {:<>, ...}
-iex> Eml.render(t, atoms: "Atoms", are: "are", converted: "converted", to_assigns: "to assigns.")
-{ :safe, "<h1>Atoms are converted to assigns.</h1>" }
+ [{:safe, "<h1>"}, ...]}
+iex> Eml.render!(t, assigns: "Assigns", are: "are", pretty: "pretty", nifty: "nifty!")
+{:safe, "<h1>Assigns are pretty nifty!</h1>"}
 
 iex> e = ul(quote do
 ...>   for n <- @names, do: li n
@@ -216,8 +208,8 @@ iex> e = ul(quote do
      {:@, [context: Elixir, import: Kernel], [{:names, [], Elixir}]}]},
    [do: {:li, [context: Elixir, import: Eml.HTML.Elements],
      [{:n, [], Elixir}]}]]}]>
-# You can also call `Eml.render` directly, as it precompiles content too when needed
-iex> Eml.render e, names: ~w(john james jesse)
+# You can also call `Eml.render!` directly, as it precompiles content too when needed
+iex> Eml.render! e, names: ~w(john james jesse)
 {:safe, "<ul><li>john</li><li>james</li><li>jesse</li></ul>"}
 
 iex> t = template_fn do
@@ -230,21 +222,70 @@ iex> t.(names: ~w(john james jesse))
 {:safe, "<ul><li>john</li><li>james</li><li>jesse</li></ul>"}
 ```
 To bind data to assigns in Eml, you can either compile eml data to a template
-and use `Eml.render` to bind data to assigns, or you can directly `Eml.render`,
+and use `Eml.render!` to bind data to assigns, or you can directly `Eml.render!`,
 which also precompiles on the fly when needed. However, any performance benefits of
-using templates is lost this way. See the documentation of `Eml.template` for more info
+using templates is lost this way. See the documentation of `Eml.template/3` for more info
 and examples about templates.
 
 **WARNING**
 
 Since unquoted expressions in a template are evaluated during compile time, you can't call
-functions or macro's from the same module, since the module isn't compiled yet. Also
-you can't reliably call functions or macro's from other modules in the same project as
-they might still not be compiled. Calling functions or macro's from dependencies should
-work, as Elixir always compiles dependencies before the project itself.
+functions or macro's from the same module, since the module isn't compiled yet.
 
 Quoted expressions however have normal access to other functions, because they are evaluated
 at runtime.
+
+#### Custom elements
+
+Eml also provides the `element/3` macro for defining custom elements. They
+are implemented as normal elements, but they they aditionally contain a template
+property that gets called with the element's attributes and content as arguments
+during rendering.
+
+```elixir
+iex> use Eml
+nil
+iex> use Eml.HTML.Element
+nil
+iex> defmodule ElTest do
+...>
+...>   element my_list do
+...>     ul class: :class do
+...>       quote do
+...>         for item <- @__CONTENT__ do
+...>           li do
+...>             span "* "
+...>             span item
+...>             span " *"
+...>           end
+...>         end
+...>       end
+...>     end
+...>   end
+...>
+...> end
+{:module, ElTest, ...}
+iex> import ElTest
+nil
+iex> el = my_list class: "some-class" do
+...>   "Item 1"
+...>   "Item 2"
+...> end
+#my_list<%{class: "some-class"} ["Item 1", "Item 2"]>
+iex> Eml.render(el)
+{:safe,
+ "<ul class='some-class'><li><span>* </span><span>Item 1</span><span> *</span></li><li><span>* </span><span>Item 2</span><span> *</span></li></u
+```
+
+Just like with templates, all non quoted expressions get precompiled and
+quoted expressions are evaluated at runtime. All attribute names of the element
+can be accessed as assigns and the element contents is accessable as the assign
+`@__CONTENT__`.
+
+The main difference between templates and custom elements is their
+interface. You call and use custom elements like normal elements,
+even within a match. Another difference is that template arguments don't get
+encoded to valid `eml`, while custom element's arguments do.
 
 #### Unpacking
 

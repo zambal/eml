@@ -131,15 +131,21 @@ defmodule Eml.Element.Generator do
       attrs, content, _ ->
         { attrs, content }
     end
-    case { content_or_attrs, maybe_content } do
-      { [{ :do, {:"__block__", _, content}}], _ }     -> init.(nil, content, in_match)
-      { [{ :do, content}], _ }                        -> init.(nil, List.wrap(content), in_match)
-      { attrs, [{ :do, {:"__block__", _, content}}] } -> init.(attrs, content, in_match)
-      { attrs, [{ :do, content}] }                    -> init.(attrs, List.wrap(content), in_match)
-      { [{ _, _ } | _] = attrs, nil }                 -> init.(attrs, nil, in_match)
-      { attrs, nil } when in_match                    -> init.(attrs, nil, in_match)
-      { content, nil } when not in_match              -> init.(nil, content, in_match)
-      { attrs, content }                              -> init.(attrs, content, in_match)
-    end
+    {attrs, content } =
+      case { content_or_attrs, maybe_content } do
+        { [{ :do, {:"__block__", _, content}}], _ }     -> init.(nil, content, in_match)
+        { [{ :do, content}], _ }                        -> init.(nil, List.wrap(content), in_match)
+        { attrs, [{ :do, {:"__block__", _, content}}] } -> init.(attrs, content, in_match)
+        { attrs, [{ :do, content}] }                    -> init.(attrs, List.wrap(content), in_match)
+        { [{ _, _ } | _] = attrs, nil }                 -> init.(attrs, nil, in_match)
+        { attrs, nil } when in_match                    -> init.(attrs, nil, in_match)
+        { content, nil } when not in_match              -> init.(nil, content, in_match)
+        { attrs, content }                              -> init.(attrs, content, in_match)
+      end
+    { handle_unquoted_assign(attrs), handle_unquoted_assign(content) }
+  end
+
+  defp handle_unquoted_assign(quoted) do
+    Macro.prewalk(quoted, &Eml.Renderer.handle_unquoted_assign/1)
   end
 end

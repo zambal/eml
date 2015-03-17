@@ -52,17 +52,13 @@ end
 
 defimpl Eml.Encoder, for: Atom do
   def encode(nil),   do: nil
-  def encode(true),  do: "true"
-  def encode(false), do: "false"
-  def encode(assign), do: { :quoted, [quote do: @unquote(Macro.var(assign, __MODULE__))] }
+  def encode(data),  do: Atom.to_string(data)
 end
 
 defimpl Eml.Encoder, for: Tuple do
-  def encode({ :safe, data }), do: { :safe, data }
-  def encode({ :quoted, quoted }), do: { :quoted, List.wrap(quoted) }
   def encode(data) do
     if Macro.validate(data) == :ok do
-      { :quoted, List.wrap(data) }
+      data
     else
       raise Protocol.UndefinedError, protocol: Eml.Encoder, value: data
     end

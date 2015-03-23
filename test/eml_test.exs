@@ -1,50 +1,57 @@
-defmodule CustomElement do
+defmodule EmlTest.Fragment do
   use Eml
-  use Eml.HTML.Elements
+  use Eml.HTML
 
-  template paragraph do
-    div do
+  fragment my_fragment do
+    div class: @class do
+      h1 @title
+      @__CONTENT__
+    end
+  end
+end
+
+defmodule EmlTest.Template do
+  use Eml
+  use Eml.HTML
+
+  import EmlTest.Fragment
+
+  defp upcase(s) do
+    String.upcase(s)
+  end
+
+  template my_template do
+    my_fragment class: @class, title: &upcase(@title) do
+      h3 "Paragraphs"
       quote do
-        for l <- @lines do
-          p l
+        for par <- @paragraphs do
+          p par
         end
       end
     end
   end
-
-  element my_element do
-    div class: &@class do
-      h1 &@title
-      quote do
-        import unquote(__MODULE__)
-        paragraph(lines: @__CONTENT__)
-      end
-    end
-  end
-
 end
 
 defmodule EmlTest do
   use ExUnit.Case
   use Eml
-  use Eml.HTML.Elements
+  use Eml.HTML
 
   alias Eml.Element, as: M
 
   defp doc() do
     %M{tag: :html, content: [
-     %M{tag: :head, attrs: %{class: "test"}, content: [
-       %M{tag: :title, attrs: %{class: "title"}, content: ["Eml is HTML for developers"]}
-     ]},
-     %M{tag: :body, attrs: %{class: ["test", "main"]}, content: [
-       %M{tag: :h1, attrs: %{class: "title"}, content: ["Eml is HTML for developers"]},
-       %M{tag: :article, attrs: %{class: "content", "data-custom": "some custom attribute"},
-          content: ["Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."]},
-       %M{tag: :div, attrs: %{id: "main-side-bar", class: ["content", "side-bar"]}, content: [
-         %M{tag: :span, attrs: %{class: "test"}, content: ["Some notes..."]}
-       ]}
-     ]}
-   ]}
+      %M{tag: :head, attrs: %{class: "test"}, content: [
+        %M{tag: :title, attrs: %{class: "title"}, content: "Eml is HTML for developers"}
+      ]},
+      %M{tag: :body, attrs: %{class: "test main"}, content: [
+        %M{tag: :h1, attrs: %{class: "title"}, content: "Eml is HTML for developers"},
+        %M{tag: :article, attrs: %{class: "content", "data-custom": "some custom attribute"},
+           content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."},
+        %M{tag: :div, attrs: %{id: "main-side-bar", class: "content side-bar"},
+           content: [%M{tag: :span, attrs: %{class: "test"}, content: "Some notes..."}]}
+      ]}
+    ]}
   end
 
   test "Element macro" do
@@ -52,11 +59,11 @@ defmodule EmlTest do
       head class: "test" do
         title [class: "title"], "Eml is HTML for developers"
       end
-      body class: ["test", "main"] do
+      body class: "test main" do
         h1 [class: "title"], "Eml is HTML for developers"
         article [class: "content", "data-custom": "some custom attribute"],
         "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."
-        div id: "main-side-bar", class: ["content", "side-bar"] do
+        div id: "main-side-bar", class: "content side-bar" do
           span [class: "test"], "Some notes..."
         end
       end
@@ -74,23 +81,10 @@ defmodule EmlTest do
     assert true == Enum.member?(doc(), "Some notes...")
 
     e = [h1([class: "title"], "Eml is HTML for developers")]
-    assert e == Enum.filter(doc(), &Eml.Element.has?(&1, tag: :h1))
-
-    e = [
-      head class: "test" do
-        title [class: "title"], "Eml is HTML for developers"
-      end,
-      body class: ["test", "main"] do
-        h1 [class: "title"], "Eml is HTML for developers"
-        article [class: "content", "data-custom": "some custom attribute"],
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."
-        div id: "main-side-bar", class: ["content", "side-bar"] do
-          span([class: "test"], "Some notes...")
-        end
-      end,
-      span([class: "test"], "Some notes...")
-    ]
-    assert e == Enum.filter(doc(), &Eml.Element.has?(&1, class: "test"))
+    assert e == Enum.filter(doc(), fn
+      %Element{tag: :h1} -> true
+      _ -> false
+    end)
   end
 
   test "Render => Parse => Compare" do
@@ -100,230 +94,68 @@ defmodule EmlTest do
     assert expected == Eml.parse(rendered)
   end
 
-  test "Types" do
-    assert :element     == Eml.type div(42)
-    assert :element     == Eml.type Eml.Element.new()
-    assert :string      == Eml.type "some text"
-    assert :string      == Eml.type Eml.unpackr div(42)
-    assert :content     == Eml.type Eml.unpack Eml.encode([1,2,"z"])
-    assert :quoted      == Eml.type quote do: @a
-    assert :string      == Eml.type Eml.encode(quote do: @name)
-                                  |> Eml.compile()
-                                  |> Eml.render(name: "Vincent")
-    assert :content     == Eml.type Eml.compile([div([], 1), div([], 2), div([], quote do 2 + @a end), "..."])
-  end
-
   test "Eml.Encoder protocol and encode" do
-    assert []  == Eml.encode [nil, "", []]
-    assert ["true", "false"] == Eml.encode [true, false]
-    assert ["1", "2", "3", "4", "5", "6", "7", "8"] == Eml.encode Enum.to_list(1..8)
-    assert ["H", "el", "lo", " ", "wor", "ld"] == Eml.encode ["H", ["el", "lo", [" "]], ["wor", ["ld"]]]
-    assert ["Happy new ", "2", "0", "1", "5", "!"] == Eml.encode ["Happy new ", 2, 0, 1, 5, "!"]
-    assert_raise Protocol.UndefinedError, fn -> Eml.encode({}) end
+    assert "true" == Eml.Encoder.encode true
+    assert_raise Protocol.UndefinedError, fn -> Eml.Encoder.encode({}) end
   end
 
   test "Unpack" do
     e = div 42
-    assert "42" == Eml.unpack e
+    assert 42   == Eml.unpack e
     assert "42" == Eml.unpack ["42"]
     assert "42" == Eml.unpack "42"
-    assert "42" == Eml.unpack Eml.Element.new(:div, [], 42)
+    assert "42" == Eml.unpack %Eml.Element{tag: :div, attrs: %{}, content: ["42"]}
 
     e = [div(1), div(2)]
-    assert e == Eml.unpack e
+    assert [1, 2] == Eml.unpack e
   end
 
-  test "Single unpackr" do
-    single = html do
-      body do
-        div 42
-      end
-    end
-    assert "42" == Eml.unpackr(single)
-  end
-
-  test "Multi unpackr" do
+  test "Multi unpack" do
     multi = html do
       body do
         div [ span(1), span(2) ]
         div span(3)
       end
     end
-    assert [["1", "2"], "3"] == Eml.unpackr(multi)
-  end
-
-  test "Funpackr" do
-    multi = html do
-      body do
-        div [span(1), span(2)]
-        div span(3)
-      end
-    end
-    assert ["1", "2", "3"] == Eml.funpackr(multi)
-  end
-
-  test "Add content" do
-    input = body(id: "test")
-    to_add = div("Hello world!")
-    expected = body([id: "test"], to_add)
-
-    assert expected == Transform.add(input, to_add, id: "test")
-  end
-
-  test "Select by class1" do
-    expected = [
-      title([class: "title"], "Eml is HTML for developers"),
-      h1([class: "title"], "Eml is HTML for developers")
-    ]
-    result = Query.select(doc(), class: "title")
-
-    # The order of the returned content is unspecified,
-    # so we need to compare the nodes.
-
-    assert Enum.all?(result, fn node -> node in expected end)
-  end
-
-  test "Select by class 2" do
-    expected = [
-      head([class: "test"], title([class: "title"], "Eml is HTML for developers")),
-      body class: ["test", "main"] do
-        h1 [class: "title"], "Eml is HTML for developers"
-        article [class: "content", "data-custom": "some custom attribute"],
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."
-        div id: "main-side-bar", class: ["content", "side-bar"] do
-          span [class: "test"], "Some notes..."
-        end
-      end,
-      span([class: "test"], "Some notes...")
-    ]
-    result = Query.select(doc(), class: "test")
-
-    assert Enum.all?(result, fn node -> node in expected end)
-  end
-
-  test "Select by id" do
-    expected = [div id: "main-side-bar", class: ["content", "side-bar"] do
-      span [class: "test"], "Some notes..."
-    end]
-    result = Query.select(doc(), id: "main-side-bar")
-
-    assert expected == result
-  end
-
-  test "Select by id and class 1" do
-    expected = [div id: "main-side-bar", class: ["content", "side-bar"] do
-      span [class: "test"], "Some notes..."
-    end]
-
-    result = Query.select(doc(), id: "main-side-bar", class: "content")
-
-    # If both an id and a class are specified,
-    # only return the element that satisfies both.
-
-    assert expected == result
-  end
-
-  test "Select by id and class 2" do
-    expected = []
-
-    result = Query.select(doc(), id: "main-side-bar", class: "test")
-
-    assert expected == result
-  end
-
-  test "Remove by class 1" do
-    expected = html do
-      head [class: "test"] do
-        title [class: "title"], "Eml is HTML for developers"
-      end
-      body class: ["test", "main"] do
-        h1 [class: "title"], "Eml is HTML for developers"
-      end
-    end
-    result = Transform.remove(doc(), class: "content")
-
-    assert expected == result
-  end
-
-  test "Remove by class 2" do
-    expected = html []
-    result   = Transform.remove(doc(), class: "test")
-
-    assert expected == result
-  end
-
-  test "Remove by id" do
-    expected = html do
-      head [class: "test"], do: title([class: "title"], "Eml is HTML for developers")
-      body class: ["test", "main"] do
-        h1 [class: "title"], "Eml is HTML for developers"
-        article [class: "content", "data-custom": "some custom attribute"],
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."
-      end
-    end
-    result = Transform.remove(doc(), id: "main-side-bar")
-
-    assert expected == result
-  end
-
-  test "Remove by id and class" do
-    expected = html do
-      head [class: "test"], do: title([class: "title"], "Eml is HTML for developers")
-      body class: ["test", "main"] do
-        h1 [class: "title"], "Eml is HTML for developers"
-        article [class: "content", "data-custom": "some custom attribute"],
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam suscipit non neque pharetra dignissim."
-      end
-    end
-    result = Transform.remove(doc(), id: "main-side-bar", class: "content")
-
-    assert expected == result
-  end
-
-  test "Member?" do
-    assert Query.member?(doc(), id: "main-side-bar")
+    assert [[1, 2], 3] == Eml.unpack(multi)
   end
 
   test "Compiling 1" do
     e = div id: (quote do: @myid <> "-collection") do
-      div &@fruit1
+      div (quote do: @fruit1)
       div (quote do: @fruit2)
     end
-    compiled = Eml.compile(e)
+    template = Eml.Compiler.compile(e)
     expected = "<div id='fruit-collection'><div>lemon</div><div>orange</div></div>"
 
-    assert :content == Eml.type compiled
-    assert expected == Eml.render compiled, myid: "fruit", fruit1: "lemon", fruit2: "orange"
+    assert expected == Eml.render template, myid: "fruit", fruit1: "lemon", fruit2: "orange"
   end
 
   test "Templates" do
     e = for _ <- 1..4 do
-      div [], &@fruit
+      div [], (quote do: @fruit)
     end
-    compiled = Eml.compile(e)
+    template = Eml.Compiler.compile(e)
     expected = "<div>lemon</div><div>lemon</div><div>lemon</div><div>lemon</div>"
 
-    assert :content == Eml.type compiled
-    assert expected == Eml.render(compiled, fruit: "lemon")
+    assert expected == Eml.render(template, fruit: "lemon")
   end
 
-  test "Custom elements" do
-    require CustomElement
+  test "fragment elements" do
+    import EmlTest.Template
 
-    el = CustomElement.my_element [class: "some-class", title: "My Title"], do: [1, 2, 3]
+    el = my_template class: "some'class", title: "My&Title", paragraphs: [1, 2, 3]
 
-    expected = "<div class='some-class'><h1>My Title</h1><div><p>1</p><p>2</p><p>3</p></div></div>"
+    expected = "<div class='some&#39;class'><h1>MY&amp;TITLE</h1><h3>Paragraphs</h3><p>1</p><p>2</p><p>3</p></div>"
 
     assert Eml.render(el) == expected
   end
 
   test "Quoted content in eml" do
-    fruit  = section &@fruit
-    qfruit = Eml.compile(fruit)
+    fruit  = section (quote do: @fruit)
+    qfruit = Eml.Compiler.compile(fruit)
     aside  = aside qfruit
-    qaside = Eml.compile(aside)
-
-    assert :content == Eml.type qaside
+    qaside = Eml.Compiler.compile(aside)
 
     expected = aside do
       section "lemon"
@@ -333,8 +165,8 @@ defmodule EmlTest do
   end
 
   test "Quoted attribute rendering" do
-    e = div id: &@id_assign,
-            class: [&@class1, "class2", &@class3],
+    e = div id: (quote do: @id_assign),
+            class: [(quote do: @class1), " class2 ", (quote do: @class3)],
             _custom1: (quote do: @custom + 1),
             _custom2: (quote do: @custom + 2)
 
@@ -344,9 +176,8 @@ defmodule EmlTest do
                                      class3: "class3",
                                      custom: 1)
 
-    compiled = Eml.compile(e)
-    assert :content == Eml.type compiled
-    assert expected == Eml.render(compiled, id_assign: "assigned",
+    template = Eml.Compiler.compile(e)
+    assert expected == Eml.render(template, id_assign: "assigned",
                                           class1: "class1",
                                           class3: "class3",
                                           custom: 1)
@@ -354,66 +185,58 @@ defmodule EmlTest do
 
   test "Content escaping" do
     expected = "Tom &amp; Jerry"
-    assert expected == escape "Tom & Jerry"
+    assert expected == Eml.escape "Tom & Jerry"
 
     expected = "Tom &gt; Jerry"
-    assert expected == escape "Tom > Jerry"
+    assert expected == Eml.escape "Tom > Jerry"
 
     expected = "Tom &lt; Jerry"
-    assert expected == escape "Tom < Jerry"
+    assert expected == Eml.escape "Tom < Jerry"
 
     expected = "hello &quot;world&quot;"
-    assert expected == escape "hello \"world\""
+    assert expected == Eml.escape "hello \"world\""
 
     expected = "hello &#39;world&#39;"
-    assert expected == escape "hello 'world'"
+    assert expected == Eml.escape "hello 'world'"
 
     expected = div span("Tom &amp; Jerry")
-    assert expected == escape div span("Tom & Jerry")
+    assert expected == Eml.escape div span("Tom & Jerry")
+
+    expected = "<div><span>Tom &amp; Jerry</span></div>"
+    assert expected == Eml.render div span("Tom & Jerry")
+
+    expected = "<div><span>Tom & Jerry</span></div>"
+    assert expected == Eml.render div span({ :safe, "Tom & Jerry" })
   end
 
   test "Content unescaping" do
     expected = "Tom & Jerry"
-    assert expected == unescape "Tom &amp; Jerry"
+    assert expected == Eml.unescape "Tom &amp; Jerry"
 
     expected = "Tom > Jerry"
-    assert expected == unescape "Tom &gt; Jerry"
+    assert expected == Eml.unescape "Tom &gt; Jerry"
 
     expected = "Tom < Jerry"
-    assert expected == unescape "Tom &lt; Jerry"
+    assert expected == Eml.unescape "Tom &lt; Jerry"
 
     expected = "hello \"world\""
-    assert expected == unescape "hello &quot;world&quot;"
+    assert expected == Eml.unescape "hello &quot;world&quot;"
 
     expected = "hello 'world'"
-    assert expected == unescape "hello &#39;world&#39;"
+    assert expected == Eml.unescape "hello &#39;world&#39;"
 
     expected = div span("Tom & Jerry")
-    assert expected == unescape div span("Tom &amp; Jerry")
+    assert expected == Eml.unescape div span("Tom &amp; Jerry")
   end
 
-  test "Prerender" do
+  test "Prerender transform" do
     e = div do
       span "hallo "
       span "world"
     end
     expected = "<div><span>HALLO </span><span>WORLD</span></div>"
 
-    assert expected == Eml.compile(e, prerender: &(if is_binary(&1), do: String.upcase(&1), else: &1))
-  end
-
-  test "Postrender" do
-    e = div do
-      span "hallo "
-      span "world"
-    end
-    expected = "<DIV><SPAN>HALLO </SPAN><SPAN>WORLD</SPAN></DIV>"
-
-    assert expected == Eml.compile(e, postrender: fn chunks ->
-      for c <- chunks do
-        if is_binary(c), do: String.upcase(c), else: c
-      end
-    end)
+    assert expected == Eml.render(e, [], transform: &(if is_binary(&1), do: String.upcase(&1), else: &1))
   end
 
   test "Element casing" do

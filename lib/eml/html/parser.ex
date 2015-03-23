@@ -1,8 +1,6 @@
 defmodule Eml.HTML.Parser do
   @moduledoc false
 
-  import Eml.Parser
-
   # API
 
   @spec parse(binary) :: [Eml.t]
@@ -12,7 +10,7 @@ defmodule Eml.HTML.Parser do
       { content, [] } ->
         content
       { content, rest }->
-        raise Eml.ParseError, type: :unparsable, value: [compiled: content, rest: rest]
+        raise Eml.ParseError, type: :unparsable, value: [parsed: content, rest: rest]
     end
   end
 
@@ -321,7 +319,7 @@ defmodule Eml.HTML.Parser do
         attrs = if is_binary(current) && is_binary(value) do
                   [{ field, current <> value } | rest]
                 else
-                  [{ field, Eml.Element.ensure_list(current) ++ [value] } | rest]
+                  [{ field, List.wrap(current) ++ [value] } | rest]
                 end
         parse_element(ts, Keyword.put(acc, :attrs, attrs))
       :start_content ->
@@ -337,10 +335,7 @@ defmodule Eml.HTML.Parser do
 
   defp make_element(acc) do
     attrs = acc[:attrs]
-    if attrs[:class] do
-      attrs = Keyword.update!(attrs, :class, &class_value/1)
-    end
-    Eml.Element.new(acc[:tag], attrs, maybe_trim_whitespace(acc[:content], acc[:tag]))
+    %Eml.Element{tag: acc[:tag], attrs: Enum.into(attrs, %{}), content: finalize_content(acc[:content], acc[:tag])}
   end
 
   defp preparse(:blank, _),            do: :skip
@@ -366,14 +361,23 @@ defmodule Eml.HTML.Parser do
 
   defp preparse(:cdata, token), do: { :cdata, token }
 
-  defp maybe_trim_whitespace(content, tag)
-  when tag in [:textarea, :pre], do: content
-  defp maybe_trim_whitespace(content, _) do
+  defp finalize_content(content, tag)
+  when tag in [:textarea, :pre] do
     case content do
-      [only] ->
-        [trim_whitespace(only, :only)]
+      [content] when is_binary(content) ->
+        content
       [] ->
-        []
+        nil
+      content ->
+        content
+    end
+  end
+  defp finalize_content(content, _) do
+    case content do
+      [content] when is_binary(content) ->
+        trim_whitespace(content, :only)
+      [] ->
+        nil
       [first | rest] ->
         first = trim_whitespace(first, :first)
         [first | trim_whitespace_loop(rest, [])]
@@ -386,6 +390,9 @@ defmodule Eml.HTML.Parser do
   end
   defp trim_whitespace_loop([h | t], acc) do
     trim_whitespace_loop(t, [trim_whitespace(h, :other) | acc])
+  end
+  defp trim_whitespace_loop([], acc) do
+    acc
   end
 
   defp trim_whitespace(content, position) do

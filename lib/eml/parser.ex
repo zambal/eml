@@ -34,14 +34,4 @@ defmodule Eml.Parser do
   defp unescape("", acc) do
     acc
   end
-
-  # Attribute helper
-
-  def class_value(nil), do: nil
-  def class_value(value) do
-    case String.split(value, " ") do
-      [class] -> class
-      classes -> classes
-    end
-  end
 end

@@ -9,7 +9,7 @@ defmodule Eml do
 
   This piece of code
   ```elixir
-  use Eml.HTML.Elements
+  use Eml.HTML
 
   name = "Vincent"
   age  = 36
@@ -46,38 +46,42 @@ defmodule Eml do
 
   alias Eml.Element
 
-  @default_renderer Eml.HTML.Renderer
+  @default_compiler Eml.HTML.Compiler
   @default_parser Eml.HTML.Parser
 
-  @type t               :: String.t | Eml.Element.t | Macro.t
-  @type content         :: [t]
-  @type transformable   :: t | [t]
-  @type bindings        :: [{ atom, Eml.Encoder.t }]
-  @type unpackr_result  :: funpackr_result | [unpackr_result]
-  @type funpackr_result :: String.t | Macro.t | [String.t | Macro.t]
+  @type t :: Eml.Encoder.t | [Eml.Encoder.t] | [t]
 
   @doc """
   Define a template function that renders eml to a string during compile time.
 
-  Quoted expressions are evaluated at runtime and it's results are
-  rendered to eml and concatenated with the precompiled eml.
+  Quoted expressions are evaluated at runtime and it's results are compileed to
+  eml and concatenated with the precompiled eml.
 
-  Eml uses the assigns extension from `EEx` for easy data access in
-  a template. See the `EEx` docs for more info about them. Since all
-  runtime behaviour is written in quoted expressions, assigns need to
-  be quoted too. To prevent you from writing `quote do: @my_assign` all
-  the time, Eml provides `&` as a shortcut for `quote do:`. You
-  can use this shortcut only in element macro's. This means that for
-  example `div(&@a)` and `div(quote do: @a)` have the same result.
-  The function that the template macro defines accepts optionally any
-  Dict compatible dictionary as argument for binding values to assigns.
+  Eml uses the assigns extension from `EEx` for easy data access in a
+  template. See the `EEx` docs for more info about them. Since all runtime
+  behaviour is written in quoted expressions, assigns need to be quoted too. To
+  prevent you from writing `quote do: @my_assign` all the time, Eml provides the
+  `&` capture operator as a shortcut for `quote do:`. You can use this shortcut
+  only in template and template element macro's.  This means that for example
+  `div(&@a)` and `div(quote do: @a)` have the same result. The function that the
+  template macro defines accepts optionally any Dict compatible dictionary as
+  argument for binding values to assigns.
+
+  Templates are composable, so they are allowed to call other templates. The
+  only catch is that it's not possible to pass a quoted expression to a
+  template.  The reason for this is that the logic in a template is executed the
+  moment the template is called, so if you would pass a quoted expression, the
+  logic in a template would receive this quoted expression instead of its
+  result. This all means that when you for example want to pass an assign to a
+  nested template, the template should be part of a quoted expression, or in
+  other word, executed during runtime.
 
   Note that because the unquoted code is evaluated at compile time, it's not
   possible to call other functions from the same module. Quoted expressions
   however can call any local function, including other templates.
 
-  Instead of defining a do block, you can also provide a path to a file with
-  the `:file` option.
+  Instead of defining a do block, you can also provide a path to a file with the
+  `:file` option.
 
   In addition, all options of `Eml.render/3` also apply to the template macro.
 
@@ -86,7 +90,7 @@ defmodule Eml do
       iex> File.write! "test.eml.exs", "div(quote do: @number + @number)"
       iex> defmodule MyTemplates do
       ...>   use Eml
-      ...>   use Eml.HTML.Elements
+      ...>   use Eml.HTML
       ...>
       ...>   template fruit do
       ...>     prefix = "fruit"
@@ -119,13 +123,27 @@ defmodule Eml do
 
   """
   defmacro template(name, opts, do_block \\ []) do
+    do_template(name, opts, do_block, __CALLER__, false)
+  end
+
+  @doc """
+  Define a private template.
+
+  Same as `template/3` except that it defines a private function.
+  """
+  defmacro templatep(name, opts, do_block \\ []) do
+    do_template(name, opts, do_block, __CALLER__, true)
+  end
+
+  defp do_template(tag, opts, do_block, caller, private) do
     opts = Keyword.merge(opts, do_block)
-    compiled = precompile(__CALLER__, opts)
-    { name, _, _ } = name
+    { tag, _, _ } = tag
+    def_call = if private, do: :defp, else: :def
+    template = Eml.Compiler.precompile(caller, opts)
     quote do
-      def unquote(name)(var!(assigns) \\ []) do
+      unquote(def_call)(unquote(tag)(var!(assigns))) do
         _ = var!(assigns)
-        Eml.Renderer.finalize_chunks(unquote(compiled))
+        unquote(template)
       end
     end
   end
@@ -133,8 +151,8 @@ defmodule Eml do
   @doc """
   Define a template as an anonymous function.
 
-  All non quoted expressions are precompiled and the anonymous function that
-  is returned expects a Keyword list for binding assigns.
+  All non quoted expressions are precompiled and the anonymous function that is
+  returned expects a Keyword list for binding assigns.
 
   See `template/3` for more info.
 
@@ -151,36 +169,39 @@ defmodule Eml do
   """
   defmacro template_fn(opts, do_block \\ []) do
     opts = Keyword.merge(opts, do_block)
-    compiled = precompile(__CALLER__, opts)
+    template = Eml.Compiler.precompile(__CALLER__, opts)
     quote do
       fn var!(assigns) ->
         _ = var!(assigns)
-        Eml.Renderer.finalize_chunks(unquote(compiled))
+        unquote(template)
       end
     end
   end
 
   @doc """
-  Define a custom element
+  Define a component macro
 
-  Custom elements in Eml are a special kind of elements that inherit functionality from templates. Like templates,
-  everything within the do block gets precompiled, except quoted code. Defined attributes on a custom element can be
-  accessed as assigns, just like with templates. Content can be accessed via the the special assign `__CONTENT__`.
-  However, since the type of a custom element is `Eml.Element.t`, they can be queried and transformed, just like normal
-  Eml elements.
+  Components in Eml are a special kind of element that inherit functionality
+  from templates. Like templates, everything within the do block gets
+  precompiled, except quoted code. Defined attributes on a component can be
+  accessed as assigns, just like with templates. Content can be accessed via the
+  the special assign `__CONTENT__`.  However, since the type of a component is
+  `Eml.Element.t`, they can be queried and transformed, just like normal Eml
+  elements.
 
-  See `template/3` for more info about quoted blocks, assigns an accepted options.
+  See `template/3` for more info about composability, quoted blocks, assigns and
+  accepted options.
 
   ### Example
 
       iex> use Eml
       nil
-      iex> use Eml.HTML.Element
+      iex> use Eml.HTML
       nil
       iex> defmodule ElTest do
       ...>
-      ...>   element my_list do
-      ...>     ul class: :class do
+      ...>   component my_list do
+      ...>     ul class: &@class do
       ...>       quote do
       ...>         for item <- @__CONTENT__ do
       ...>           li do
@@ -205,13 +226,85 @@ defmodule Eml do
       iex> Eml.render(el)
       "<ul class='some-class'><li><span>* </span><span>Item 1</span><span> *</span></li><li><span>* </span><span>Item 2</span><span> *</span></li></ul>"
   """
-  defmacro element(tag, opts, do_block \\ []) do
-    opts = Keyword.merge(opts, do_block) |> Macro.escape()
+  defmacro component(tag, opts, do_block \\ []) do
+    do_template_element(tag, opts, do_block, __CALLER__)
+  end
+
+  @doc """
+  Define a fragment macro
+
+  Fragments in Eml are a special kind of element that inherit functionality
+  from templates. Like templates, everything within the do block gets
+  precompiled, except assigns. Defined attributes on a component can be
+  accessed as assigns, just like with templates. Content can be accessed via the
+  the special assign `__CONTENT__`.  However, since the type of a component is
+  `Eml.Element.t`, they can be queried and transformed, just like normal Eml
+  elements.
+
+  The difference between components and fragments is that fragments are
+  without any logic, so quoted expressions or the `&` capture operator are not
+  allowed in a fragment definition. This means that assigns don't need to be
+  quoted.
+
+  The reason for their existence is easier composability and performance,
+  because unlike templates and components, it is allowed to pass quoted
+  expressions to fragments.  This is possible because fragments don't contain
+  any logic.
+
+  See `render/3` for more info about accepted options.
+
+  ### Example
+
+      iex> use Eml
+      nil
+      iex> use Eml.HTML
+      nil
+      iex> defmodule ElTest do
+      ...>
+      ...>   fragment basic_page do
+      ...>     html do
+      ...>       head do
+      ...>         meta charset: "UTF-8"
+      ...>         title @title
+      ...>       end
+      ...>       body do
+      ...>         @__CONTENT__
+      ...>       end
+      ...>     end
+      ...>   end
+      ...>
+      ...> end
+      {:module, ElTest, ...}
+      iex> import ElTest
+      nil
+      iex> page = basic_page title: "Hello!" do
+      ...>   div "Hello World"
+      ...> end
+      #basic_page<%{title: "Hello!!"} [#div<"Hello World">]>
+      iex> Eml.render page
+      "<!doctype html>\n<html><head><meta charset='UTF-8'/><title>Hello!!</title></head><body><div>Hello World</div></body></html>"
+  """
+  defmacro fragment(tag, opts, do_block \\ []) do
+    opts = Keyword.put(opts, :fragment, true)
+    do_template_element(tag, opts, do_block, __CALLER__)
+  end
+
+  defp do_template_element(tag, opts, do_block, caller) do
+    opts = Keyword.merge(opts, do_block)
     { tag, _, _ } = tag
-    compiled = Eml.precompile(__CALLER__, opts)
+    template = Eml.Compiler.precompile(caller, opts)
+    template_tag = (Atom.to_string(tag) <> "__template") |> String.to_atom()
+    template_type = if opts[:fragment], do: :fragment, else: :component
     quote do
+      @doc false
+      def unquote(template_tag)(var!(assigns)) do
+        _ = var!(assigns)
+        unquote(template)
+      end
       defmacro unquote(tag)(content_or_attrs, maybe_content \\ nil) do
         tag = unquote(tag)
+        template_tag = unquote(template_tag)
+        template_type = unquote(template_type)
         in_match = Macro.Env.in_match?(__CALLER__)
         { attrs, content } = Eml.Element.Generator.extract_content(content_or_attrs, maybe_content, in_match)
         if in_match do
@@ -219,69 +312,17 @@ defmodule Eml do
             %Eml.Element{tag: unquote(tag), attrs: unquote(attrs), content: unquote(content)}
           end
         else
-          compiled = unquote(compiled)
           quote do
-            Eml.Element.new(unquote(tag), unquote(attrs), unquote(content), fn var!(assigns) ->
-              _ = var!(assigns)
-              Eml.Renderer.finalize_chunks(unquote(compiled))
-            end)
+            %Eml.Element{tag: unquote(tag),
+                         attrs: Enum.into(unquote(attrs), %{}),
+                         content: List.wrap(unquote(content)),
+                         template: &unquote(__MODULE__).unquote(template_tag)/1,
+                         type: unquote(template_type)}
           end
         end
       end
     end
   end
-
-  @doc """
-  Converts data to `eml` content by using the `Eml.Encoder` protocol.
-
-  It also concatenates binaries and flatten lists to ensure the result
-  is valid content.
-
-  ### Example
-
-      iex> Eml.encode(["1", 2, [3], " ", ["miles"]])
-      ["123 miles"]
-
-  You can also use this function to add data to existing content:
-
-      iex> Eml.encode(42, [" is the number"], :begin)
-      ["42 is the number"]
-
-      iex> Eml.encode(42, ["the number is "], :end)
-      ["the number is 42"]
-
-  """
-  @spec encode(Eml.Encoder.t | [Eml.Encoder.t], content, atom) :: content
-  def encode(data, acc \\ [], insert_at \\ :begin)
-
-  # No-ops
-  def encode(nondata, acc, _)
-  when nondata in [nil, "", []], do: acc
-
-  # Handle lists
-  def encode(data, acc, :end)
-  when is_list(data), do: add_nodes(data, :lists.reverse(acc), :end) |> :lists.reverse()
-  def encode(data, acc, :begin)
-  when is_list(data), do: add_nodes(:lists.reverse(data), acc, :begin)
-
-  # Convert data to eml node
-  def encode(data, acc, insert_at) do
-    Eml.Encoder.encode(data) |> add_node(acc, insert_at)
-  end
-
-  defp add_node(node, acc, _) do
-      [node | acc]
-  end
-
-  defp add_nodes([h | t], acc, insert_at) do
-    acc = if is_list(h) and insert_at === :end do
-            add_nodes(h, acc, insert_at)
-          else
-            encode(h, acc, insert_at)
-          end
-    add_nodes(t, acc, insert_at)
-  end
-  defp add_nodes([], acc, _), do: acc
 
   defp collect_embeded_decoders(ast, _env) do
     { match, decoders } = Macro.prewalk(ast, [], fn
@@ -370,9 +411,9 @@ defmodule Eml do
   ### Examples:
 
       iex> Eml.parse("<body><h1 id='main-title'>The title</h1></body>")
-      [#body<[#h1<%{id: "main-title"} ["The title"]>]>]
+      [#body<[#h1<%{id: "main-title"} "The title">]>]
   """
-  @spec parse(String.t, module) :: content
+  @spec parse(String.t, module) :: [t]
   def parse(data, parser \\ @default_parser)
 
   def parse(data, parser) when is_binary(data) do
@@ -383,7 +424,7 @@ defmodule Eml do
   end
 
   @doc """
-  Renders eml content with the specified markup renderer, which is html by default.
+  Renders eml content with the specified markup compiler, which is html by default.
 
   When the provided eml contains quoted expressions that use assigns,
   you can bind to these by providing a Keyword list as the
@@ -391,13 +432,13 @@ defmodule Eml do
 
   The accepted options are:
 
-  * `:renderer` - The renderer to use, by default `Eml.HTML.Renderer`
+  * `:compiler` - The compiler to use, by default `Eml.HTML.Compiler`
   * `:quotes` - The type of quotes used for attribute values. Accepted values are `:single` (default) and `:double`.
-  * `:prerender` - A function that receives every node just before it gets rendered.
-  * `:postrender` - A function that receives all rendered chunks.
+  * `:transform` - A function that receives every node just before it get's compiled. Same as using `transform/2`,
+     but more efficient, since it's getting called during the compile pass.
+  * `:escape` - Automatically escape strings, default is `true`.
 
-  In case of error, raises an Eml.CompileError exception. If the input contains a quoted expression
-  that has a compile or runtime error, an exception will be raised for those too.
+  In case of error, raises an Eml.CompileError exception.
 
   ### Examples:
 
@@ -411,126 +452,82 @@ defmodule Eml do
       "<p>Tom &amp; Jerry</p>"
 
   """
-  @spec render(t, Eml.bindings, Dict.t) :: String.t | Macro.t
-  def render(content, assigns \\ [], opts \\ []) do
-    case compile(content, opts) do
-      string when is_binary(string) ->
+  @spec render(t, Dict.t, Dict.t) :: String.t
+  def render(content, assigns \\ %{}, opts \\ []) do
+    case Eml.Compiler.compile(content, Keyword.put(opts, :fragment, false)) do
+      { :safe, string } when is_binary(string) ->
         string
       quoted ->
-        { res, _ } = Code.eval_quoted(quoted, [assigns: assigns])
-        Eml.Renderer.finalize_chunks(res)
+        { { :safe, res }, _ } = Code.eval_quoted(quoted, [assigns: assigns])
+        res
     end
-  end
-
-
-  @doc """
-  Compiles eml to a quoted expression.
-
-  Accepts the same options as `Eml.render/3` and its result
-  can be rendered to a string with a subsequent call to `Eml.render/3`.
-
-  In case of error, raises an Eml.CompileError exception.
-
-  ### Examples:
-
-      iex> t = Eml.compile(body(h1([id: "main-title"], :the_title)))
-      ["<body><h1 id='main-title'>",
-        {{:., [], [{:__aliases__, [alias: false], [:Eml]}, :render]}, [],
-         [{{:., [], [{:__aliases__, [alias: false], [:Eml]}, :encode]}, [],
-           [{:the_title, [line: 4], nil}]},
-          {:%{}, [],
-           [mode: :render, postrender: nil, prerender: nil, quotes: :single,
-            renderer: Eml.HTML.Renderer]}]}, "</h1></body>"]
-            iex> t.chunks
-            ["<body><h1 id='main-title'>", #param:the_title, "</h1></body>"]
-      iex> Eml.render(t, the_title: "The Title")
-      "<body><h1 id='main-title'>The Title</h1></body>"
-
-  """
-
-  @spec compile(t, Dict.t) :: String.t | Macro.t
-  def compile(content, opts \\ []) do
-    { renderer, opts } = Dict.pop(opts, :renderer, @default_renderer)
-    renderer.render(content, opts)
-  end
-
-  @doc false
-  @spec precompile(Macro.Env.t | Keyword.t, Dict.t) :: String.t | Macro.t
-  def precompile(env \\ [], opts) do
-    file = opts[:file]
-    ast = if file do
-            string = File.read!(file)
-            Code.string_to_quoted!(string, file: file, line: 1)
-          else
-            opts[:do]
-          end
-    { res, _ } = Code.eval_quoted(ast, [], env)
-    compile_opts = Dict.take(opts, [:escape, :quotes, :renderer])
-    res |> Eml.encode() |> Eml.compile(compile_opts)
   end
 
   @doc """
   Recursively transforms `eml` content.
 
-  This is the most low level operation provided by Eml for manipulating
-  eml nodes. For example, `update/3` and `remove/2` are implemented by
-  using this function.
+  It traverses all nodes of the provided eml tree.  The provided transform
+  function will be evaluated for every node `transform/3` encounters. Parent
+  nodes will be transformed before their children. Child nodes of a parent will
+  be evaluated before moving to the next sibling.
 
-  It accepts any eml and traverses all nodes of the provided eml tree.
-  The provided transform function will be evaluated for every node `transform/3`
-  encounters. Parent nodes will be transformed before their children. Child nodes
-  of a parent will be evaluated before moving to the next sibling.
+  When the provided function returns `nil`, the node will be removed from the
+  eml tree.
 
-  When the provided function returns `nil`, the node will
-  be removed from the eml tree. Any other returned value will be
-  evaluated by `Eml.encode/3` in order to guarantee valid eml.
-
-  Note that because parent nodes are evaluated before their children,
-  no children will be evaluated if the parent is removed.
+  Note that because parent nodes are evaluated before their children, no
+  children will be evaluated if the parent is removed.
 
   ### Examples:
 
-      iex> use Eml.Transform
       iex> e = div do
       ...>   span [id: "inner1", class: "inner"], "hello "
       ...>   span [id: "inner2", class: "inner"], "world"
       ...> end
-      #div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
-       #span<%{id: "inner2", class: "inner"} ["world"]>]>
-      iex> transform(e, fn x -> if Element.has?(x, tag: :span), do: "matched", else: x end)
-      [#div<["matched", "matched"]>]
-      iex> transform(e, fn x ->
-      ...> IO.puts(inspect x)
-      ...> x end)
-      #div<[#span<%{id: "inner1", class: "inner"} ["hello "]>, #span<%{id: "inner2", class: "inner"} ["world"]>]>
-      #span<%{id: "inner1", class: "inner"} ["hello "]>
-      "hello "
-      #span<%{id: "inner2", class: "inner"} ["world"]>
-      "world"
-      [#div<[#span<%{id: "inner1", class: "inner"} ["hello "]>,
-        #span<%{id: "inner2", class: "inner"} ["world"]>]>]
+      #div<[#span<%{id: "inner1", class: "inner"} "hello ">,
+       #span<%{id: "inner2", class: "inner"} "world">]>
 
+      iex> Eml.transform(e, fn
+      ...>   span(_) -> "matched"
+      ...>   node    -> node
+      ...> end)
+      #div<["matched", "matched"]>
+
+      iex> transform(e, fn node ->
+      ...>   IO.inspect(node)
+      ...>   node
+      ...> end)
+      #div<[#span<%{class: "inner", id: "inner1"} "hello ">,
+       #span<%{class: "inner", id: "inner2"} "world">]>
+      #span<%{class: "inner", id: "inner1"} "hello ">
+      "hello "
+      #span<%{class: "inner", id: "inner2"} "world">
+      "world"
+      #div<[#span<%{class: "inner", id: "inner1"} "hello ">,
+       #span<%{class: "inner", id: "inner2"} "world">]>
   """
-  @spec transform(transformable, (t -> Eml.Encoder.t)) :: transformable | nil
+  @spec transform(t, (t -> t)) :: t | nil
+  def transform(nil, _fun) do
+    nil
+  end
   def transform(eml, fun) when is_list(eml) do
     for node <- eml, t = transform(node, fun), do: t
   end
   def transform(node, fun) do
-    node = fun.(node) |> Eml.Encoder.encode()
-    if element?(node) do
-      %Element{node| content: transform(node.content, fun)}
-    else
-      node
+    case fun.(node) do
+      %Element{content: content} = node ->
+        %Element{node| content: transform(content, fun)}
+      node ->
+        node
     end
   end
 
   @doc """
-  Extracts a value from content (which is always a list) or an element
+  Extracts a value recursively from content
 
   ### Examples
 
-      iex> Eml.unpack ["42"]
-      "42"
+      iex> Eml.unpack [42]
+     bm 42
 
       iex> Eml.unpack 42
       42
@@ -541,69 +538,29 @@ defmodule Eml do
       iex> Eml.unpack Eml.unpack(div(span("hallo")))
       "hallo"
 
-  """
-  @spec unpack(t | [t]) :: t | [t]
-  def unpack(%Element{content: content}),   do: unpack(content)
-  def unpack([node]),                       do: node
-  def unpack(node),                         do: node
+      iex> Eml.unpack div(span(42))
+      42
 
-  @doc """
-  Extracts a value recursively from content or an element
-
-  ### Examples
-
-      iex> Eml.unpackr div(span(42))
-      "42"
-
-      iex> Eml.unpackr div([span("Hallo"), span(" world")])
+      iex> Eml.unpack div([span("Hallo"), span(" world")])
       ["Hallo", " world"]
 
   """
-  @spec unpackr(t) :: unpackr_result
-  def unpackr(%Element{content: [node]}),     do: unpackr(node)
-  def unpackr(%Element{content: content}),    do: unpack_content(content)
-  def unpackr([node]),                        do: unpackr(node)
-  def unpackr(content) when is_list(content), do: unpack_content(content)
-  def unpackr(node),                          do: node
-
-  defp unpack_content(content) do
-    for node <- content, do: unpackr(node)
+  @spec unpack(t) :: t
+  def unpack(%Element{content: content}) do
+    unpack(content)
   end
-
-  @doc """
-  Extracts a value recursively from content or an element and flatten the results.
-  """
-  @spec funpackr(t) :: funpackr_result
-  def funpackr(eml), do: unpackr(eml) |> :lists.flatten
-
-  @doc "Checks if a term is a `Eml.Element` struct."
-  @spec element?(term) :: boolean
-  def element?(%Element{}), do: true
-  def element?(_),   do: false
-
-  @doc "Checks if a term is a custom element"
-  @spec custom_element?(term) :: boolean
-  def custom_element?(%Element{template: t}) when is_function(t), do: true
-  def custom_element?(_), do: false
-
-  @doc "Checks if a value is regarded as empty by Eml."
-  @spec empty?(term) :: boolean
-  def empty?(nil), do: true
-  def empty?([]), do: true
-  def empty?(%Element{content: []}), do: true
-  def empty?(_), do: false
-
-  @doc """
-  Returns the type of content.
-
-  The types are `:string`, `:element`, `:quoted`, or `:undefined`.
-  """
-  @spec type(t) :: :string | :element | :quoted | :content | :undefined
-  def type(node) when is_binary(node), do: :string
-  def type(node) when is_tuple(node), do: :quoted
-  def type(node) when is_list(node), do: :content
-  def type(%Element{}), do: :element
-  def type(_), do: :undefined
+  def unpack([node]) do
+    unpack(node)
+  end
+  def unpack(content) when is_list(content) do
+    for node <- content, do: unpack(node)
+  end
+  def unpack({ :safe, node }) do
+    node
+  end
+  def unpack(node) do
+    node
+  end
 
   @doc """
   Escape content
@@ -616,7 +573,7 @@ defmodule Eml do
       #div<[#span<["Tom &amp; Jerry"]>]>
   """
   @spec escape(t) :: t
-  defdelegate escape(eml), to: Eml.Renderer
+  defdelegate escape(eml), to: Eml.Compiler
 
   @doc """
   Unescape content
@@ -638,21 +595,25 @@ defmodule Eml do
   Invoking it translates to:
   ```
   alias Eml.Element
-  alias Eml.Query
-  alias Eml.Transform
-  import Eml, only: [template_fn: 1, template_fn: 2, template: 2, template: 3]
+  import Eml, only: [
+    template: 2, template: 3,
+    templatep: 2, templatep: 3,
+    template_fn: 1, template_fn: 2,
+    fragment: 2, fragment: 3,
+    component: 2, component: 3,
+    decoder: 1, decoder: 2
+  ]
   ```
   """
   defmacro __using__(_) do
     quote do
       alias Eml.Element
-      alias Eml.Query
-      alias Eml.Transform
       import Eml, only: [
-        escape: 1, unescape: 1,
         template: 2, template: 3,
+        templatep: 2, templatep: 3,
         template_fn: 1, template_fn: 2,
-        element: 2, element: 3,
+        fragment: 2, fragment: 3,
+        component: 2, component: 3,
         decoder: 1, decoder: 2
       ]
     end

@@ -6,22 +6,35 @@
   * Removed all generic functionality from the html parser and renderer,
     which makes it easier to implement other parsers and renderers
   * Added `{ :safe, String.t }` as a new content type which you can use when you need to add content to an element that should not get escaped
-  * Added `prerender` and `postrender` options to `Eml.render/3`
+  * Added `transform` option to `Eml.render/3`
   * Added `casing` option to `Eml.Element.Generator.__using__` to control the casing of tags for generated elements
+  * Added the `&` capture operator as shortcut for quoted expressions
+  * Introduced components and fragments
+  * Added `Eml.match?/2` macro
+  * Added `Eml.Element.put_template/3`, `Eml.Element.remove_template/1` and `Eml.apply_template/1` functions
+  * Added `any` element as a catch all tag macro to be used in a match
+  * Added `Eml.escape/1` and `Eml.unescape/1` functions that recursively escape or unescape content.
+  * `Eml.Compiler.compile` returns results by default as `{ :safe, result }` so that
+    they can be easily added to other elements, witout getting escaped
 
  * Bug fixes
   * Using element macro's in a match had different confusing behaviour
 
  * Backwards incompatible changes
   * Removed `Eml.Template` and `Eml.Parameter` in favor of quoted expressions
-  * Replaced `Eml.precompile` with `Eml.Template` and `Eml.template_fn`
-  * Changed names of render options: :lang => :renderer, :quote => :quotes and :escape => :safe
-  * `Eml.compile` and `Eml.render` return results by default as `{ :safe, result }` so that
-    they can be easily added to other elements, witout getting escaped
-  * Importing all HTML element macro's is now done via `use Eml.HTML.Elements` instead of `use Eml.Language.HTML`
-  * Renamed `Eml.Data` protocol to `Eml.Encoder` and `Eml.to_content` to `Eml.encode`
-  * Moved query functions from the `Eml` module to `Eml.Query`
-  * Moved transform functions from the `Eml` module to `Eml.Transform`, except `Eml.transform` itself.
+  * Replaced `Eml.precompile` with `Eml.template` and `Eml.template_fn`
+  * Changed names of render options: :lang => :renderer, :quote => :quotes
+  * Importing all HTML element macro's is now done via `use Eml.HTML` instead of `use Eml.Language.HTML`
+  * Renamed `Eml.Data` protocol to `Eml.Encoder` and removed `Eml.to_content`
+  * Data conversion is now only done during compiling and not when adding data to elements.
+  * Removed query functions
+  * Removed transform functions
+  * Removed `defeml` and `defhtml` macros
+  * Removed `Eml.unpackr/1` and `Eml.funpackr/1`. `Eml.unpack` now always unpacks recursively
+  * Removed `Eml.element?/1`, `Eml.empty?/1` and `Eml.type/1` functions.
+  * Removed all previous helper functions from `Eml.Element`
+  * Removed `Eml.compile/2` in favor of `Eml.Compiler.compile/2`
+  * Parser doesn't automatically converts entities anymore. Use `Eml.unescape/1` instead.
 
 ## v0.7.1
  * Enhancements

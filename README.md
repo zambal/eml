@@ -13,7 +13,7 @@ To start off:
 
 This piece of code
 ```elixir
-use Eml.HTML.Elements
+use Eml.HTML
 
 name = "Vincent"
 age  = 36

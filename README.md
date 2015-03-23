@@ -166,12 +166,13 @@ function instead.
 Eml uses the assigns extension from `EEx` for easy data access in a
 template. See the `EEx` docs for more info about them. Since all runtime
 behaviour is written in quoted expressions, assigns need to be quoted too. To
-prevent you from writing `quote do: @my_assign` all the time, Eml provides the
-`&` capture operator as a shortcut for `quote do: ...`. You can use this
-shortcut only in template and component macro's. This means that for
-example `div(&@a)` and `div(quote do: @a)` have the same result inside a
-template. The function that the template macro defines accepts optionally a
-Keyword list for binding values to assigns.
+prevent you from writing things like `quote do: @my_assign + 4` all the time,
+Eml provides the `&` capture operator as a shortcut for `quote do: ...`. You can
+use this shortcut only in template and component macro's. This means that for
+example `div &(@a + 4)` and `div (quote do: @a + 4)` have the same result inside
+a template. If you just want to pass an assign, you can even leave out the
+capture operator and just write `div @a`. The function that the template macro
+defines accepts optionally a Keyword list for binding values to assigns.
 ```elixir
 iex> e = h1 [(quote do: @assigns), " ", (quote do: @are), " ", (quote do: @pretty), " ", (quote do: @nifty)]
 #h1<[{:quoted, [{:@, [line: 12], [{:assigns, [line: 12], nil}]}]}, " ",
@@ -227,9 +228,9 @@ template templ1 do
 end
 
 template templ2 do
- h2 &@title
- templ1(num: &@number) # THIS GENERATES A COMPILE TIME ERROR
- &templ(num: @number) # THIS IS OK
+ h2 @title
+ templ1(num: @number) # THIS GENERATES A COMPILE TIME ERROR
+ &templ1(num: @number) # THIS IS OK
 ```
 
 See the documentation
@@ -250,7 +251,7 @@ nil
 iex> defmodule ElTest do
 ...>
 ...>   component my_list do
-...>     ul class: &@class do
+...>     ul class: @class do
 ...>       quote do
 ...>         for item <- @__CONTENT__ do
 ...>           li do

@@ -453,7 +453,11 @@ defmodule Eml do
 
   """
   @spec render(t, Dict.t, Dict.t) :: String.t
-  def render(content, assigns \\ %{}, opts \\ []) do
+  def render(content, assigns \\ %{}, opts \\ [])
+  def render({ :safe, string }, assigns, opts) when is_binary(string) do
+    string
+  end
+  def render(content, assigns, opts) do
     case Eml.Compiler.compile(content, Keyword.put(opts, :fragment, false)) do
       { :safe, string } when is_binary(string) ->
         string

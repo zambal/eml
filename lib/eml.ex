@@ -522,6 +522,47 @@ defmodule Eml do
   end
 
   @doc """
+  Match on element tag, attributes, or content
+
+  Implemented as a macro.
+  ### Examples:
+
+      iex> use Eml
+      iex> use Eml.HTML
+      iex> node = section [id: "my-section"], [div([id: "some_id"], "Some content"), div([id: "another_id"], "Other content")]
+      iex> Eml.match?(node, attrs: %{id: "my-section"})
+      true
+      iex> Eml.match?(node, tag: :div)
+      false
+      iex> Enum.filter(node, &Eml.match?(&1, tag: :div))
+      [#div<%{id: "some_id"} "Some content">, #div<%{id: "another_id"}
+      "Other content">]
+      iex> Eml.transform(node, fn node ->
+      ...>   if Eml.match?(node, content: "Other content") do
+      ...>     put_in(node.content, "New content")
+      ...>   else
+      ...>     node
+      ...>   end
+      ...> end)
+      #section<%{id: "my-section"}
+      [#div<%{id: "some_id"} "Some content">, #div<%{id: "another_id"}
+       "New content">]>
+  """
+  defmacro match?(node, opts \\ []) do
+    tag     = opts[:tag]     || quote do: _
+    attrs   = opts[:attrs]   || quote do: _
+    content = opts[:content] || quote do: _
+    quote do
+      case unquote(node) do
+        %Eml.Element{tag: unquote(tag), attrs: unquote(attrs), content: unquote(content)} ->
+          true
+        _ ->
+          false
+      end
+    end
+  end
+
+  @doc """
   Extracts a value recursively from content
 
   ### Examples

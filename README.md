@@ -193,9 +193,7 @@ iex> Eml.render e, names: ~w(john james jesse)
 "<ul><li>john</li><li>james</li><li>jesse</li></ul>"
 
 iex> t = template_fn do
-...>   ul(quote do
-...>     for n <- @names, do: li n
-...>   end)
+...>   ul &(for n <- @names, do: li n)
 ...> end
 #Function<6.90072148/1 in :erl_eval.expr/5>
 iex> t.(names: ~w(john james jesse))

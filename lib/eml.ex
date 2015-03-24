@@ -50,6 +50,7 @@ defmodule Eml do
   @default_parser Eml.HTML.Parser
 
   @type t :: Eml.Encoder.t | [Eml.Encoder.t] | [t]
+  @type node_primitive :: String.t | { :safe, String.t } | Macro.t | Eml.Element.t
 
   @doc """
   Define a template function that renders eml to a string during compile time.
@@ -456,7 +457,7 @@ defmodule Eml do
   """
   @spec render(t, Dict.t, Dict.t) :: String.t
   def render(content, assigns \\ %{}, opts \\ [])
-  def render({ :safe, string }, assigns, opts) when is_binary(string) do
+  def render({ :safe, string }, _assigns, _opts) when is_binary(string) do
     string
   end
   def render(content, assigns, opts) do

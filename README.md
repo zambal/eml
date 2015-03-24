@@ -82,7 +82,8 @@ nil
 By invoking `use Eml`, some macro's are imported into the current scope and core
 API modules are aliased. `use Eml.HTML` imports all generated html element
 macros from `Eml.HTML` into the current scope. The element macros just translate
-to a call to `%Eml.Element{...}`, so they can even be used inside a match.
+to a call to `%Eml.Element{...}`, a struct that is the actual representation of
+elements, so they can even be used inside a match.
 ```elixir
 iex> div 42
 #div<42>
@@ -111,6 +112,9 @@ iex> div id: "some-id" do
 ...>   "some content"
 ...> end
 #div<%{id: "some-id"} ["some content"]>
+
+iex> %Element{tag: :div, attrs: %{id: "some-id"}, content: "some content"}
+#div<%{id: "some-id"} "some content">
 ```
 
 Note that attributes are stored internally as a map.
@@ -155,12 +159,12 @@ not properly closed.
 Compiling and templates can be used in situations where most content is static
 and performance is critical. A template is just Eml content that contains quoted
 expressions. `Eml.Compiler.compile/2` renders all non quoted expressions and all
-quoted expressions are preprocessed for efficient rendering with `Eml.render/3
+quoted expressions are preprocessed for efficient rendering with `Eml.render/3`
 afterwards. It's not needed to work with `Eml.Compiler.compile/2` directly, as
-using `Eml.template` and `Eml.template_fn` is more convenient in most
-cases. `Eml.template` defines a function that has all non quoted expressions
+using `template/3` and `Eml.template_fn/3` is more convenient in most
+cases. `template/3` defines a function that has all non quoted expressions
 prerendered and when called, concatenates the results from the quoted
-expressions with it. `Eml.template_fn` works the same, but returns an anonymous
+expressions with it. `template_fn/3` works the same, but returns an anonymous
 function instead.
 
 Eml uses the assigns extension from `EEx` for easy data access in a
@@ -186,9 +190,6 @@ iex> Eml.render(t, assigns: "Assigns", are: "are", pretty: "pretty", nifty: "nif
 iex> e = ul(quote do
 ...>   for n <- @names, do: li n
 ...> end)
-```
-You can also call `Eml.render` directly, as it compiles content before rendering.
-```elixir
 iex> Eml.render e, names: ~w(john james jesse)
 "<ul><li>john</li><li>james</li><li>jesse</li></ul>"
 
@@ -197,7 +198,7 @@ iex> t = template_fn do
 ...> end
 #Function<6.90072148/1 in :erl_eval.expr/5>
 iex> t.(names: ~w(john james jesse))
-"<ul><li>john</li><li>james</li><li>jesse</li></ul>"
+{ :safe, "<ul><li>john</li><li>james</li><li>jesse</li></ul>" }
 ```
 To bind data to assigns in Eml, you can either compile eml data to a template
 and use `Eml.render` to bind data to assigns, or you can directly call
@@ -217,7 +218,7 @@ reason for this is that the logic in a template is executed the moment the
 template is called, so if you would pass a quoted expression, the logic in a
 template would receive this quoted expression instead of its result. This all
 means that when you for example want to pass an assign to a nested template, the
-template should be part of a quoted expression, or in other word, executed
+template should be part of a quoted expression, or in other words, executed
 during runtime.
 
 ```elixir
@@ -229,6 +230,7 @@ template templ2 do
  h2 @title
  templ1(num: @number) # THIS GENERATES A COMPILE TIME ERROR
  &templ1(num: @number) # THIS IS OK
+end
 ```
 
 See the documentation
@@ -250,15 +252,7 @@ iex> defmodule ElTest do
 ...>
 ...>   component my_list do
 ...>     ul class: @class do
-...>       quote do
-...>         for item <- @__CONTENT__ do
-...>           li do
-...>             span "* "
-...>             span item
-...>             span " *"
-...>           end
-...>         end
-...>       end
+...>       &(for item <- @__CONTENT__, do: li "* #{item} *")
 ...>     end
 ...>   end
 ...>
@@ -272,7 +266,7 @@ iex> el = my_list class: "some-class" do
 ...> end
 #my_list<%{class: "some-class"} ["Item 1", "Item 2"]>
 iex> Eml.render(el)
-"<ul class='some-class'><li><span>* </span><span>Item 1</span><span> *</span></li><li><span>* </span><span>Item 2</span><span> *</span></li></ul>"
+"<ul class='some-class'><li>* Item 1 *</li><li>* Item 2 *</li></ul>"
 ```
 
 Just like templates, all non quoted expressions get precompiled and quoted
@@ -287,7 +281,7 @@ match.
 In addition to components, Eml also provides fragments. The difference between
 components and fragments is that fragments are without any logic, so quoted
 expressions or the `&` capture operator are not allowed in a fragment
-definition. This means that assigns don't need to be quoted.
+definition.
 
 Fragments can be used for better composability and performance, because
 unlike templates and components, quoted expressions are allowed as arguments for
@@ -296,8 +290,7 @@ fragments. This is possible because fragments don't contain any logic.
 
 #### Unpacking
 
-Since the contents of elements are always wrapped in a list, Eml provides a
-utility function to easily access its contents.
+In order to easily access the contents of elements, Eml provides `unpack/1`.
 ```elixir
 iex> Eml.unpack div 42
 42
@@ -348,22 +341,14 @@ iex> Enum.each(e, fn x -> IO.puts(inspect x) end)
 :ok
 ```
 
-As you can see every node of the tree is passed to `Enum`.
-Let's continue with some other examples
-```elixir
-iex> Enum.member?(e, "TODO")
-true
+As you can see every node of the tree is passed to `Enum`. Let's continue with
+some other examples.
+```elixir iex> Enum.member?(e, "TODO") true
 
-iex> Enum.filter(e, fn
-...>   h3(_) -> true
-...>   _     -> false
-...> end)
+iex> Enum.filter(e, &Eml.match?(&1, tag: :h3))
 [#h3<"Hello world">]
 
-iex> Enum.filter(e, fn
-       any(%{class: "article"}) -> true
-       _ -> false
-     end)
+iex> Enum.filter(e, Eml.match?(&1, attrs: %{class: "article"}))
 [#section<%{class: "article"} [#h3<"Hello world">]>,
  #section<%{class: "article"} ["TODO"]>]
 ```
@@ -375,9 +360,8 @@ Eml also provides `Eml.transform/2`. `transform` mostly works like
 enumeration. The key difference is that `transform` returns a modified version
 of the eml tree that was passed as an argument, instead of collecting nodes in a
 list.  `transform` passes any node it encounters to the provided transformation
-function. The transformation function can return any data or `nil`, in which
-case the node is discarded, so it works a bit like a map and filter function in
-one pass.
+function. This transformer can return any data or `nil`, in which case the node
+is discarded, so it works a bit like a map and filter function in one pass.
 ```elixir
 iex> Eml.transform(e, fn
 ...>   any(%{class: "article"}) = el -> %{el|content: "#"}
@@ -394,10 +378,10 @@ iex> Eml.transform(e, fn
 ...> end)
 nil
 ```
-The last result may seem unexpected, but the `section` elements aren't
-returned because `Eml.transform` first evaluates a parent node, before
-continuing with its children. If the parent node gets removed,
-the children will be removed too and won't get evaluated.
+The last result may seem unexpected, but the result is `nil` because
+`Eml.transform` first evaluates a parent node, before continuing with its
+children. If the parent node gets removed, the children will be removed too and
+won't get evaluated.
 
 
 #### Encoding data in Eml
@@ -406,7 +390,7 @@ In order to provide conversions from various data types, Eml provides the
 `Eml.Encoder` protocol. It is used internally by Eml's compiler. Eml provides a
 implementation for strings, numbers, tuples and atoms, but you can provide a
 protocol implementation for your own types by just implementing a `encode`
-function that converts your type to a valid `Eml.Compiler.chunk` type.
+function that converts your type to a valid `Eml.Compiler.node_primitive` type.
 
 Some examples using `Eml.encode`
 ```elixir

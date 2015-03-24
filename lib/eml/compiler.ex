@@ -3,7 +3,7 @@ defmodule Eml.Compiler do
   Various helper functions for implementing an Eml compiler.
   """
 
-  @type chunk :: String.t | { :safe, String.t } | Eml.Element.t | Macro.t
+  @type chunk :: String.t | { :safe, String.t } | Macro.t
 
   # Options helper
 
@@ -66,6 +66,7 @@ defmodule Eml.Compiler do
 
   # Content parsing
 
+  @spec compile_node(Eml.t, map, [chunk]) :: [chunk]
   def compile_node(list, opts, chunks) when is_list(list) do
     Enum.reduce(list, chunks, fn node, chunks ->
       compile_node(node, opts, chunks)
@@ -84,6 +85,7 @@ defmodule Eml.Compiler do
     end
   end
 
+  @spec default_compile_node(Eml.node_primitive, map, [chunk]) :: [chunk]
   defp default_compile_node(node, opts, chunks) when is_binary(node) do
     add_chunk(maybe_escape(node, opts), chunks)
   end
@@ -113,11 +115,12 @@ defmodule Eml.Compiler do
   end
 
   defp default_compile_node(node, _, _) do
-    raise Eml.CompileError, type: :unsupported_node_type, value: node
+    raise Eml.CompileError, type: :bad_node_primitive, value: node
   end
 
   # Attributes parsing
 
+  @spec compile_attrs(Eml.Element.attrs, map, [chunk]) :: [chunk]
   def compile_attrs(attrs, opts, chunks) when is_map(attrs) do
     Enum.reduce(attrs, chunks, fn
       { _, nil }, chunks -> chunks
@@ -125,10 +128,12 @@ defmodule Eml.Compiler do
     end)
   end
 
+  @spec compile_attr(atom, Eml.t, map, [chunk]) :: [chunk]
   def compile_attr(field, value, opts, chunks) do
     opts.compiler.compile_attr(field, value, opts, chunks)
   end
 
+  @spec compile_attr_value(Eml.t, map, [chunk]) :: [chunk]
   def compile_attr_value(list, opts, chunks) when is_list(list) do
     Enum.reduce(list, chunks, fn value, chunks ->
       compile_attr_value(value, opts, chunks)

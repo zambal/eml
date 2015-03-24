@@ -44,7 +44,7 @@ defprotocol Eml.Encoder do
       "<div class='customer'><div><span>name: </span><span>Fred</span></div><div><span>email: </span><span>freddy@mail.com</span></div><div><span>phone: </span><span>+31 6 5678 1234</span></div></div>"
 
   """
-  @spec encode(Eml.Encoder.t) :: Eml.t
+  @spec encode(Eml.Encoder.t) :: Eml.node_primitive
   def encode(data)
 end
 

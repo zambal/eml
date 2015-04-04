@@ -343,7 +343,8 @@ iex> Enum.each(e, fn x -> IO.puts(inspect x) end)
 
 As you can see every node of the tree is passed to `Enum`. Let's continue with
 some other examples.
-```elixir iex> Enum.member?(e, "TODO") true
+```elixir 
+iex> Enum.member?(e, "TODO") true
 
 iex> Enum.filter(e, &Eml.match?(&1, tag: :h3))
 [#h3<"Hello world">]

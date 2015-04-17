@@ -232,6 +232,9 @@ defmodule Eml.Compiler do
   defp concat(chunks, acc, opts) when is_list(chunks) do
     Enum.reduce(chunks, acc, &concat(&1, &2, opts))
   end
+  defp concat(nil, acc, _opts) do
+    acc
+  end
   defp concat(node, acc, opts) do
     case Eml.Compiler.compile(node, opts) do
       { :safe, chunk } ->

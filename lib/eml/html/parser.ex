@@ -3,9 +3,9 @@ defmodule Eml.HTML.Parser do
 
   # API
 
-  @spec parse(binary) :: [Eml.t]
-  def parse(html) do
-    res = tokenize(html, { :blank, [] }, [], :blank) |> parse_content()
+  @spec parse(binary, Keyword.t) :: [Eml.t]
+  def parse(html, opts \\ []) do
+    res = tokenize(html, { :blank, [] }, [], :blank, opts) |> parse_content()
     case res do
       { content, [] } ->
         content
@@ -17,44 +17,44 @@ defmodule Eml.HTML.Parser do
   # Tokenize
 
   # Skip comments
-  defp tokenize("<!--" <> rest, buf, acc, _) do
-    tokenize(rest, buf, acc, :comment)
+  defp tokenize("<!--" <> rest, buf, acc, _, opts) do
+    tokenize(rest, buf, acc, :comment, opts)
   end
-  defp tokenize("-->" <> rest, buf, acc, :comment) do
+  defp tokenize("-->" <> rest, buf, acc, :comment, opts) do
     { state, _ } = buf
-    tokenize(rest, buf, acc, state)
+    tokenize(rest, buf, acc, state, opts)
   end
-  defp tokenize(<<_>> <> rest, buf, acc, :comment) do
-    tokenize(rest, buf, acc, :comment)
+  defp tokenize(<<_>> <> rest, buf, acc, :comment, opts) do
+    tokenize(rest, buf, acc, :comment, opts)
   end
 
   # Skip doctype
-  defp tokenize("<!DOCTYPE" <> rest, buf, acc, :blank) do
-    tokenize(rest, buf, acc, :doctype)
+  defp tokenize("<!DOCTYPE" <> rest, buf, acc, :blank, opts) do
+    tokenize(rest, buf, acc, :doctype, opts)
   end
-  defp tokenize("<!doctype" <> rest, buf, acc, :blank) do
-    tokenize(rest, buf, acc, :doctype)
+  defp tokenize("<!doctype" <> rest, buf, acc, :blank, opts) do
+    tokenize(rest, buf, acc, :doctype, opts)
   end
-  defp tokenize(">" <> rest, buf, acc, :doctype) do
-    tokenize(rest, buf, acc, :blank)
+  defp tokenize(">" <> rest, buf, acc, :doctype, opts) do
+    tokenize(rest, buf, acc, :blank, opts)
   end
-  defp tokenize(<<_>> <> rest, buf, acc, :doctype) do
-    tokenize(rest, buf, acc, :doctype)
+  defp tokenize(<<_>> <> rest, buf, acc, :doctype, opts) do
+    tokenize(rest, buf, acc, :doctype, opts)
   end
 
   # CDATA
-  defp tokenize("<![CDATA[" <> rest, buf, acc, state)
+  defp tokenize("<![CDATA[" <> rest, buf, acc, state, opts)
   when state in [:content, :blank, :start_close, :end_close, :close] do
-    next(rest, buf, "", acc, :cdata)
+    next(rest, buf, "", acc, :cdata, opts)
   end
-  defp tokenize("]]>" <> rest, buf, acc, :cdata) do
-    next(rest, buf, "", acc, :content)
+  defp tokenize("]]>" <> rest, buf, acc, :cdata, opts) do
+    next(rest, buf, "", acc, :content, opts)
   end
-  defp tokenize(<<char>> <> rest, buf, acc, :cdata) do
-    consume(char, rest, buf, acc, :cdata)
+  defp tokenize(<<char>> <> rest, buf, acc, :cdata, opts) do
+    consume(char, rest, buf, acc, :cdata, opts)
   end
   # Makes it possible for elements to treat its contents as if cdata
-  defp tokenize(chars, buf, acc, { :cdata, end_tag } = state) do
+  defp tokenize(chars, buf, acc, { :cdata, end_tag } = state, opts) do
     end_token = "</" <> end_tag <> ">"
     n = byte_size(end_token)
     case chars do
@@ -63,85 +63,85 @@ defmodule Eml.HTML.Parser do
         acc = change({ :open, "<" }, acc)
         acc = change({ :slash, "/" }, acc)
         acc = change({ :end_tag, end_tag }, acc)
-        tokenize(rest, { :end_close, ">" }, acc, :end_close)
+        tokenize(rest, { :end_close, ">" }, acc, :end_close, opts)
       <<char>> <> rest ->
-        consume(char, rest, buf, acc, state)
+        consume(char, rest, buf, acc, state, opts)
       "" ->
         :lists.reverse([buf | acc])
     end
   end
 
   # Attribute quotes
-  defp tokenize("'" <> rest, buf, acc, :attr_sep) do
-    next(rest, buf, "'", acc, :attr_single_open)
+  defp tokenize("'" <> rest, buf, acc, :attr_sep, opts) do
+    next(rest, buf, "'", acc, :attr_single_open, opts)
   end
-  defp tokenize("\"" <> rest, buf, acc, :attr_sep) do
-    next(rest, buf, "\"", acc, :attr_double_open)
+  defp tokenize("\"" <> rest, buf, acc, :attr_sep, opts) do
+    next(rest, buf, "\"", acc, :attr_double_open, opts)
   end
-  defp tokenize(<<char>> <> rest, buf, acc, :attr_value) when char in [?\", ?\'] do
+  defp tokenize(<<char>> <> rest, buf, acc, :attr_value, opts) when char in [?\", ?\'] do
     case { char, previous_state(acc, [:attr_value]) } do
       t when t in [{ ?\', :attr_single_open }, { ?\", :attr_double_open }] ->
-        next(rest, buf, char, acc, :attr_close)
+        next(rest, buf, char, acc, :attr_close, opts)
       _else ->
-        consume(char, rest, buf, acc, :attr_value)
+        consume(char, rest, buf, acc, :attr_value, opts)
     end
   end
-  defp tokenize(<<char>> <> rest, buf, acc, state)
+  defp tokenize(<<char>> <> rest, buf, acc, state, opts)
   when { char, state } in [{ ?\', :attr_single_open }, { ?\", :attr_double_open }] do
-    next(rest, buf, char, acc, :attr_close)
+    next(rest, buf, char, acc, :attr_close, opts)
   end
 
   # Attributes values accept any character
-  defp tokenize(<<char>> <> rest, buf, acc, state)
+  defp tokenize(<<char>> <> rest, buf, acc, state, opts)
   when state in [:attr_single_open, :attr_double_open] do
-    next(rest, buf, char, acc, :attr_value)
+    next(rest, buf, char, acc, :attr_value, opts)
   end
-  defp tokenize(<<char>> <> rest, buf, acc, :attr_value) do
-    consume(char, rest, buf, acc, :attr_value)
+  defp tokenize(<<char>> <> rest, buf, acc, :attr_value, opts) do
+    consume(char, rest, buf, acc, :attr_value, opts)
   end
 
   # Attribute field/value seperator
-  defp tokenize("=" <> rest, buf, acc, :attr_field) do
-    next(rest, buf, "=", acc, :attr_sep)
+  defp tokenize("=" <> rest, buf, acc, :attr_field, opts) do
+    next(rest, buf, "=", acc, :attr_sep, opts)
   end
 
   # Allow boolean attributes, ie. attributes with only a field name
-  defp tokenize(<<char>> <> rest, buf, acc, :attr_field)
+  defp tokenize(<<char>> <> rest, buf, acc, :attr_field, opts)
   when char in [?\>, ?\s, ?\n, ?\r, ?\t] do
-    next(<<char, rest::binary>>, buf, "\"", acc, :attr_close)
+    next(<<char, rest::binary>>, buf, "\"", acc, :attr_close, opts)
   end
 
   # Whitespace handling
-  defp tokenize(<<char>> <> rest, buf, acc, state)
+  defp tokenize(<<char>> <> rest, buf, acc, state, opts)
   when char in [?\s, ?\n, ?\r, ?\t] do
     case state do
       :start_tag ->
-        next(rest, buf, "", acc, :start_tag_close)
+        next(rest, buf, "", acc, :start_tag_close, opts)
       s when s in [:close, :start_close, :end_close] ->
         if char in [?\n, ?\r] do
-          next(rest, buf, "", acc, :content)
+          next(rest, buf, "", acc, :content, opts)
         else
-          next(rest, buf, char, acc, :content)
+          next(rest, buf, char, acc, :content, opts)
         end
       :content ->
-        consume(char, rest, buf, acc, state)
+        consume(char, rest, buf, acc, state, opts)
       _ ->
-        tokenize(rest, buf, acc, state)
+        tokenize(rest, buf, acc, state, opts)
     end
   end
 
   # Open tag
-  defp tokenize("<" <> rest, buf, acc, state) do
+  defp tokenize("<" <> rest, buf, acc, state, opts) do
     case state do
       s when s in [:blank, :start_close, :end_close, :close, :content] ->
-        next(rest, buf, "<", acc, :open)
+        next(rest, buf, "<", acc, :open, opts)
       _ ->
         error("<", rest, buf, acc, state)
     end
   end
 
   # Close tag
-  defp tokenize(">" <> rest, buf, acc, state) do
+  defp tokenize(">" <> rest, buf, acc, state, opts) do
     case state do
       s when s in [:attr_close, :start_tag] ->
         # The html tokenizer doesn't support elements without proper closing.
@@ -149,52 +149,52 @@ defmodule Eml.HTML.Parser do
         # and assume they never have children.
         tag = get_last_tag(acc, buf)
         if is_void_element?(tag) do
-          next(rest, buf, ">", acc, :close)
+          next(rest, buf, ">", acc, :close, opts)
         else
           # check if the content of the element should be interpreted as cdata
-          case element_type([buf | acc]) do
+          case element_type([buf | acc], List.wrap(opts[:treat_as_cdata])) do
             :content ->
-              next(rest, buf, ">", acc, :start_close)
+              next(rest, buf, ">", acc, :start_close, opts)
             { :cdata, tag } ->
               acc = change(buf, acc)
-              next(rest, { :start_close, ">" }, "", acc, { :cdata, tag })
+              next(rest, { :start_close, ">" }, "", acc, { :cdata, tag }, opts)
           end
         end
       :slash ->
-        next(rest, buf, ">", acc, :close)
+        next(rest, buf, ">", acc, :close, opts)
       :end_tag ->
-        next(rest, buf, ">", acc, :end_close)
+        next(rest, buf, ">", acc, :end_close, opts)
       _ ->
-        def_tokenize(">" <> rest, buf, acc, state)
+        def_tokenize(">" <> rest, buf, acc, state, opts)
     end
   end
 
   # Slash
-  defp tokenize("/" <> rest, buf, acc, state)
+  defp tokenize("/" <> rest, buf, acc, state, opts)
   when state in [:open, :attr_field, :attr_close, :start_tag, :start_tag_close] do
-    next(rest, buf, "/", acc, :slash)
+    next(rest, buf, "/", acc, :slash, opts)
   end
 
-  defp tokenize("", buf, acc, _) do
+  defp tokenize("", buf, acc, _, _opts) do
     :lists.reverse([buf | acc])
   end
 
   # Default parsing
-  defp tokenize(chars, buf, acc, state), do: def_tokenize(chars, buf, acc, state)
+  defp tokenize(chars, buf, acc, state, opts), do: def_tokenize(chars, buf, acc, state, opts)
 
   # Either start or consume content or tag.
-  defp def_tokenize(<<char>> <> rest, buf, acc, state) do
+  defp def_tokenize(<<char>> <> rest, buf, acc, state, opts) do
     case state do
       s when s in [:start_tag, :end_tag, :attr_field, :content] ->
-        consume(char, rest, buf, acc, state)
+        consume(char, rest, buf, acc, state, opts)
       s when s in [:blank, :start_close, :end_close, :close] ->
-        next(rest, buf, char, acc, :content)
+        next(rest, buf, char, acc, :content, opts)
       s when s in [:attr_close, :start_tag_close] ->
-        next(rest, buf, char, acc, :attr_field)
+        next(rest, buf, char, acc, :attr_field, opts)
       :open ->
-        next(rest, buf, char, acc, :start_tag)
+        next(rest, buf, char, acc, :start_tag, opts)
       :slash ->
-        next(rest, buf, char, acc, :end_tag)
+        next(rest, buf, char, acc, :end_tag, opts)
       _ ->
         error(char, rest, buf, acc, state)
     end
@@ -212,16 +212,16 @@ defmodule Eml.HTML.Parser do
   end
 
   # Consumes character and put it in the buffer
-  defp consume(char, rest, { type, buf }, acc, state) do
+  defp consume(char, rest, { type, buf }, acc, state, opts) do
     char = if is_integer(char), do: <<char>>, else: char
-    tokenize(rest, { type, buf <> char }, acc, state)
+    tokenize(rest, { type, buf <> char }, acc, state, opts)
   end
 
   # Add the old buffer to the accumulator and start a new buffer
-  defp next(rest, old_buf, new_buf, acc, new_state) do
+  defp next(rest, old_buf, new_buf, acc, new_state, opts) do
     acc = change(old_buf, acc)
     new_buf = if is_integer(new_buf), do: <<new_buf>>, else: new_buf
-    tokenize(rest, { new_state, new_buf }, acc, new_state)
+    tokenize(rest, { new_state, new_buf }, acc, new_state, opts)
   end
 
   # Add buffer to the accumulator if its content is not empty.
@@ -268,12 +268,13 @@ defmodule Eml.HTML.Parser do
 
   @cdata_elements ["script", "style"]
 
-  defp element_type(acc) do
+  defp element_type(acc, extra_cdata_elements) do
+    cdata_elements = @cdata_elements ++ extra_cdata_elements
     case get_last_tag(acc) do
       nil ->
         :content
       tag ->
-        if tag in @cdata_elements do
+        if tag in cdata_elements do
           { :cdata, tag }
         else
           :content

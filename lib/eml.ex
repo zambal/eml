@@ -417,10 +417,11 @@ defmodule Eml do
       [#body<[#h1<%{id: "main-title"} "The title">]>]
   """
   @spec parse(String.t, module) :: [t]
-  def parse(data, parser \\ @default_parser)
+  def parse(data, opts \\ [])
 
-  def parse(data, parser) when is_binary(data) do
-    parser.parse(data)
+  def parse(data, opts) when is_binary(data) do
+    parser = opts[:parser] || @default_parser
+    parser.parse(data, opts)
   end
   def parse(data, _) do
     raise Eml.ParseError, type: :badarg, value: data

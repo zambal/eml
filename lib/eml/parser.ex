@@ -29,7 +29,7 @@ defmodule Eml.Parser do
     end
   end
   defp unescape(<<char::utf8, rest::binary>>, acc) do
-    unescape(rest, acc <> <<char>>)
+    unescape(rest, acc <> <<char::utf8>>)
   end
   defp unescape("", acc) do
     acc

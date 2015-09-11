@@ -174,7 +174,7 @@ defmodule Eml.Compiler do
     end
   end
   defp escape(<<char::utf8, rest::binary>>, acc) do
-    escape(rest, acc <> <<char>>)
+    escape(rest, acc <> <<char::utf8>>)
   end
   defp escape("", acc) do
     acc

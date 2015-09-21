@@ -104,7 +104,7 @@ defmodule Eml do
 
 
   Templates are composable, so they are allowed to call other templates. The
-  only catch is that it's not possible to pass an assing to another template
+  only catch is that it's not possible to pass an assign to another template
   during precompilation. The reason for this is that the logic in a template is
   executed the moment the template is called, so if you would pass an assign
   during precompilation, the logic in a template would receive this assign

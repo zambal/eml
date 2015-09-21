@@ -3,7 +3,7 @@ defmodule Eml.Mixfile do
 
   def project do
     [ app: :eml,
-      version: "0.8.0-dev",
+      version: "0.9.0-dev",
       name: "Eml",
       source_url: "https://github.com/zambal/eml",
       homepage_url: "https://github.com/zambal/eml",
@@ -18,7 +18,7 @@ defmodule Eml.Mixfile do
 
   def deps do
     [ { :ex_doc, "~> 0.7", only: :docs },
-      {:earmark, "~> 0.1", only: :docs} ]
+      { :earmark, "~> 0.1", only: :docs } ]
   end
 
   defp description do

@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.9.0-dev
+ * Enhancements
+  * Replaced quoted expressions with assign handlers and runtime function calls
+
+ * Bug fixed
+  * Fixed typo in Eml.Element.apply_template/1
+
+ * Backwards incompatible changes
+  * Quoted expressions are now invalid. Use assign handlers or runtime function calls instead.
+
 ## v0.8.0-dev
  * Enhancements
   * Much richer templates by using quoted expressions as replacement for parameters

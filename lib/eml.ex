@@ -23,7 +23,7 @@ defmodule Eml do
       span "age: "
       span age
     end
-  end |> Eml.render
+  end |> Eml.compile
   ```
 
   produces
@@ -53,7 +53,7 @@ defmodule Eml do
   @type node_primitive :: String.t | { :safe, String.t } | Macro.t | Eml.Element.t
 
   @doc """
-  Define a template function that renders eml to a string during compile time.
+  Define a template function that compiles eml to a string during compile time.
 
   Eml uses the assigns extension from `EEx` for parameterizing templates. See
   the `EEx` docs for more info about them. The function that the template macro
@@ -128,7 +128,7 @@ defmodule Eml do
       ...>   &templ1(num: @number) # THIS IS OK
       ...> end
 
-  Note that because the body of a template is evaluated at compile time, it's
+  Note that because the body of a template is evaluated at compiletime, it's
   not possible to call other functions from the same module without using `&`
   operator.
 
@@ -269,8 +269,6 @@ defmodule Eml do
   fragments during precompilation. This is possible because fragments don't
   contain any logic.
 
-  See `render/3` for more info about accepted options.
-
   ### Example
 
       iex> use Eml
@@ -299,7 +297,7 @@ defmodule Eml do
       ...>   div "Hello World"
       ...> end
       #basic_page<%{title: "Hello!!"} [#div<"Hello World">]>
-      iex> Eml.render page
+      iex> Eml.compile page
       "<!doctype html>\n<html><head><meta charset='UTF-8'/><title>Hello!!</title></head><body><div>Hello World</div></body></html>"
   """
   defmacro fragment(tag, do_block) do

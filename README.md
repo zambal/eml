@@ -27,7 +27,7 @@ div class: "person" do
     span "age: "
     span age
   end
-end |> Eml.render
+end |> Eml.compile
 ```
 
 produces
@@ -60,7 +60,7 @@ Please read on for a walkthrough that tries to cover most of Eml's features.
 ### Walkthrough
 
 - [Intro](#intro)
-- [Rendering](#rendering)
+- [Compiling](#compiling)
 - [Parsing](#parsing)
 - [Compiling and templates](#compiling-and-templates)
 - [Components and fragments](#components-and-fragments)
@@ -120,15 +120,15 @@ iex> %Element{tag: :div, attrs: %{id: "some-id"}, content: "some content"}
 Note that attributes are stored internally as a map.
 
 
-#### Rendering
+#### Compiling
 
-Contents can be rendered to a string by calling `Eml.render`. Eml automatically
+Contents can be compiled to a string by calling `Eml.compile`. Eml automatically
 inserts a doctype declaration when the html element is the root.
 ```elixir
-iex> html(body(div(42))) |> Eml.render
+iex> html(body(div(42))) |> Eml.compile
 "<!doctype html>\n<html><body><div>42</div></body>\n</html>"
 
-iex> "text & more" |> div |> body |> html |> Eml.render
+iex> "text & more" |> div |> body |> html |> Eml.compile
 "<!doctype html>\n<html><body><div>text &amp; more</div></body></html>"
 ```
 As you can see, you can also use Elixir's pipe operator for creating markup.
@@ -148,7 +148,7 @@ iex> Eml.parse "<div class=\"content article\"><h1 class='title'>Title<h1><p cla
   ["Title", #h1<[#p<%{class: "paragraph"} "blah & blah">]>]>]>]
 ```
 
-The html parser is primarily written to parse html rendered by Eml, but it's
+The html parser is primarily written to parse html compiled by Eml, but it's
 flexible enough to parse most html you throw at it. Most notable missing
 features of the parser are attribute values without quotes and elements that are
 not properly closed.
@@ -253,7 +253,7 @@ iex> MyTemplates3.from_file number: 42
 Eml also provides `component/3` and `fragment/3` macros for defining
 template elements. They behave as normal elements, but they
 aditionally contain a template function that gets called with the
-element's attributes and content as arguments during rendering.
+element's attributes and content as arguments during compiling.
 
 ```elixir
 iex> use Eml
@@ -447,7 +447,7 @@ Eml doesn't perform any validation on the produced output.
 You can add any attribute name to any element and Eml won't
 complain, as it has no knowledge of the type of markup that
 is to be generated. If you want to make sure that your eml code
-will be valid html, render it to an html file and use this file with any
+will be valid html, compile it to an html file and use this file with any
 existing html validator. In this sense Eml is the same as hand
 written html.
 

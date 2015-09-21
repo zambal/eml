@@ -17,7 +17,7 @@ defmodule Eml.Mixfile do
   end
 
   def deps do
-    [ { :ex_doc, "~> 0.7", only: :docs },
+    [ { :ex_doc, "~> 0.9", only: :docs },
       { :earmark, "~> 0.1", only: :docs } ]
   end
 

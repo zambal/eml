@@ -113,17 +113,20 @@ defmodule Eml do
   template should be prefixed with the `&` operator, or in other words, executed
   during runtime.
 
- ### Example
-     template templ1,
-     num: &(&1 + &1) do
-       div @num
-     end
+  ### Example
 
-     template templ2 do
-       h2 @title
-       templ1(num: @number) # THIS GENERATES A COMPILE TIME ERROR
-       &templ1(num: @number) # THIS IS OK
-     end
+      iex> defmodule T1 do
+      ...>   template templ1,
+      ...>   num: &(&1 + &1) do
+      ...>     div @num
+      ...>   end
+      ...> end
+
+      iex> template templ2 do
+      ...>   h2 @title
+      ...>   templ1(num: @number) # THIS GENERATES A COMPILE TIME ERROR
+      ...>   &templ1(num: @number) # THIS IS OK
+      ...> end
 
   Note that because the body of a template is evaluated at compile time, it's
   not possible to call other functions from the same module without using `&`

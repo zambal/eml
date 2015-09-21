@@ -18,26 +18,17 @@ defmodule Eml.Compiler do
   # API
 
   @doc """
-  Compiles eml to a quoted expression.
+  Compiles eml to a string, or a quoted expression when the input contains
+  contains quoted expressions too.
 
-  Accepts the same options as `Eml.render/3` and its result
-  can be rendered to a string with a subsequent call to `Eml.render/3`.
+  Accepts the same options as `Eml.render/3`
 
   In case of error, raises an Eml.CompileError exception.
 
   ### Examples:
 
-      iex> t = Eml.compile(body(h1([id: "main-title"], :the_title)))
-      ["<body><h1 id='main-title'>",
-        {{:., [], [{:__aliases__, [alias: false], [:Eml]}, :compile]}, [],
-         [{{:., [], [{:__aliases__, [alias: false], [:Eml]}, :encode]}, [],
-           [{:the_title, [line: 4], nil}]},
-          {:%{}, [],
-           [quotes: :single, compiler: Eml.HTML.Compiler]}]}, "</h1></body>"]
-            iex> t.chunks
-            ["<body><h1 id='main-title'>", #param:the_title, "</h1></body>"]
-      iex> Eml.compile(t, the_title: "The Title")
-      "<body><h1 id='main-title'>The Title</h1></body>"
+      iex> Eml.Compiler.compile(body(h1(id: "main-title")))
+      {:safe, "<body><h1 id='main-title'></h1></body>"
 
   """
 
@@ -94,15 +85,7 @@ defmodule Eml.Compiler do
     add_chunk(node, chunks)
   end
 
-  defp default_compile_node(node, opts, chunks) when is_tuple(node) do
-    node = case opts do
-             %{handle_assigns: true, fragment: false} ->
-               Macro.prewalk(node, &handle_template_assign/1)
-             %{handle_assigns: true, fragment: true} ->
-               Macro.prewalk(node, &EEx.Engine.handle_assign/1)
-             _ ->
-               node
-           end
+  defp default_compile_node(node, _opts, chunks) when is_tuple(node) do
     add_chunk(node, chunks)
   end
 
@@ -216,10 +199,11 @@ defmodule Eml.Compiler do
     try do
       { :safe, concat(buffer, "", opts) }
     catch
-      :throw, :illegal_quoted ->
-        raise Eml.CompileError,
-        type: :illegal_quoted,
-        value: "It's not possible to pass quoted expressions to templates, components and Eml.render/3"
+      :throw, { :illegal_quoted, st } ->
+        reraise Eml.CompileError, [
+          type: :illegal_assign,
+          value: "It's only possible to pass assigns to templates or components when using &"
+        ], st
     end
   end
 
@@ -240,93 +224,71 @@ defmodule Eml.Compiler do
       { :safe, chunk } ->
         acc <> chunk
       _ ->
-        throw :illegal_quoted
+        throw { :illegal_quoted, System.stacktrace() }
     end
   end
 
-  defp prewalk(quoted, fragment?) do
-    if fragment? do
-      case Macro.prewalk(quoted, false, &check_quoted/2) do
-        { _, false } ->
-          Macro.prewalk(quoted, &handle_fragment/1)
-        { _, true } ->
-          raise Eml.CompileError,
-          type: :illegal_quoted,
-          value: "It's not possible to use quoted expressions inside fragments"
-      end
-    else
-      Macro.prewalk(quoted, &handle_template/1)
-      |> Macro.prewalk(&temp_capture_rewrite_back/1)
+  def prewalk(quoted, fragment?) do
+    handler = if fragment?,
+              do: &handle_fragment/1,
+              else: &handle_template/1
+    Macro.prewalk(quoted, handler)
+  end
+
+  defp handle_fragment({ :@, _, [{ name, _, atom }] } = ast) when is_atom(name) and is_atom(atom) do
+    Macro.escape(EEx.Engine.handle_assign(ast))
+  end
+  defp handle_fragment({ :&, _meta, [{ _fun, _, args }] } = ast) do
+    case Macro.prewalk(args, false, &handle_capture_args/2) do
+      { _, true } ->
+        ast
+      { _, false } ->
+        raise Eml.CompileError,
+        type: :illegal_call,
+        value: "It's not possible to use & inside fragments"
     end
-  end
-
-  defp check_quoted({ :&, _, [_] } = arg, _quoted?) do
-    { arg, true }
-  end
-  defp check_quoted({ :{}, _, _ } = arg, _quoted?) do
-    { arg, true }
-  end
-  defp check_quoted({ :quote, _, _ } = arg, _quoted?) do
-    { arg, true }
-  end
-  defp check_quoted(arg, quoted?) do
-    { arg, quoted? }
-  end
-
-  defp handle_fragment({ :@, _, [{ name, _, atom }] } = arg) when is_atom(name) and is_atom(atom) do
-    Macro.escape(EEx.Engine.handle_assign(arg))
   end
   defp handle_fragment(arg) do
     arg
   end
 
-  defp handle_template({ :quote, meta, quoted }) do
-    quoted = Macro.prewalk(quoted, &(temp_capture_rewrite(&1) |> handle_template_assign()))
-    { :quote, meta, quoted }
-  end
-  defp handle_template({ :&, _, [call] }) do
-    Macro.escape(Macro.prewalk(call, &handle_template_assign/1))
-  end
-  defp handle_template({ :@, _, [{ name, _, atom }]} = arg) when is_atom(name) and is_atom(atom) do
-    Macro.escape(handle_template_assign(arg))
-  end
-  defp handle_template(arg) do
-    arg
-  end
-
-  defp handle_template_assign({ :@, meta, [{ name, _, atom }] }) when is_atom(name) and is_atom(atom) do
-    line = meta[:line] || 0
-    quote line: line, do: Eml.Compiler.get_assign(var!(assigns), unquote(name))
-  end
-  defp handle_template_assign(arg) do
-    arg
-  end
-
-  defp temp_capture_rewrite({ :&, meta, args }) do
-    { :__temp__capture, meta, args }
-  end
-  defp temp_capture_rewrite(arg) do
-    arg
-  end
-
-  defp temp_capture_rewrite_back({ :__temp__capture, meta, args }) do
-    { :&, meta, args }
-  end
-  defp temp_capture_rewrite_back(arg) do
-    arg
-  end
-
-  @doc false
-  def get_assign(assigns, key) do
-    case Dict.get(assigns, key) do
-      { :safe, _ } = value ->
-        value
-      value when is_tuple(value) ->
+  defp handle_template({ :&, meta, [{ fun, _, args }] }) do
+    case Macro.prewalk(args, false, &handle_capture_args/2) do
+      { _, true } ->
         raise Eml.CompileError,
-        type: :illegal_quoted,
-        value: "It's not possible to pass quoted expressions to templates, components and Eml.render/3"
-      value ->
-        value
+        type: :illegal_capture,
+        value: "It's not possible to use & for captures inside templates or components"
+      { new_args, false } ->
+        line = Keyword.get(meta, :line, 0)
+        Macro.escape(quote line: line do
+          unquote(fun)(unquote_splicing(List.wrap(new_args)))
+        end)
     end
+  end
+  defp handle_template({ :@, meta, [{ name, _, atom }]}) when is_atom(name) and is_atom(atom) do
+    line = Keyword.get(meta, :line, 0)
+    Macro.escape(quote line: line do
+      Keyword.get(var!(_funs), unquote(name), var!(_noop)).(Dict.get(var!(assigns), unquote(name)))
+    end)
+  end
+  defp handle_template(ast) do
+    ast
+  end
+
+  defp handle_capture_args({ :@, meta, [{ name, _, atom }]}, regular_capure?) when is_atom(name) and is_atom(atom) do
+    line = Keyword.get(meta, :line, 0)
+    ast = quote line: line do
+      Keyword.get(var!(_funs), unquote(name), var!(_noop)).(Dict.get(var!(assigns), unquote(name)))
+    end
+    { ast, regular_capure? }
+  end
+  defp handle_capture_args({ :&, _meta, [num]} = ast, _regular_capure?) when is_integer(num) do
+    { ast, true }
+  end
+  defp handle_capture_args({ :/, _meta, _args} = ast, _regular_capure?) do
+    { ast, true }
+  end
+  defp handle_capture_args(ast, regular_capure?) do
+    { ast, regular_capure? }
   end
 end

@@ -55,78 +55,99 @@ defmodule Eml do
   @doc """
   Define a template function that renders eml to a string during compile time.
 
-  Quoted expressions are evaluated at runtime and it's results are compileed to
-  eml and concatenated with the precompiled eml.
+  Eml uses the assigns extension from `EEx` for parameterizing templates. See
+  the `EEx` docs for more info about them. The function that the template macro
+  defines accepts optionally any Dict compatible dictionary as argument for
+  binding values to assigns.
 
-  Eml uses the assigns extension from `EEx` for easy data access in a
-  template. See the `EEx` docs for more info about them. Since all runtime
-  behaviour is written in quoted expressions, assigns need to be quoted too. To
-  prevent you from writing things like `quote do: @my_assign + 4` all the time,
-  Eml provides the `&` capture operator as a shortcut for `quote do: ...`. You
-  can use this shortcut only in template and component macro's. This means that
-  for example `div &(@a + 4)` and `div (quote do: @a + 4)` have the same result
-  inside a template. If you just want to pass an assign, you can even leave out
-  the capture operator and just write `div @a`. The function that the template
-  macro defines accepts optionally any Dict compatible dictionary as argument
-  for binding values to assigns.
+  ### Example:
+
+      iex> defmodule MyTemplates1 do
+      ...>   use Eml
+      ...>   use Eml.HTML
+      ...>
+      ...>   template example do
+      ...>     div id: "example" do
+      ...>       span @text
+      ...>     end
+      ...>   end
+      ...> end
+      iex> MyTemplates.example text: "Example text"
+      {:safe, "<div id='example'><span>Example text</span></div>"}
+
+
+  Eml templates provides two ways of executing logic during runtime. By
+  providing assigns handlers to the optional `funs` dictionary, or by calling
+  external functions during runtime with the `&` operator.
+
+  ### Example:
+
+      iex> defmodule MyTemplates2 do
+      ...>   use Eml
+      ...>   use Eml.HTML
+      ...>
+      ...>   template assigns_handler,
+      ...>   text: &String.upcase/1 do
+      ...>     div id: "example1" do
+      ...>       span @text
+      ...>     end
+      ...>   end
+      ...>
+      ...>   template external_call do
+      ...>     body &assigns_handler(text: @example_text)
+      ...>   end
+      ...> end
+      iex> MyTemplates.assigns_handler text: "Example text"
+      {:safe, "<div id='example'><span>EXAMPLE TEXT</span></div>"}
+      iex> MyTemplates.exernal_call example_text: "Example text"
+      {:safe, "<body><div id='example'><span>EXAMPLE TEXT</span></div></body>"}
+
 
   Templates are composable, so they are allowed to call other templates. The
-  only catch is that it's not possible to pass a quoted expression to a
-  template.  The reason for this is that the logic in a template is executed the
-  moment the template is called, so if you would pass a quoted expression, the
-  logic in a template would receive this quoted expression instead of its
-  result. This all means that when you for example want to pass an assign to a
-  nested template, the template should be part of a quoted expression, or in
-  other word, executed during runtime.
+  only catch is that it's not possible to pass an assing to another template
+  during precompilation. The reason for this is that the logic in a template is
+  executed the moment the template is called, so if you would pass an assign
+  during precompilation, the logic in a template would receive this assign
+  instead of its result, which is only available during runtime. This all means
+  that when you for example want to pass an assign to a nested template, the
+  template should be prefixed with the `&` operator, or in other words, executed
+  during runtime.
 
-  Note that because the unquoted code is evaluated at compile time, it's not
-  possible to call other functions from the same module. Quoted expressions
-  however can call any local function, including other templates.
+ ### Example
+     template templ1,
+     num: &(&1 + &1) do
+       div @num
+     end
+
+     template templ2 do
+       h2 @title
+       templ1(num: @number) # THIS GENERATES A COMPILE TIME ERROR
+       &templ1(num: @number) # THIS IS OK
+     end
+
+  Note that because the body of a template is evaluated at compile time, it's
+  not possible to call other functions from the same module without using `&`
+  operator.
 
   Instead of defining a do block, you can also provide a path to a file with the
   `:file` option.
 
-  In addition, all options of `Eml.render/3` also apply to the template macro.
-
   ### Example:
 
-      iex> File.write! "test.eml.exs", "div(quote do: @number + @number)"
-      iex> defmodule MyTemplates do
+      iex> File.write! "test.eml.exs", "div @number"
+      iex> defmodule MyTemplates3 do
       ...>   use Eml
       ...>   use Eml.HTML
-      ...>
-      ...>   template fruit do
-      ...>     prefix = "fruit"
-      ...>     div do
-      ...>       span [class: "prefix"], prefix
-      ...>       span [class: "name"], &@name
-      ...>     end
-      ...>   end
-      ...>
-      ...>   template tropical_fruit do
-      ...>     body do
-      ...>       h2 "Tropical Fruit"
-      ...>       quote do
-      ...>         for n <- @names do
-      ...>           fruit name: n
-      ...>         end
-      ...>       end
-      ...>     end
-      ...>   end
       ...>
       ...>   template from_file, file: "test.eml.exs"
       ...> end
       iex> File.rm! "test.eml.exs"
-      iex> MyTemplates.tropical_fruit names: ~w(mango papaya banana acai)
-      "<body><h2>Tropical Fruit</h2><div><span class='prefix'>fruit</span><span class='name'>mango</span></div><div><span class='prefix'>fruit</span><span class='name'>papaya</span></div><div><span class='prefix'>fruit</span><span class='name'>banana</span></div><div><span class='prefix'>fruit</span><span class='name'>acai</span></div></body>"
-      iex> MyTemplates.from_file number: 21
-      "<div>42</div>"
-      iex> MyTemplates.precompile()
-      "<body><p>Strawberry</p></body>"
+      iex> MyTemplates3.from_file number: 42
+      {:safe, "<div>42</div>"}
 
   """
-  defmacro template(name, opts, do_block \\ []) do
-    do_template(name, opts, do_block, __CALLER__, false)
+  defmacro template(name, funs \\ [], do_block) do
+    do_template(name, funs, do_block, __CALLER__, false)
   end
 
   @doc """
@@ -134,18 +155,19 @@ defmodule Eml do
 
   Same as `template/3` except that it defines a private function.
   """
-  defmacro templatep(name, opts, do_block \\ []) do
-    do_template(name, opts, do_block, __CALLER__, true)
+  defmacro templatep(name, funs \\ [], do_block) do
+    do_template(name, funs, do_block, __CALLER__, true)
   end
 
-  defp do_template(tag, opts, do_block, caller, private) do
-    opts = Keyword.merge(opts, do_block)
+  defp do_template(tag, funs, do_block, caller, private) do
     { tag, _, _ } = tag
     def_call = if private, do: :defp, else: :def
-    template = Eml.Compiler.precompile(caller, opts)
+    template = Eml.Compiler.precompile(caller, do_block)
     quote do
       unquote(def_call)(unquote(tag)(var!(assigns))) do
         _ = var!(assigns)
+        var!(_funs) = unquote(funs)
+        var!(_noop) = &(&1)
         unquote(template)
       end
     end
@@ -154,105 +176,95 @@ defmodule Eml do
   @doc """
   Define a template as an anonymous function.
 
-  All non quoted expressions are precompiled and the anonymous function that is
-  returned expects a Keyword list for binding assigns.
-
-  See `template/3` for more info.
+  Same as `template/3`, except that it defines an anonymous function.
 
   ### Example
-      iex> t = template_fn do
-      ...>   names = quote do
-      ...>     for n <- @names, do: li n
-      ...>   end
-      ...>   ul names
+      iex> t = template_fn names: fn names ->
+      ...>   for n <- names, do: li n
+      ...> end do
+      ...>   ul @names
       ...> end
       iex> t.(names: ~w(john james jesse))
-      "<ul><li>john</li><li>james</li><li>jesse</li></ul>"
+      {:safe, "<ul><li>john</li><li>james</li><li>jesse</li></ul>"}
 
   """
-  defmacro template_fn(opts, do_block \\ []) do
-    opts = Keyword.merge(opts, do_block)
-    template = Eml.Compiler.precompile(__CALLER__, opts)
+  defmacro template_fn(funs \\ [], do_block) do
+    template = Eml.Compiler.precompile(__CALLER__, do_block)
     quote do
       fn var!(assigns) ->
         _ = var!(assigns)
+        var!(_funs) = unquote(funs)
+        var!(_noop) = &(&1)
         unquote(template)
       end
     end
   end
 
   @doc """
-  Define a component macro
+  Define a component element
 
   Components in Eml are a special kind of element that inherit functionality
   from templates. Like templates, everything within the do block gets
-  precompiled, except quoted code. Defined attributes on a component can be
-  accessed as assigns, just like with templates. Content can be accessed via the
-  the special assign `__CONTENT__`.  However, since the type of a component is
-  `Eml.Element.t`, they can be queried and transformed, just like normal Eml
-  elements.
+  precompiled, except assigns and function calls prefixed with the `&`
+  operator. Defined attributes on a component can be accessed as assigns, just
+  like with templates. Content can be accessed via the the special assign
+  `__CONTENT__`. However, since the type of a component is `Eml.Element.t`,
+  they can be queried and transformed, just like normal Eml elements.
 
-  See `template/3` for more info about composability, quoted blocks, assigns and
+  See `template/3` for more info about composability, assigns, runtime logic and
   accepted options.
 
   ### Example
 
       iex> use Eml
-      nil
       iex> use Eml.HTML
-      nil
       iex> defmodule ElTest do
       ...>
-      ...>   component my_list do
-      ...>     ul class: &@class do
-      ...>       quote do
-      ...>         for item <- @__CONTENT__ do
-      ...>           li do
-      ...>             span "* "
-      ...>             span item
-      ...>             span " *"
-      ...>           end
-      ...>         end
+      ...>   component my_list,
+      ...>   __CONTENT__: fn content ->
+      ...>     for item <- content do
+      ...>       li do
+      ...>         span "* "
+      ...>         span item
+      ...>         span " *"
       ...>       end
       ...>     end
+      ...>   end do
+      ...>     ul [class: @class], @__CONTENT__
       ...>   end
       ...>
       ...> end
-      {:module, ElTest, ...}
       iex> import ElTest
-      nil
       iex> el = my_list class: "some-class" do
       ...>   "Item 1"
       ...>   "Item 2"
       ...> end
       #my_list<%{class: "some-class"} ["Item 1", "Item 2"]>
-      iex> Eml.render(el)
+      iex> Eml.compile(el)
       "<ul class='some-class'><li><span>* </span><span>Item 1</span><span> *</span></li><li><span>* </span><span>Item 2</span><span> *</span></li></ul>"
   """
-  defmacro component(tag, opts, do_block \\ []) do
-    do_template_element(tag, opts, do_block, __CALLER__)
+  defmacro component(tag, funs \\ [], do_block) do
+    do_template_element(tag, funs, do_block, __CALLER__, false)
   end
 
   @doc """
-  Define a fragment macro
+  Define a fragment element
 
-  Fragments in Eml are a special kind of element that inherit functionality
-  from templates. Like templates, everything within the do block gets
-  precompiled, except assigns. Defined attributes on a component can be
-  accessed as assigns, just like with templates. Content can be accessed via the
-  the special assign `__CONTENT__`.  However, since the type of a component is
-  `Eml.Element.t`, they can be queried and transformed, just like normal Eml
-  elements.
+  Fragments in Eml are a special kind of element that inherit functionality from
+  templates. Like templates, everything within the do block gets precompiled,
+  except assigns. Defined attributes on a component can be accessed as assigns,
+  just like with templates. Content can be accessed via the the special assign
+  `__CONTENT__`.  However, since the type of a fragment is `Eml.Element.t`, they
+  can be queried and transformed, just like normal Eml elements.
 
-  The difference between components and fragments is that fragments are
-  without any logic, so quoted expressions or the `&` capture operator are not
-  allowed in a fragment definition. This means that assigns don't need to be
-  quoted.
+  The difference between components and fragments is that fragments are without
+  any logic, so assign handlers or the `&` operator are not allowed in a
+  fragment definition.
 
   The reason for their existence is easier composability and performance,
-  because unlike templates and components, it is allowed to pass quoted
-  expressions to fragments.  This is possible because fragments don't contain
-  any logic.
+  because unlike templates and components, it is allowed to pass assigns to
+  fragments during precompilation. This is possible because fragments don't
+  contain any logic.
 
   See `render/3` for more info about accepted options.
 
@@ -287,21 +299,26 @@ defmodule Eml do
       iex> Eml.render page
       "<!doctype html>\n<html><head><meta charset='UTF-8'/><title>Hello!!</title></head><body><div>Hello World</div></body></html>"
   """
-  defmacro fragment(tag, opts, do_block \\ []) do
-    opts = Keyword.put(opts, :fragment, true)
-    do_template_element(tag, opts, do_block, __CALLER__)
+  defmacro fragment(tag, do_block) do
+    do_template_element(tag, nil, do_block, __CALLER__, true)
   end
 
-  defp do_template_element(tag, opts, do_block, caller) do
-    opts = Keyword.merge(opts, do_block)
+  defp do_template_element(tag, funs, do_block, caller, fragment?) do
     { tag, _, _ } = tag
-    template = Eml.Compiler.precompile(caller, opts)
+    template = Eml.Compiler.precompile(caller, Keyword.merge(do_block, fragment: fragment?))
     template_tag = (Atom.to_string(tag) <> "__template") |> String.to_atom()
-    template_type = if opts[:fragment], do: :fragment, else: :component
+    template_type = if fragment?, do: :fragment, else: :component
+    funs = unless fragment? do
+      quote do
+        var!(_funs) = unquote(funs)
+        var!(_noop) = &(&1)
+      end
+    end
     quote do
       @doc false
       def unquote(template_tag)(var!(assigns)) do
         _ = var!(assigns)
+        unquote(funs)
         unquote(template)
       end
       defmacro unquote(tag)(content_or_attrs, maybe_content \\ nil) do
@@ -428,11 +445,7 @@ defmodule Eml do
   end
 
   @doc """
-  Renders eml content with the specified markup compiler, which is html by default.
-
-  When the provided eml contains quoted expressions that use assigns,
-  you can bind to these by providing a Keyword list as the
-  second argument.
+  Compiles eml content with the specified markup compiler, which is html by default.
 
   The accepted options are:
 
@@ -446,29 +459,24 @@ defmodule Eml do
 
   ### Examples:
 
-      iex> Eml.render(body(h1([id: "main-title"], "A title")))
+      iex> Eml.compile(body(h1([id: "main-title"], "A title")))
       "<body><h1 id='main-title'>A title</h1></body>"
 
-      iex> Eml.render(body(h1([id: "main-title"], "A title")), quotes: :double)
+      iex> Eml.compile(body(h1([id: "main-title"], "A title")), quotes: :double)
       "<body><h1 id=\"main-title\">A title</h1></body>"
 
-      iex> Eml.render(p "Tom & Jerry")
+      iex> Eml.compile(p "Tom & Jerry")
       "<p>Tom &amp; Jerry</p>"
 
   """
-  @spec render(t, Dict.t, Dict.t) :: String.t
-  def render(content, assigns \\ %{}, opts \\ [])
-  def render({ :safe, string }, _assigns, _opts) when is_binary(string) do
+  @spec compile(t, Dict.t) :: String.t
+  def compile(content, opts \\ [])
+  def compile({ :safe, string }, _opts) do
     string
   end
-  def render(content, assigns, opts) do
-    case Eml.Compiler.compile(content, Keyword.put(opts, :fragment, false)) do
-      { :safe, string } when is_binary(string) ->
-        string
-      quoted ->
-        { { :safe, res }, _ } = Code.eval_quoted(quoted, [assigns: assigns])
-        res
-    end
+  def compile(content, opts) do
+    { :safe, string } = Eml.Compiler.compile(content, opts)
+    string
   end
 
   @doc """
@@ -661,7 +669,7 @@ defmodule Eml do
         template: 2, template: 3,
         templatep: 2, templatep: 3,
         template_fn: 1, template_fn: 2,
-        fragment: 2, fragment: 3,
+        fragment: 2,
         component: 2, component: 3,
         decoder: 1, decoder: 2
       ]

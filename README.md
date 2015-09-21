@@ -157,73 +157,68 @@ not properly closed.
 #### Compiling and templates
 
 Compiling and templates can be used in situations where most content is static
-and performance is critical. A template is just Eml content that contains quoted
-expressions. `Eml.Compiler.compile/2` renders all non quoted expressions and all
-quoted expressions are preprocessed for efficient rendering with `Eml.render/3`
-afterwards. It's not needed to work with `Eml.Compiler.compile/2` directly, as
-using `template/3` and `Eml.template_fn/3` is more convenient in most
-cases. `template/3` defines a function that has all non quoted expressions
-prerendered and when called, concatenates the results from the quoted
-expressions with it. `template_fn/3` works the same, but returns an anonymous
-function instead.
+and performance is critical, since its contents gets precompiled during compiletime.
 
-Eml uses the assigns extension from `EEx` for easy data access in a
-template. See the `EEx` docs for more info about them. Since all runtime
-behaviour is written in quoted expressions, assigns need to be quoted too. To
-prevent you from writing things like `quote do: @my_assign + 4` all the time,
-Eml provides the `&` capture operator as a shortcut for `quote do: ...`. You can
-use this shortcut only in template and component macro's. This means that for
-example `div &(@a + 4)` and `div (quote do: @a + 4)` have the same result inside
-a template. If you just want to pass an assign, you can even leave out the
-capture operator and just write `div @a`. The function that the template macro
-defines accepts optionally a Keyword list for binding values to assigns.
+Eml uses the assigns extension from `EEx` for parameterizing templates. See
+the `EEx` docs for more info about them. The function that the template macro
+defines accepts optionally any Dict compatible dictionary as argument for
+binding values to assigns.
+
 ```elixir
-iex> e = h1 [(quote do: @assigns), " ", (quote do: @are), " ", (quote do: @pretty), " ", (quote do: @nifty)]
-#h1<[{:quoted, [{:@, [line: 12], [{:assigns, [line: 12], nil}]}]}, " ",
- {:quoted, [{:@, [line: 12], [{:are, [line: 12], nil}]}]}, " ",
- {:quoted, [{:@, [line: 12], [{:pretty, [line: 12], nil}]}]}, " ",
- {:quoted, [{:@, [line: 12], [{:nifty, [line: 12], nil}]}]}]>
-iex> t = Eml.compile(e)
-iex> Eml.render(t, assigns: "Assigns", are: "are", pretty: "pretty", nifty: "nifty!")
-"<h1>Assigns are pretty nifty!</h1>"
-
-iex> e = ul(quote do
-...>   for n <- @names, do: li n
-...> end)
-iex> Eml.render e, names: ~w(john james jesse)
-"<ul><li>john</li><li>james</li><li>jesse</li></ul>"
-
-iex> t = template_fn do
-...>   ul &(for n <- @names, do: li n)
+iex> defmodule MyTemplates1 do
+...>   use Eml
+...>   use Eml.HTML
+...>
+...>   template example do
+...>     div id: "example" do
+...>       span @text
+...>     end
+...>   end
 ...> end
-#Function<6.90072148/1 in :erl_eval.expr/5>
-iex> t.(names: ~w(john james jesse))
-{ :safe, "<ul><li>john</li><li>james</li><li>jesse</li></ul>" }
+iex> MyTemplates.example text: "Example text"
+{:safe, "<div id='example'><span>Example text</span></div>"}
 ```
-To bind data to assigns in Eml, you can either compile eml data to a template
-and use `Eml.render` to bind data to assigns, or you can directly call
-`Eml.render`, which also precompiles on the fly when needed. However, any
-performance benefits of using templates is lost this way.
 
-Since unquoted expressions in a template are evaluated during compile time, you
-can't call functions or macro's from the same module, since the module isn't
-compiled yet.
+Eml templates provides two ways of executing logic during runtime. By
+providing assigns handlers to the optional `funs` dictionary, or by calling
+external functions during runtime with the `&` operator.
 
-Quoted expressions however have normal access to other functions, because they
-are evaluated at runtime.
+```elixir
+iex> defmodule MyTemplates2 do
+...>   use Eml
+...>   use Eml.HTML
+...>
+...>   template assigns_handler,
+...>   text: &String.upcase/1 do
+...>     div id: "example1" do
+...>       span @text
+...>     end
+...>   end
+...>
+...>   template external_call do
+...>     body &assigns_handler(text: @example_text)
+...>   end
+...> end
+iex> MyTemplates.assigns_handler text: "Example text"
+{:safe, "<div id='example'><span>EXAMPLE TEXT</span></div>"}
+iex> MyTemplates.exernal_call example_text: "Example text"
+{:safe, "<body><div id='example'><span>EXAMPLE TEXT</span></div></body>"}
+```
 
-Templates are composable, so they are allowed to call other templates. The only
-catch is that it's not possible to pass a quoted expression to a template. The
-reason for this is that the logic in a template is executed the moment the
-template is called, so if you would pass a quoted expression, the logic in a
-template would receive this quoted expression instead of its result. This all
-means that when you for example want to pass an assign to a nested template, the
-template should be part of a quoted expression, or in other words, executed
+Templates are composable, so they are allowed to call other templates. The
+only catch is that it's not possible to pass an assing to another template
+during precompilation. The reason for this is that the logic in a template is
+executed the moment the template is called, so if you would pass an assign
+during precompilation, the logic in a template would receive this assign
+instead of its result, which is only available during runtime. This all means
+that when you for example want to pass an assign to a nested template, the
+template should be prefixed with the `&` operator, or in other words, executed
 during runtime.
 
 ```elixir
-template templ1 do
-  div &(@num + @num)
+template templ1,
+num: &(&1 + &1) do
+  div @num
 end
 
 template templ2 do
@@ -233,59 +228,80 @@ template templ2 do
 end
 ```
 
-See the documentation
-of `Eml.template/3` for more info and examples about templates.
+Note that because the body of a template is evaluated at compile time, it's
+not possible to call other functions from the same module without using `&`
+operator.
+
+Instead of defining a do block, you can also provide a path to a file with the
+`:file` option.
+
+```elixir
+iex> File.write! "test.eml.exs", "div @number"
+iex> defmodule MyTemplates3 do
+...>   use Eml
+...>   use Eml.HTML
+...>
+...>   template from_file, file: "test.eml.exs"
+...> end
+iex> File.rm! "test.eml.exs"
+iex> MyTemplates3.from_file number: 42
+{:safe, "<div>42</div>"}
+```
 
 #### Components and fragments
 
-Eml also provides `component/3` and `fragment/3` macros for defining template elements. They are
-implemented as normal elements, but they aditionally contain a template
-function that gets called with the element's attributes and content as arguments
-during rendering.
+Eml also provides `component/3` and `fragment/3` macros for defining
+template elements. They behave as normal elements, but they
+aditionally contain a template function that gets called with the
+element's attributes and content as arguments during rendering.
 
 ```elixir
 iex> use Eml
-nil
-iex> use Eml.HTML.Element
-nil
+iex> use Eml.HTML
 iex> defmodule ElTest do
 ...>
-...>   component my_list do
-...>     ul class: @class do
-...>       &(for item <- @__CONTENT__, do: li "* #{item} *")
+...>   component my_list,
+...>   __CONTENT__: fn content ->
+...>     for item <- content do
+...>       li do
+...>         span "* "
+...>         span item
+...>         span " *"
+...>       end
 ...>     end
+...>   end do
+...>     ul [class: @class], @__CONTENT__
 ...>   end
 ...>
 ...> end
-{:module, ElTest, ...}
 iex> import ElTest
-nil
 iex> el = my_list class: "some-class" do
 ...>   "Item 1"
 ...>   "Item 2"
 ...> end
 #my_list<%{class: "some-class"} ["Item 1", "Item 2"]>
-iex> Eml.render(el)
-"<ul class='some-class'><li>* Item 1 *</li><li>* Item 2 *</li></ul>"
+iex> Eml.compile(el)
+"<ul class='some-class'><li><span>* </span><span>Item 1</span><span> *</span></li><li><span>* </span><span>Item 2</span><span> *</span></li></ul>"
 ```
 
-Just like templates, all non quoted expressions get precompiled and quoted
-expressions are evaluated at runtime. All attributes of the element can be
-accessed as assigns and the element contents is accessable as the assign
-`@__CONTENT__`.
+Just like templates, its body gets precompiled and assigns, assign
+handlers and function calls prefixed with the `operator` are evaluated
+at runtime. All attributes of the element can be accessed as assigns
+and the element contents is accessable as the assign `@__CONTENT__`.
 
 The main difference between templates and components is their
 interface. You can use components like normal elements, even within a
 match.
 
-In addition to components, Eml also provides fragments. The difference between
-components and fragments is that fragments are without any logic, so quoted
-expressions or the `&` capture operator are not allowed in a fragment
-definition.
+In addition to components, Eml also provides fragments. The difference
+between components and fragments is that fragments are without any
+logic, so assign handlers or the `&` capture operator are not allowed
+in fragment definitions.
 
-Fragments can be used for better composability and performance, because
-unlike templates and components, quoted expressions are allowed as arguments for
-fragments. This is possible because fragments don't contain any logic.
+Fragments can be used for better composability and performance,
+because unlike templates and components, assigns are allowed as
+arguments during precompilation for fragments. This is possible
+because fragments don't contain any logic.
 
 
 #### Unpacking

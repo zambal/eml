@@ -14,20 +14,14 @@ defmodule EmlTest.Template do
   use Eml
   use Eml.HTML
 
-  import EmlTest.Fragment
+  import EmlTest.Fragment, warn: false
 
-  defp upcase(s) do
-    String.upcase(s)
-  end
-
-  template my_template do
-    my_fragment class: @class, title: &upcase(@title) do
+  template my_template,
+  title: &String.upcase/1,
+  paragraphs: &(for par <- &1, do: p par) do
+    my_fragment class: @class, title: @title do
       h3 "Paragraphs"
-      quote do
-        for par <- @paragraphs do
-          p par
-        end
-      end
+      @paragraphs
     end
   end
 end
@@ -87,11 +81,11 @@ defmodule EmlTest do
     end)
   end
 
-  test "Render => Parse => Compare" do
+  test "Compile => Parse => Compare" do
     # Parsing always return results in a list
     expected = [doc()]
-    rendered = Eml.render(doc())
-    assert expected == Eml.parse(rendered)
+    compiled = Eml.compile(doc())
+    assert expected == Eml.parse(compiled)
   end
 
   test "Eml.Encoder protocol and encode" do
@@ -120,25 +114,36 @@ defmodule EmlTest do
     assert [[1, 2], 3] == Eml.unpack(multi)
   end
 
-  test "Compiling 1" do
-    e = div id: (quote do: @myid <> "-collection") do
-      div (quote do: @fruit1)
-      div (quote do: @fruit2)
+  test "Compiling" do
+    e = quote do
+      div id: (@myid) do
+        div (@fruit1)
+        div (@fruit2)
+      end
     end
-    template = Eml.Compiler.compile(e)
-    expected = "<div id='fruit-collection'><div>lemon</div><div>orange</div></div>"
 
-    assert expected == Eml.render template, myid: "fruit", fruit1: "lemon", fruit2: "orange"
+    { chunks, _ } = Eml.Compiler.precompile(fragment: true, do: e)
+    |> Code.eval_quoted(assigns: [myid: "fruit", fruit1: "lemon", fruit2: "orange"])
+    compiled = Eml.Compiler.concat(chunks, [])
+
+    expected = { :safe, "<div id='fruit'><div>lemon</div><div>orange</div></div>" }
+
+    assert expected == compiled
   end
 
   test "Templates" do
-    e = for _ <- 1..4 do
-      div [], (quote do: @fruit)
+    e = quote do
+      for _ <- 1..4 do
+        div [], @fruit
+      end
     end
-    template = Eml.Compiler.compile(e)
-    expected = "<div>lemon</div><div>lemon</div><div>lemon</div><div>lemon</div>"
+    { chunks, _ } = Eml.Compiler.precompile(fragment: true, do: e)
+    |> Code.eval_quoted(assigns: [fruit: "lemon"])
+    compiled = Eml.Compiler.concat(chunks, [])
 
-    assert expected == Eml.render(template, fruit: "lemon")
+    expected = { :safe, "<div>lemon</div><div>lemon</div><div>lemon</div><div>lemon</div>" }
+
+    assert expected == compiled
   end
 
   test "fragment elements" do
@@ -148,12 +153,12 @@ defmodule EmlTest do
 
     expected = "<div class='some&#39;class'><h1>MY&amp;TITLE</h1><h3>Paragraphs</h3><p>1</p><p>2</p><p>3</p></div>"
 
-    assert Eml.render(el) == expected
+    assert Eml.compile(el) == expected
   end
 
   test "Quoted content in eml" do
-    fruit  = section (quote do: @fruit)
-    qfruit = Eml.Compiler.compile(fruit)
+    fruit  = quote do: section @fruit
+    qfruit = Eml.Compiler.precompile(fragment: true, do: fruit)
     aside  = aside qfruit
     qaside = Eml.Compiler.compile(aside)
 
@@ -161,26 +166,29 @@ defmodule EmlTest do
       section "lemon"
     end
 
-    assert Eml.render(expected) == Eml.render(qaside, fruit: "lemon")
+    { chunks, _ } = Code.eval_quoted(qaside, assigns: [fruit: "lemon"])
+    { :safe, string } = Eml.Compiler.concat(chunks, [])
+
+    assert Eml.compile(expected) == string
   end
 
-  test "Quoted attribute rendering" do
-    e = div id: (quote do: @id_assign),
-            class: [(quote do: @class1), " class2 ", (quote do: @class3)],
-            _custom1: (quote do: @custom + 1),
-            _custom2: (quote do: @custom + 2)
+  test "Assigns and attribute compiling" do
+    e = quote do
+      div id: @id_assign,
+      class: [@class1, " class2 ", @class3],
+      _custom: @custom
+    end
 
-    expected = "<div data-custom1='2' data-custom2='3' class='class1 class2 class3' id='assigned'></div>"
-    assert expected == Eml.render(e, id_assign: "assigned",
-                                     class1: "class1",
-                                     class3: "class3",
-                                     custom: 1)
+    { chunks, _ } = Eml.Compiler.precompile(fragment: true, do: e)
+    |> Code.eval_quoted(assigns: [id_assign: "assigned",
+                                  class1: "class1",
+                                  class3: "class3",
+                                  custom: 1])
+    compiled = Eml.Compiler.concat(chunks, [])
 
-    template = Eml.Compiler.compile(e)
-    assert expected == Eml.render(template, id_assign: "assigned",
-                                          class1: "class1",
-                                          class3: "class3",
-                                          custom: 1)
+    expected = { :safe, "<div data-custom='1' class='class1 class2 class3' id='assigned'></div>" }
+
+    assert expected == compiled
   end
 
   test "Content escaping" do
@@ -203,10 +211,10 @@ defmodule EmlTest do
     assert expected == Eml.escape div span("Tom & Jerry")
 
     expected = "<div><span>Tom &amp; Jerry</span></div>"
-    assert expected == Eml.render div span("Tom & Jerry")
+    assert expected == Eml.compile div span("Tom & Jerry")
 
     expected = "<div><span>Tom & Jerry</span></div>"
-    assert expected == Eml.render div span({ :safe, "Tom & Jerry" })
+    assert expected == Eml.compile div span({ :safe, "Tom & Jerry" })
   end
 
   test "Content unescaping" do
@@ -229,14 +237,14 @@ defmodule EmlTest do
     assert expected == Eml.unescape div span("Tom &amp; Jerry")
   end
 
-  test "Prerender transform" do
+  test "Precompile transform" do
     e = div do
       span "hallo "
       span "world"
     end
     expected = "<div><span>HALLO </span><span>WORLD</span></div>"
 
-    assert expected == Eml.render(e, [], transform: &(if is_binary(&1), do: String.upcase(&1), else: &1))
+    assert expected == Eml.compile(e, transform: &(if is_binary(&1), do: String.upcase(&1), else: &1))
   end
 
   test "Element casing" do

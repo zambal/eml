@@ -81,7 +81,7 @@ defmodule Eml.Element do
     fun.(assigns)
   end
   def apply_template(badarg) do
-    raise Eml.CompileError, type: :bad_template_element, data: badarg
+    raise Eml.CompileError, type: :bad_template_element, value: badarg
   end
 end
 

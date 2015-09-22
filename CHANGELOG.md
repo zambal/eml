@@ -3,6 +3,7 @@
 ## v0.9.0-dev
  * Enhancements
   * Replaced quoted expressions with assign handlers and runtime function calls
+  * `use Eml` can now be used to set compile options and elements to import
 
  * Bug fixed
   * Fixed typo in Eml.Element.apply_template/1

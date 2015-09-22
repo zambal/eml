@@ -1,6 +1,5 @@
 defmodule EmlTest.Fragment do
   use Eml
-  use Eml.HTML
 
   fragment my_fragment do
     div class: @class do
@@ -12,7 +11,6 @@ end
 
 defmodule EmlTest.Template do
   use Eml
-  use Eml.HTML
 
   import EmlTest.Fragment, warn: false
 
@@ -29,7 +27,6 @@ end
 defmodule EmlTest do
   use ExUnit.Case
   use Eml
-  use Eml.HTML
 
   alias Eml.Element, as: M
 

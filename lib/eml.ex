@@ -46,7 +46,7 @@ defmodule Eml do
 
   alias Eml.Element
 
-  @default_compiler Eml.HTML.Compiler
+  @default_elements Eml.HTML
   @default_parser Eml.HTML.Parser
 
   @type t :: Eml.Encoder.t | [Eml.Encoder.t] | [t]
@@ -589,8 +589,16 @@ defmodule Eml do
   ]
   ```
   """
-  defmacro __using__(_) do
+  defmacro __using__(opts) do
+    use_elements = if mods = Keyword.get(opts, :elements, @default_elements) do
+                 for mod <- List.wrap(mods) do
+                   quote do: use unquote(mod)
+                 end
+               end
+    compile_opts = Keyword.get(opts, :compile, [])
+    Module.put_attribute(__CALLER__.module, :eml_compile, compile_opts)
     quote do
+      unquote(use_elements)
       alias Eml.Element
       import Eml, only: [
         template: 2, template: 3,

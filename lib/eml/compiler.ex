@@ -10,7 +10,6 @@ defmodule Eml.Compiler do
   @default_opts %{escape: true,
                   transform: nil,
                   fragment: false,
-                  handle_assigns: true,
                   compiler: Eml.HTML.Compiler}
 
   defp new_opts(opts), do: Dict.merge(@default_opts, opts)
@@ -39,11 +38,14 @@ defmodule Eml.Compiler do
     compile_node(eml, opts, []) |> to_result(opts)
   end
 
-  @spec precompile(Macro.Env.t | Keyword.t, Dict.t) :: { :safe, String.t } | Macro.t
-  def precompile(env \\ [], opts) do
+  @spec precompile(Macro.Env.t, Dict.t) :: { :safe, String.t } | Macro.t
+  def precompile(env \\ %Macro.Env{}, opts) do
+      mod_opts = if mod = env.module,
+                 do: Module.get_attribute(mod, :eml_compile) |> Macro.escape(),
+                 else: []
+      opts = Keyword.merge(mod_opts, opts)
     { file, opts } = Keyword.pop(opts, :file)
     { block, opts } = Keyword.pop(opts, :do)
-    Keyword.put(opts, :handle_assigns, false)
     ast = if file do
             string = File.read!(file)
             Code.string_to_quoted!(string, file: file, line: 1)

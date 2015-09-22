@@ -574,20 +574,16 @@ defmodule Eml do
 
   # use Eml
   @doc """
-  Import macro's and alias core modules.
+  Import macro's from this module and alias `Eml.Element`.
 
-  Invoking it translates to:
-  ```
-  alias Eml.Element
-  import Eml, only: [
-    template: 2, template: 3,
-    templatep: 2, templatep: 3,
-    template_fn: 1, template_fn: 2,
-    fragment: 2, fragment: 3,
-    component: 2, component: 3,
-    decoder: 1, decoder: 2
-  ]
-  ```
+  Accepts the following options:
+
+  * `:compile` - Set dcompile options as a Keyword list for all templates,
+    components and fragments that are defined in the module where `use Eml` is
+    invoked. See `Eml.compile/2` for all available options.
+  * `:elements` - Which elements to import in the current scope. Accepts a
+    module, or list of modules and defaults to `Eml.HTML`. When you don't want
+    to import any elements, set to `nil` or `false`.
   """
   defmacro __using__(opts) do
     use_elements = if mods = Keyword.get(opts, :elements, @default_elements) do

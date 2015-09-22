@@ -170,7 +170,6 @@ defmodule Eml do
       unquote(def_call)(unquote(tag)(var!(assigns))) do
         _ = var!(assigns)
         var!(_funs) = unquote(funs)
-        var!(_noop) = &(&1)
         unquote(template)
       end
     end
@@ -197,7 +196,6 @@ defmodule Eml do
       fn var!(assigns) ->
         _ = var!(assigns)
         var!(_funs) = unquote(funs)
-        var!(_noop) = &(&1)
         unquote(template)
       end
     end
@@ -312,7 +310,6 @@ defmodule Eml do
     funs = unless fragment? do
       quote do
         var!(_funs) = unquote(funs)
-        var!(_noop) = &(&1)
       end
     end
     quote do

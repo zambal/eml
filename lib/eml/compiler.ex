@@ -268,7 +268,7 @@ defmodule Eml.Compiler do
   defp handle_template({ :@, meta, [{ name, _, atom }]}) when is_atom(name) and is_atom(atom) do
     line = Keyword.get(meta, :line, 0)
     Macro.escape(quote line: line do
-      Keyword.get(var!(_funs), unquote(name), var!(_noop)).(Dict.get(var!(assigns), unquote(name)))
+      Eml.Compiler.get_assign(unquote(name), var!(assigns), var!(_funs))
     end)
   end
   defp handle_template(ast) do
@@ -278,7 +278,7 @@ defmodule Eml.Compiler do
   defp handle_capture_args({ :@, meta, [{ name, _, atom }]}, regular_capure?) when is_atom(name) and is_atom(atom) do
     line = Keyword.get(meta, :line, 0)
     ast = quote line: line do
-      Keyword.get(var!(_funs), unquote(name), var!(_noop)).(Dict.get(var!(assigns), unquote(name)))
+      Eml.Compiler.get_assign(unquote(name), var!(assigns), var!(_funs))
     end
     { ast, regular_capure? }
   end
@@ -290,5 +290,14 @@ defmodule Eml.Compiler do
   end
   defp handle_capture_args(ast, regular_capure?) do
     { ast, regular_capure? }
+  end
+
+  @doc false
+  def get_assign(key, assigns, funs) do
+    x = Dict.get(assigns, key)
+    case Keyword.get(funs, key) do
+      nil -> x
+      fun -> fun.(x)
+    end
   end
 end

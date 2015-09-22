@@ -213,8 +213,11 @@ defmodule Eml.Compiler do
   defp concat(chunk, acc, opts) when is_binary(chunk) do
     acc <> maybe_escape(chunk, opts)
   end
-  defp concat(chunks, acc, opts) when is_list(chunks) do
-    Enum.reduce(chunks, acc, &concat(&1, &2, opts))
+  defp concat([chunk | rest], acc, opts) do
+    concat(rest, concat(chunk, acc, opts), opts)
+  end
+  defp concat([], acc, _opts) do
+    acc
   end
   defp concat(nil, acc, _opts) do
     acc

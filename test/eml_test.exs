@@ -116,9 +116,9 @@ defmodule EmlTest do
 
   test "Compiling" do
     e = quote do
-      div id: (@myid) do
-        div (@fruit1)
-        div (@fruit2)
+      div id: @myid do
+        div @fruit1
+        div @fruit2
       end
     end
 

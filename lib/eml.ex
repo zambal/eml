@@ -364,7 +364,7 @@ defmodule Eml do
     parser.parse(data, opts)
   end
   def parse(data, _) do
-    raise Eml.ParseError, type: :badarg, value: data
+    raise Eml.ParseError, message: "Bad argument: #{inspect data}"
   end
 
   @doc """
@@ -398,8 +398,12 @@ defmodule Eml do
     string
   end
   def compile(content, opts) do
-    { :safe, string } = Eml.Compiler.compile(content, opts)
-    string
+    case Eml.Compiler.compile(content, opts) do
+      { :safe, string } ->
+        string
+      _ ->
+        raise Eml.CompileError, message: "Bad argument: #{inspect content}"
+    end
   end
 
   @doc """

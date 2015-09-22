@@ -98,7 +98,7 @@ defmodule Eml.Compiler do
   end
 
   defp default_compile_node(node, _, _) do
-    raise Eml.CompileError, type: :bad_node_primitive, value: node
+    raise Eml.CompileError, message: "Bad node primitive: #{inspect node}"
   end
 
   # Attributes parsing
@@ -199,11 +199,10 @@ defmodule Eml.Compiler do
     try do
       { :safe, concat(buffer, "", opts) }
     catch
-      :throw, { :illegal_quoted, st } ->
-        reraise Eml.CompileError, [
-          type: :illegal_assign,
-          value: "It's only possible to pass assigns to templates or components when using &"
-        ], st
+      :throw, { :illegal_quoted, stacktrace } ->
+        reraise Eml.CompileError,
+        [message: "It's only possible to pass assigns to templates or components when using &"],
+        stacktrace
     end
   end
 
@@ -247,8 +246,7 @@ defmodule Eml.Compiler do
         ast
       { _, false } ->
         raise Eml.CompileError,
-        type: :illegal_call,
-        value: "It's not possible to use & inside fragments"
+        message: "It's not possible to use & inside fragments"
     end
   end
   defp handle_fragment(arg) do
@@ -259,8 +257,7 @@ defmodule Eml.Compiler do
     case Macro.prewalk(args, false, &handle_capture_args/2) do
       { _, true } ->
         raise Eml.CompileError,
-        type: :illegal_capture,
-        value: "It's not possible to use & for captures inside templates or components"
+        message: "It's not possible to use & for captures inside templates or components"
       { new_args, false } ->
         line = Keyword.get(meta, :line, 0)
         Macro.escape(quote line: line do

@@ -10,7 +10,7 @@ defmodule Eml.HTML.Parser do
       { content, [] } ->
         content
       { content, rest }->
-        raise Eml.ParseError, type: :unparsable, value: [parsed: content, rest: rest]
+        raise Eml.ParseError, message: "Unparsable content, parsed: #{inspect content}, rest: #{inspect rest}"
     end
   end
 
@@ -208,7 +208,7 @@ defmodule Eml.HTML.Parser do
              buf: buf,
              last_token: List.first(acc),
              next_char: String.first(rest)]
-    raise Eml.ParseError, type: :illegal_token, value: state
+    raise Eml.ParseError, message: "Illegal token, parse state is: #{inspect state}"
   end
 
   # Consumes character and put it in the buffer

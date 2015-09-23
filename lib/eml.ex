@@ -592,7 +592,9 @@ defmodule Eml do
                  end
                end
     compile_opts = Keyword.get(opts, :compile, [])
-    Module.put_attribute(__CALLER__.module, :eml_compile, compile_opts)
+    if mod = __CALLER__.module do
+      Module.put_attribute(mod, :eml_compile, compile_opts)
+    end
     quote do
       unquote(use_elements)
       alias Eml.Element

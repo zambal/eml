@@ -4,9 +4,12 @@
  * Enhancements
   * Replaced quoted expressions with assign handlers and runtime function calls
   * `use Eml` can now be used to set compile options and elements to import
+  * Added `Eml.collect/3`
+  * Added `Eml.Query`, a small dsl for transforming and collecting Eml nodes
 
  * Bug fixed
   * Fixed typo in Eml.Element.apply_template/1
+  * Suppress new underscore variable compile warning
 
  * Backwards incompatible changes
   * Quoted expressions are now invalid. Use assign handlers or runtime function calls instead.

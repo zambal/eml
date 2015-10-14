@@ -73,7 +73,7 @@ defmodule EmlTest do
 
     e = [h1([class: "title"], "Eml is HTML for developers")]
     assert e == Enum.filter(doc(), fn
-      %Element{tag: :h1} -> true
+      %M{tag: :h1} -> true
       _ -> false
     end)
   end
@@ -95,7 +95,7 @@ defmodule EmlTest do
     assert 42   == Eml.unpack e
     assert "42" == Eml.unpack ["42"]
     assert "42" == Eml.unpack "42"
-    assert "42" == Eml.unpack %Eml.Element{tag: :div, attrs: %{}, content: ["42"]}
+    assert "42" == Eml.unpack %M{tag: :div, attrs: %{}, content: ["42"]}
 
     e = [div(1), div(2)]
     assert [1, 2] == Eml.unpack e

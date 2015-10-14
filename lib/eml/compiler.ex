@@ -270,7 +270,7 @@ defmodule Eml.Compiler do
   defp handle_template({ :@, meta, [{ name, _, atom }]}) when is_atom(name) and is_atom(atom) do
     line = Keyword.get(meta, :line, 0)
     Macro.escape(quote line: line do
-      Eml.Compiler.get_assign(unquote(name), var!(assigns), var!(_funs))
+      Eml.Compiler.get_assign(unquote(name), var!(assigns), var!(funs))
     end)
   end
   defp handle_template(ast) do
@@ -280,7 +280,7 @@ defmodule Eml.Compiler do
   defp handle_capture_args({ :@, meta, [{ name, _, atom }]}, regular_capure?) when is_atom(name) and is_atom(atom) do
     line = Keyword.get(meta, :line, 0)
     ast = quote line: line do
-      Eml.Compiler.get_assign(unquote(name), var!(assigns), var!(_funs))
+      Eml.Compiler.get_assign(unquote(name), var!(assigns), var!(funs))
     end
     { ast, regular_capure? }
   end

@@ -41,7 +41,7 @@ defmodule Eml.Compiler do
   @spec precompile(Macro.Env.t, Dict.t) :: { :safe, String.t } | Macro.t
   def precompile(env \\ %Macro.Env{}, opts) do
     mod = env.module
-    mod_opts = if mod and Module.open?(mod),
+    mod_opts = if mod && Module.open?(mod),
                  do: Module.get_attribute(mod, :eml_compile) |> Macro.escape(),
                  else: []
     opts = Keyword.merge(mod_opts, opts)

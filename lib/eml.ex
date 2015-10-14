@@ -600,13 +600,12 @@ defmodule Eml do
     end
     quote do
       unquote(use_elements)
-      alias Eml.Element
       import Eml, only: [
         template: 2, template: 3,
         templatep: 2, templatep: 3,
         template_fn: 1, template_fn: 2,
-        fragment: 2,
-        component: 2, component: 3
+        component: 2, component: 3,
+        fragment: 2
       ]
     end
   end

@@ -254,4 +254,53 @@ defmodule EmlTest do
     assert :"some-long-element-name" == Eml.Element.Generator.do_casing(name, :lisp)
     assert :"SOME-LONG-ELEMENT-NAME" == Eml.Element.Generator.do_casing(name, :lisp_upcase)
   end
+
+  test "Eml transform queries" do
+    import Eml.Query
+
+    e = div do
+      span [class: "upcase-me"], "hallo "
+      span ["world", "?"]
+    end
+
+    transformed = Eml.transform(e, fn node ->
+      pipe node do
+        update content, with: &String.upcase/1, where: attrs.class == "upcase-me"
+        append "!", where: is_list(content) and "world" in content
+        drop where: node == "?"
+      end
+    end)
+
+    expected = div do
+      span [class: "upcase-me"], "HALLO "
+      span ["world", "!"]
+    end
+
+    assert transformed == expected
+  end
+
+  test "Eml collect queries" do
+    import Eml.Query
+
+    collected = Eml.collect(doc(), fn node, acc ->
+      pipe acc, inject: node do
+        put content, in: :title, where: attrs.class == "title" and tag == :title
+        insert attrs, in: :content_attrs, where: not is_nil(attrs.class) and String.contains?(attrs.class, "content")
+        put tag, in: :main_tag, with: &Atom.to_string/1, where: not is_nil(attrs.class) and String.contains?(attrs.class, "main")
+        append tag, in: :tags_with_id, where: not is_nil(attrs.id)
+      end
+    end)
+
+    expected = %{
+      title: "Eml is HTML for developers",
+      content_attrs: [
+        %{id: "main-side-bar", class: "content side-bar"},
+        %{class: "content", "data-custom": "some custom attribute"}
+      ],
+      main_tag: "body",
+      tags_with_id: [:div]
+    }
+
+    assert collected == expected
+  end
 end

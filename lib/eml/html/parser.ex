@@ -17,7 +17,8 @@ defmodule Eml.HTML.Parser do
   # Tokenize
 
   # Skip comments
-  defp tokenize("<!--" <> rest, buf, acc, _, opts) do
+  defp tokenize("<!--" <> rest, buf, acc, state, opts)
+  when state != :comment do
     tokenize(rest, buf, acc, :comment, opts)
   end
   defp tokenize("-->" <> rest, buf, acc, :comment, opts) do

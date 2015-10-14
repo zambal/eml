@@ -468,6 +468,39 @@ defmodule Eml do
   end
 
   @doc """
+  Recursively reduces a tree of nodes
+
+  ### Example
+
+      iex> tree = div do
+      ...>   span 1
+      ...>   span 2
+      ...> end
+      iex> list = [tree, tree]
+
+      iex> Eml.collect(list, [], fn node, acc ->
+      ...>   if is_integer(node) do
+      ...>     [node | acc]
+      ...>   else
+      ...>     acc
+      ...>   end
+      ...> end)
+      [2, 1, 2, 1]
+  """
+  @spec collect(t, term, (t, term -> term)) :: term
+  def collect(eml, acc \\ %{}, fun)
+  def collect(eml, acc, fun) when is_list(eml) do
+    Enum.reduce(eml, acc, &collect(&1, &2, fun))
+  end
+  def collect(%Element{} = eml, acc, fun) do
+    Enum.reduce(eml, acc, fun)
+  end
+  def collect(eml, acc, fun) do
+    fun.(eml, acc)
+  end
+
+
+  @doc """
   Match on element tag, attributes, or content
 
   Implemented as a macro.

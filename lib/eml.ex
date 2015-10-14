@@ -359,7 +359,7 @@ defmodule Eml do
       iex> Eml.parse("<body><h1 id='main-title'>The title</h1></body>")
       [#body<[#h1<%{id: "main-title"} "The title">]>]
   """
-  @spec parse(String.t, module) :: [t]
+  @spec parse(String.t, Keyword.t) :: [t]
   def parse(data, opts \\ [])
 
   def parse(data, opts) when is_binary(data) do

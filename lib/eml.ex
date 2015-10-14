@@ -169,7 +169,8 @@ defmodule Eml do
     quote do
       unquote(def_call)(unquote(tag)(var!(assigns))) do
         _ = var!(assigns)
-        var!(_funs) = unquote(funs)
+        var!(funs) = unquote(funs)
+        _ = var!(funs)
         unquote(template)
       end
     end
@@ -195,7 +196,8 @@ defmodule Eml do
     quote do
       fn var!(assigns) ->
         _ = var!(assigns)
-        var!(_funs) = unquote(funs)
+        var!(funs) = unquote(funs)
+        _ = var!(funs)
         unquote(template)
       end
     end
@@ -309,7 +311,8 @@ defmodule Eml do
     template_type = if fragment?, do: :fragment, else: :component
     funs = unless fragment? do
       quote do
-        var!(_funs) = unquote(funs)
+        var!(funs) = unquote(funs)
+        _ = var!(funs)
       end
     end
     quote do

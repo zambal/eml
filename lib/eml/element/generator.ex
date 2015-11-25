@@ -51,7 +51,7 @@ defmodule Eml.Element.Generator do
   @doc false
   defmacro def_element(tag, casing) do
     quote bind_quoted: [tag: tag, casing: casing] do
-      defmacro unquote(tag)(content_or_attrs, maybe_content \\ nil) do
+      defmacro unquote(tag)(content_or_attrs \\ nil, maybe_content \\ nil) do
         tag = unquote(tag) |> Eml.Element.Generator.do_casing(unquote(casing))
         in_match = Macro.Env.in_match?(__CALLER__)
         { attrs, content } = Eml.Element.Generator.extract_content(content_or_attrs, maybe_content, in_match)
@@ -135,6 +135,10 @@ defmodule Eml.Element.Generator do
   @doc false
   def extract_content(content_or_attrs, maybe_content, in_match) do
     init = fn
+      nil, nil, true ->
+        { (quote do: _), quote do: _ }
+      nil, nil, false ->
+        { (quote do: %{}), nil }
       nil, content, true ->
         { (quote do: _), content }
       nil, content, false ->

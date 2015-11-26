@@ -63,6 +63,18 @@ defmodule EmlTest do
     assert doc() == doc
   end
 
+  test "Element macro arguments" do
+    assert %M{tag: :div, attrs: %{}, content: nil} == div
+    assert %M{tag: :div, attrs: %{}, content: "content"} == div "content"
+    assert %M{tag: :div, attrs: %{class: "some-class"}, content: nil} == div class: "some-class"
+    assert %M{tag: :div, attrs: %{class: "some-class"}, content: "content"} == div [class: "some-class"], "content"
+    assert %M{tag: :div, attrs: %{class: "some-class"}, content: ["content"]} == div [class: "some-class"], do: "content"
+    assert %M{tag: :div, attrs: %{class: "some-class"}, content: ["content"]} == div [class: "some-class"], do: ["content"]
+    assert %M{tag: :div, attrs: %{class: "some-class"}, content: ["content"]} == (div class: "some-class" do
+                                                                                   "content"
+                                                                                 end)
+  end
+
   test "Element macro as match pattern" do
     span(%{id: id}, _) = %M{tag: :span, attrs: %{id: "test"}, content: []}
     assert "test" == id

@@ -350,8 +350,10 @@ defmodule Eml.Query do
   """
   defmacro pipe(x, opts \\ [], do: block) do
     { :__block__, _, calls } = block
-    if arg = Keyword.get(opts, :inject) do
-      calls = insert_arg(calls, arg)
+    calls = if arg = Keyword.get(opts, :inject) do
+      insert_arg(calls, arg)
+    else
+      calls
     end
     pipeline = build_pipeline(x, calls)
     quote do
@@ -402,8 +404,10 @@ defmodule Eml.Query do
     validate_var(var)
     key = fetch!(opts, :in)
     expr = Macro.prewalk(var, &handle_attrs/1)
-    if fun = Keyword.get(opts, :with) do
-      expr = quote do: unquote(fun).(unquote(expr))
+    expr = if fun = Keyword.get(opts, :with) do
+      quote do: unquote(fun).(unquote(expr))
+    else
+      expr
     end
     quote do
       acc = unquote(acc)

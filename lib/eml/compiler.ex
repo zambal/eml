@@ -240,8 +240,11 @@ defmodule Eml.Compiler do
     Macro.prewalk(quoted, handler)
   end
 
-  defp handle_fragment({ :@, _, [{ name, _, atom }] } = ast) when is_atom(name) and is_atom(atom) do
-    Macro.escape(EEx.Engine.handle_assign(ast))
+  defp handle_fragment({ :@, meta, [{ name, _, atom }] }) when is_atom(name) and is_atom(atom) do
+    line = meta[:line] || 0
+    Macro.escape(quote line: line do
+      Access.get(var!(assigns), unquote(name))
+    end)
   end
   defp handle_fragment({ :&, _meta, [{ _fun, _, args }] } = ast) do
     case Macro.prewalk(args, false, &handle_capture_args/2) do

@@ -64,7 +64,7 @@ defmodule EmlTest do
   end
 
   test "Element macro arguments" do
-    assert %M{tag: :div, attrs: %{}, content: nil} == div
+    assert %M{tag: :div, attrs: %{}, content: nil} == div()
     assert %M{tag: :div, attrs: %{}, content: "content"} == div "content"
     assert %M{tag: :div, attrs: %{class: "some-class"}, content: nil} == div class: "some-class"
     assert %M{tag: :div, attrs: %{class: "some-class"}, content: "content"} == div [class: "some-class"], "content"

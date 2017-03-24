@@ -7,12 +7,12 @@ defmodule Eml.Compiler do
 
   # Options helper
 
-  @default_opts %{escape: true,
-                  transform: nil,
-                  fragment: false,
-                  compiler: Eml.HTML.Compiler}
+  @default_opts [escape: true,
+                 transform: nil,
+                 fragment: false,
+                 compiler: Eml.HTML.Compiler]
 
-  defp new_opts(opts), do: Dict.merge(@default_opts, opts)
+  defp new_opts(opts), do: Keyword.merge(@default_opts, opts)
 
   # API
 
@@ -31,14 +31,14 @@ defmodule Eml.Compiler do
 
   """
 
-  @spec compile(Eml.t, Dict.t) :: { :safe, String.t } | Macro.t
-  def compile(eml, opts \\ %{}) do
+  @spec compile(Eml.t, Keyword.t) :: { :safe, String.t } | Macro.t
+  def compile(eml, opts \\ []) do
     opts = new_opts(opts)
-    opts = Dict.merge(opts.compiler.opts(), opts)
+    opts = Keyword.merge(opts[:compiler].opts(), opts)
     compile_node(eml, opts, []) |> to_result(opts)
   end
 
-  @spec precompile(Macro.Env.t, Dict.t) :: { :safe, String.t } | Macro.t
+  @spec precompile(Macro.Env.t, Keyword.t) :: { :safe, String.t } | Macro.t
   def precompile(env \\ %Macro.Env{}, opts) do
     mod = env.module
     mod_opts = if mod && Module.open?(mod),
@@ -71,7 +71,7 @@ defmodule Eml.Compiler do
     node = node
     |> maybe_transform(opts)
     |> Eml.Encoder.encode()
-    case opts.compiler.compile_node(node, opts, chunks) do
+    case opts[:compiler].compile_node(node, opts, chunks) do
       :unhandled ->
         default_compile_node(node, opts, chunks)
       s ->
@@ -116,7 +116,7 @@ defmodule Eml.Compiler do
 
   @spec compile_attr(atom, Eml.t, map, [chunk]) :: [chunk]
   def compile_attr(field, value, opts, chunks) do
-    opts.compiler.compile_attr(field, value, opts, chunks)
+    opts[:compiler].compile_attr(field, value, opts, chunks)
   end
 
   @spec compile_attr_value(Eml.t, map, [chunk]) :: [chunk]
@@ -128,7 +128,7 @@ defmodule Eml.Compiler do
 
   def compile_attr_value(value, opts, chunks) do
     value = Eml.Encoder.encode(value)
-    case opts.compiler.compile_attr_value(value, opts, chunks) do
+    case opts[:compiler].compile_attr_value(value, opts, chunks) do
       :unhandled ->
         default_compile_node(value, opts, chunks)
       s ->
@@ -173,7 +173,7 @@ defmodule Eml.Compiler do
   end
   defp to_result(chunks, opts) do
     template = :lists.reverse(chunks)
-    if opts.fragment do
+    if opts[:fragment] do
       template
     else
       quote do
@@ -182,11 +182,14 @@ defmodule Eml.Compiler do
     end
   end
 
-  def maybe_transform(node, %{transform: fun}) when is_function(fun), do: fun.(node)
-  def maybe_transform(node, _opts), do: node
+  def maybe_transform(node, opts) do
+    fun = opts[:transform]
+    if is_function(fun), do: fun.(node), else: node
+  end
 
-  def maybe_escape(node, %{escape: true}), do: escape(node, "")
-  def maybe_escape(node, _opts), do: node
+  def maybe_escape(node, opts) do
+    if opts[:escape], do: escape(node, ""), else: node
+  end
 
   def add_chunk(chunk, [{:safe, safe_chunk} | rest]) when is_binary(chunk) do
     [{:safe, safe_chunk <> chunk } | rest]
@@ -300,7 +303,7 @@ defmodule Eml.Compiler do
 
   @doc false
   def get_assign(key, assigns, funs) do
-    x = Dict.get(assigns, key)
+    x = if is_map(assigns), do: Map.get(assigns, key), else: Keyword.get(assigns, key)
     case Keyword.get(funs, key) do
       nil -> x
       fun -> fun.(x)

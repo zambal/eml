@@ -7,9 +7,9 @@ defmodule Eml.Mixfile do
       name: "Eml",
       source_url: "https://github.com/zambal/eml",
       homepage_url: "https://github.com/zambal/eml",
-      deps: deps,
-      description: description,
-      package: package ]
+      deps: deps(),
+      description: description(),
+      package: package() ]
   end
 
   def application do

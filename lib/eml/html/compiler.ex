@@ -6,7 +6,7 @@ defmodule Eml.HTML.Compiler do
   import Eml.Compiler, only: [add_chunk: 2]
 
   def opts do
-    %{quotes: :single}
+    [quotes: :single]
   end
 
   # Eml parsing
@@ -27,8 +27,8 @@ defmodule Eml.HTML.Compiler do
     :unhandled
   end
 
-  def compile_attr(field, value, %{quotes: q} = opts, chunks) do
-    quotes_char = quotes_char(q)
+  def compile_attr(field, value, opts, chunks) do
+    quotes_char = quotes_char(opts[:quotes])
     field = attr_field(field)
     chunks = add_chunk(" #{field}=#{quotes_char}", chunks)
     chunks = Compiler.compile_attr_value(value, opts, chunks)

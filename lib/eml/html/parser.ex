@@ -239,7 +239,7 @@ defmodule Eml.HTML.Parser do
   # Checks for empty content
   defp empty?({ :blank, _ }), do: true
   defp empty?({ :content, content }) do
-    String.strip(content) === ""
+    String.trim(content) === ""
   end
   defp empty?(_), do: false
 
@@ -414,9 +414,9 @@ defmodule Eml.HTML.Parser do
   end
   defp trim_whitespace("", acc, _, pos) do
     case pos do
-      :first -> String.lstrip(acc)
-      :last  -> String.rstrip(acc)
-      :only  -> String.strip(acc)
+      :first -> String.trim_leading(acc)
+      :last  -> String.trim_trailing(acc)
+      :only  -> String.trim(acc)
       :other -> acc
     end
   end

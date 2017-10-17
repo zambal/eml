@@ -38,7 +38,7 @@ defmodule Eml.HTML.Compiler do
   defp attr_field(field) do
     field = Atom.to_string(field)
     if String.starts_with?(field, "_"),
-      do: "data-" <> String.lstrip(field, ?_),
+      do: "data-" <> String.trim_leading(field, "_"),
     else: field
   end
 

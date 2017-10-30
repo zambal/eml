@@ -6,7 +6,7 @@
 
 ### What is it?
 Eml makes markup a first class citizen in Elixir. It provides a flexible and
-modular toolkit for generating, parsing and manipulating markup. It's main focus
+modular toolkit for generating, parsing and manipulating markup. Its main focus
 is html, but other markup languages could be implemented as well.
 
 To start off:
@@ -45,8 +45,8 @@ produces
 ```
 
 ### Why?
-Most templating libraries are build around the idea of interpreting strings that
-can contain embeded code. This code is mostly used for implementing view logic
+Most templating libraries are built around the idea of interpreting strings that
+can contain embedded code. This code is mostly used for implementing view logic
 in the template. You could say that these libraries are making code a first
 class citizen in template strings. As long as the view logic is simple this
 works pretty well, but with more complex views this can become quite messy. Eml
@@ -79,7 +79,7 @@ iex> use Eml.HTML
 nil
 ```
 
-By invoking `use Eml`, some macro's are imported into the current scope and core
+By invoking `use Eml`, some macros are imported into the current scope and core
 API modules are aliased. `use Eml.HTML` imports all generated html element
 macros from `Eml.HTML` into the current scope. The element macros just translate
 to a call to `%Eml.Element{...}`, a struct that is the actual representation of
@@ -88,9 +88,9 @@ elements, so they can even be used inside a match.
 iex> div 42
 #div<42>
 ```
-Here we created a `div` element with `42` as it contents.
+Here we created a `div` element with `42` as its contents.
 
-The element macro's in Eml try to be clever about the type of arguments that get
+The element macros in Eml try to be clever about the type of arguments that get
 passed. For example, if the first argument is a Keyword list, it will be
 interpreted as attributes, otherwise as content.
 ```elixir
@@ -157,7 +157,7 @@ not properly closed.
 #### Compiling and templates
 
 Compiling and templates can be used in situations where most content is static
-and performance is critical, since its contents gets precompiled during compiletime.
+and performance is critical, since its contents gets precompiled during compile time.
 
 Eml uses the assigns extension from `EEx` for parameterizing templates. See
 the `EEx` docs for more info about them. The function that the template macro
@@ -179,7 +179,7 @@ iex> MyTemplates.example text: "Example text"
 {:safe, "<div id='example'><span>Example text</span></div>"}
 ```
 
-Eml templates provides two ways of executing logic during runtime. By
+Eml templates provide two ways of executing logic during runtime. By
 providing assigns handlers to the optional `funs` dictionary, or by calling
 external functions during runtime with the `&` operator.
 
@@ -252,8 +252,8 @@ iex> MyTemplates3.from_file number: 42
 
 Eml also provides `component/3` and `fragment/3` macros for defining
 template elements. They behave as normal elements, but they
-aditionally contain a template function that gets called with the
-element's attributes and content as arguments during compiling.
+additionally contain a template function that gets called with the
+element's attributes and content as arguments during compilation.
 
 ```elixir
 iex> use Eml
@@ -287,7 +287,7 @@ iex> Eml.compile(el)
 Just like templates, its body gets precompiled and assigns, assign
 handlers and function calls prefixed with the `operator` are evaluated
 at runtime. All attributes of the element can be accessed as assigns
-and the element contents is accessable as the assign `@__CONTENT__`.
+and the element contents is accessible as the assign `@__CONTENT__`.
 
 The main difference between templates and components is their
 interface. You can use components like normal elements, even within a
@@ -454,7 +454,7 @@ written html.
 #### HTML Parser
 The main purpose of the html parser is to parse back generated html
 from Eml. It's a custom parser written in about 500 LOC,
-so don't expect it to successfully parse every html in the wild.
+so don't expect it to successfully parse every piece of html in the wild.
 
 Most notably, it doesn't understand attribute values without quotes and arbitrary
 elements without proper closing, like `<div>`. An element should always be written

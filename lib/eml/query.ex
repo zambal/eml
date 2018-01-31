@@ -168,7 +168,7 @@ defmodule Eml.Query do
 
   ## Chaining queries with `pipe`
 
- `Eml.Query` also provide the `pipe/3` macro that makes chains of queries more
+  `Eml.Query` also provide the `pipe/3` macro that makes chains of queries more
   readable. The first collect example could be rewritten with the `pipe` macro
   like this:
 

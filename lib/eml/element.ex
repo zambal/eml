@@ -90,6 +90,7 @@ end
 defimpl Enumerable, for: Eml.Element do
   def count(_el),           do: { :error, __MODULE__ }
   def member?(_el, _),      do: { :error, __MODULE__ }
+  def slice(_el),      do: { :error, __MODULE__ }
 
   def reduce(el, acc, fun) do
     case reduce_content([el], acc, fun) do

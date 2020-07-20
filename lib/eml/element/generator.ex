@@ -151,9 +151,9 @@ defmodule Eml.Element.Generator do
         { attrs, content }
     end
     case { content_or_attrs, maybe_content } do
-      { [{ :do, {:"__block__", _, content}}], _ }     -> init.(nil, content, in_match)
+      { [{ :do, {:__block__, _, content}}], _ }     -> init.(nil, content, in_match)
       { [{ :do, content}], _ }                        -> init.(nil, List.wrap(content), in_match)
-      { attrs, [{ :do, {:"__block__", _, content}}] } -> init.(attrs, content, in_match)
+      { attrs, [{ :do, {:__block__, _, content}}] } -> init.(attrs, content, in_match)
       { attrs, [{ :do, content}] }                    -> init.(attrs, List.wrap(content), in_match)
       { [{ _, _ } | _] = attrs, nil }                 -> init.(attrs, nil, in_match)
       { attrs, nil } when in_match                    -> init.(attrs, nil, in_match)

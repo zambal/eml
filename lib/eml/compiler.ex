@@ -205,10 +205,10 @@ defmodule Eml.Compiler do
     try do
       { :safe, concat(buffer, "", opts) }
     catch
-      :throw, { :illegal_quoted, stacktrace } ->
+      :throw, :illegal_quoted  ->
         reraise Eml.CompileError,
         [message: "It's only possible to pass assigns to templates or components when using &"],
-        stacktrace
+        System.stacktrace()
     end
   end
 
@@ -232,7 +232,7 @@ defmodule Eml.Compiler do
       { :safe, chunk } ->
         acc <> chunk
       _ ->
-        throw { :illegal_quoted, System.stacktrace() }
+        throw :illegal_quoted
     end
   end
 

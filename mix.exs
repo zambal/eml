@@ -25,7 +25,7 @@ defmodule Eml.Mixfile do
     """
     Eml makes markup a first class citizen in Elixir. It provides a
     flexible and modular toolkit for generating, parsing and
-    manipulating markup. It's main focus is html, but other markup
+    manipulating markup. Its main focus is html, but other markup
     languages could be implemented as well.
     """
   end

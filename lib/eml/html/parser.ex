@@ -5,7 +5,7 @@ defmodule Eml.HTML.Parser do
 
   @spec parse(binary, Keyword.t) :: [Eml.t]
   def parse(html, opts \\ []) do
-    res = tokenize(html, { :blank, [] }, [], :blank, opts) |> parse_content()
+    res = tokenize(html, { :blank, [] }, [], :blank, opts) |> parse_content(opts)
     case res do
       { content, [] } ->
         content
@@ -285,37 +285,37 @@ defmodule Eml.HTML.Parser do
 
   # Parse the genrated tokens
 
-  defp parse_content(tokens) do
-    parse_content(tokens, [])
+  defp parse_content(tokens, opts) do
+    parse_content(tokens, [], opts)
   end
 
-  defp parse_content([{ type, token } | ts], acc) do
+  defp parse_content([{ type, token } | ts], acc, opts) do
     case preparse(type, token) do
       :skip ->
-        parse_content(ts, acc)
+        parse_content(ts, acc, opts)
       { :tag, tag } ->
-        { element, tokens } = parse_element(ts, [tag: tag, attrs: [], content: []])
-        parse_content(tokens, [element | acc])
+        { element, tokens } = parse_element(ts, [tag: tag, attrs: [], content: []], opts)
+        parse_content(tokens, [element | acc], opts)
       { :content, content } ->
-        parse_content(ts, [content | acc])
+        parse_content(ts, [content | acc], opts)
       { :cdata, content } ->
         # tag cdata in order to skip whitespace trimming
-        parse_content(ts, [{ :cdata, content } | acc])
+        parse_content(ts, [{ :cdata, content } | acc], opts)
       :end_el ->
         { :lists.reverse(acc), ts }
     end
   end
-  defp parse_content([], acc) do
+  defp parse_content([], acc, _opts) do
     { :lists.reverse(acc), [] }
   end
 
-  defp parse_element([{ type, token } | ts], acc) do
+  defp parse_element([{ type, token } | ts], acc, opts) do
     case preparse(type, token) do
       :skip ->
-        parse_element(ts, acc)
+        parse_element(ts, acc, opts)
       { :attr_field, field } ->
         attrs = [{ field, "" } | acc[:attrs]]
-        parse_element(ts, Keyword.put(acc, :attrs, attrs))
+        parse_element(ts, Keyword.put(acc, :attrs, attrs), opts)
       { :attr_value, value } ->
         [{ field, current } | rest] = acc[:attrs]
         attrs = if is_binary(current) && is_binary(value) do
@@ -323,21 +323,21 @@ defmodule Eml.HTML.Parser do
                 else
                   [{ field, List.wrap(current) ++ [value] } | rest]
                 end
-        parse_element(ts, Keyword.put(acc, :attrs, attrs))
+        parse_element(ts, Keyword.put(acc, :attrs, attrs), opts)
       :start_content ->
-        { content, tokens } = parse_content(ts, [])
-        { make_element(Keyword.put(acc, :content, content)), tokens }
+        { content, tokens } = parse_content(ts, [], opts)
+        { make_element(Keyword.put(acc, :content, content), opts), tokens }
       :end_el ->
-        { make_element(acc), ts }
+        { make_element(acc, opts), ts }
     end
   end
-  defp parse_element([], acc) do
-    { make_element(acc), [] }
+  defp parse_element([], acc, opts) do
+    { make_element(acc, opts), [] }
   end
 
-  defp make_element(acc) do
+  defp make_element(acc, opts) do
     attrs = acc[:attrs]
-    %Eml.Element{tag: acc[:tag], attrs: Enum.into(attrs, %{}), content: finalize_content(acc[:content], acc[:tag])}
+    %Eml.Element{tag: acc[:tag], attrs: Enum.into(attrs, %{}), content: finalize_content(acc[:content], acc[:tag], opts)}
   end
 
   defp preparse(:blank, _),            do: :skip
@@ -363,7 +363,7 @@ defmodule Eml.HTML.Parser do
 
   defp preparse(:cdata, token), do: { :cdata, token }
 
-  defp finalize_content(content, tag)
+  defp finalize_content(content, tag, _opts)
   when tag in [:textarea, :pre] do
     case content do
       [content] when is_binary(content) ->
@@ -374,15 +374,22 @@ defmodule Eml.HTML.Parser do
         content
     end
   end
-  defp finalize_content(content, _) do
+  defp finalize_content(content, _, opts) do
+    app_default = Application.get_env(:eml, :trim_whitespace, true)
+    trim_whitespace = Keyword.get(opts, :trim_whitespace, app_default)
+
     case content do
       [content] when is_binary(content) ->
-        trim_whitespace(content, :only)
+        if trim_whitespace, do: trim_whitespace(content, :only), else: content
       [] ->
         nil
       [first | rest] ->
-        first = trim_whitespace(first, :first)
-        [first | trim_whitespace_loop(rest, [])]
+        if trim_whitespace do
+          first = trim_whitespace(first, :first)
+          [first | trim_whitespace_loop(rest, [])]
+        else 
+          [first | rest]
+        end
     end
   end
 

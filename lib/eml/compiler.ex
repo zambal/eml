@@ -208,7 +208,7 @@ defmodule Eml.Compiler do
       :throw, :illegal_quoted  ->
         reraise Eml.CompileError,
         [message: "It's only possible to pass assigns to templates or components when using &"],
-        System.stacktrace()
+        __STACKTRACE__
     end
   end
 

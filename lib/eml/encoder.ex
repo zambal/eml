@@ -69,6 +69,18 @@ defimpl Eml.Encoder, for: Tuple do
       raise Protocol.UndefinedError, protocol: Eml.Encoder, value: { :safe, data }
     end
   end
+
+  # for our use case we allow cdata to be included in the written HTML again, 
+  # since we only use Eml for parsing our own generated code, which must be 
+  # safe by other means already
+  def encode({ :cdata, data }) do
+    if is_binary(data) do
+      { :safe, data }
+    else
+      raise Protocol.UndefinedError, protocol: Eml.Encoder, value: { :safe, data }
+    end
+  end
+
   def encode(data) do
     if Macro.validate(data) == :ok do
       data
